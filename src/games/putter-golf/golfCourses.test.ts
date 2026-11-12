@@ -6,9 +6,9 @@ import { BALL_RADIUS, rollDistance, rollingDecel, SWITCH } from './golfPhysics'
 const HOLES = GOLF_COURSES.flatMap(course => course.holes)
 
 describe('パターゴルフのコース定義', () => {
-  test('コースの並びは COURSE_IDS のとおりで、どのコースも4ホール', () => {
+  test('コースの並びは COURSE_IDS のとおりで、どのコースも4ホール以上', () => {
     expect(GOLF_COURSES.map(course => course.id)).toEqual([...COURSE_IDS])
-    for (const course of GOLF_COURSES) expect(course.holes.length, course.id).toBe(4)
+    for (const course of GOLF_COURSES) expect(course.holes.length, course.id).toBeGreaterThanOrEqual(4)
   })
 
   test('コースの名前・アイコン・色は ほかのコースと重ならない', () => {

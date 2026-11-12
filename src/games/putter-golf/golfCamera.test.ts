@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { aimPose, canSee, followPose, lerpPose, lookHeading, lookTarget, MAX_LOOK_GAP, MAX_VIEW_OFFSET, overviewPose, projectPoint, viewHeading } from './golfCamera'
+import { aimPose, angleHeading, ballPose, cupPose, followPose, headingAngle, lerpPose, MAX_VIEW_OFFSET, overviewPose, projectPoint, turnToward, viewHeading } from './golfCamera'
 import { GOLF_COURSES } from './golfCourses'
 import { buildHoleGeometry } from './golfGeometry'
 
@@ -53,7 +53,7 @@ describe('パターゴルフのカメラ', () => {
     expect(lerpPose(a, b, 4)).toEqual(b)
   })
 
-  test('ねらうカメラは カップの ほうを 見て、ねらいが 大きく それたときだけ ねらいへ よる', () => {
+  test('ねらうカメラは 見る 点の ほうを 見て、ねらいが 大きく それたときだけ ねらいへ よる', () => {
     const ball = { x: 0, z: 0 }
     const cup = { x: 0, z: -10 }
     // すこし ずらした ねらいでは、カップの ほうを 見たまま。
@@ -69,63 +69,49 @@ describe('パターゴルフのカメラ', () => {
     }
   })
 
-  const holeById = (id: string) => GOLF_COURSES.flatMap(course => course.holes).find(hole => hole.id === id)!
-  const onFloor = (geometry: ReturnType<typeof buildHoleGeometry>, point: { x: number; z: number }) => ({ x: point.x, y: geometry.heightAt(point.x, point.z)! + 0.15, z: point.z })
-
-  test('まっすぐ 見とおせる ホールでは、カップの ほうを 見る', () => {
-    const hole = GOLF_COURSES[0]!.holes[0]!
-    const geometry = buildHoleGeometry(hole)
-    expect(lookTarget(onFloor(geometry, hole.tee), hole.cup, hole.route, geometry)).toEqual(hole.cup)
+  test('ねらう・おいかけるの あいだは、ボールの うしろに いたまま すこしずつ さがる', () => {
+    const ball = { x: 2, y: 0.15, z: -3 }
+    const heading = { x: 0.6, z: -0.8 }
+    expect(ballPose(ball, heading, 1, 0)).toEqual(aimPose(ball, heading, 1))
+    expect(ballPose(ball, heading, 1, 1)).toEqual(followPose(ball, heading, 1))
+    const middle = ballPose(ball, heading, 1, 0.5)
+    const back = { x: middle.position.x - ball.x, z: middle.position.z - ball.z }
+    // ボールの まうしろ（むきと 反対の 線の 上）に いる。
+    expect(back.x * heading.z - back.z * heading.x).toBeCloseTo(0, 6)
+    expect(back.x * heading.x + back.z * heading.z).toBeLessThan(0)
+    expect(middle.position.y).toBeGreaterThan(aimPose(ball, heading, 1).position.y)
+    expect(middle.position.y).toBeLessThan(followPose(ball, heading, 1).position.y)
   })
 
-  test.each(['candy-3', 'canyon-2'])('コの字の %s では、かべや たにを こえず みちに そって 先を 見る', id => {
-    const hole = holeById(id)
-    const geometry = buildHoleGeometry(hole)
-    const tee = onFloor(geometry, hole.tee)
-    expect(canSee(tee, hole.cup, geometry)).toBe(false)
-    const look = lookTarget(tee, hole.cup, hole.route, geometry)
-    // ティーからは まっすぐ 下の みちの ほう（-z）を 見る。
-    const d = { x: look.x - tee.x, z: look.z - tee.z }
-    expect(d.z / Math.hypot(d.x, d.z)).toBeLessThan(-0.95)
-    // みちの とちゅうでも、見る 点までは まっすぐ 見とおせる。
-    for (let i = 0; i < hole.route.length - 1; i++) {
-      const a = hole.route[i]!
-      const b = hole.route[i + 1]!
-      for (const t of [0.25, 0.5, 0.75]) {
-        const at = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }
-        if (geometry.heightAt(at.x, at.z) === null) continue
-        const ball = onFloor(geometry, at)
-        const point = lookTarget(ball, hole.cup, hole.route, geometry)
-        expect(canSee(ball, point, geometry)).toBe(true)
-        // みちの すすむ 向きと ぎゃくは 見ない。
-        const toward = { x: point.x - ball.x, z: point.z - ball.z }
-        expect(toward.x * (b.x - a.x) + toward.z * (b.z - a.z)).toBeGreaterThanOrEqual(-1e-6)
-      }
+  test('カメラの 向きは、近い ほうの まわり方で すこしずつ よせる', () => {
+    for (const heading of [{ x: 0, z: -1 }, { x: 1, z: 0 }, { x: -0.6, z: 0.8 }]) {
+      const back = angleHeading(headingAngle(heading))
+      expect(back.x).toBeCloseTo(heading.x, 6)
+      expect(back.z).toBeCloseTo(heading.z, 6)
     }
+    // 170° と -170° の あいだは、0° を 通らず 180° を またいで 20° だけ まわる。
+    const from = (170 * Math.PI) / 180
+    const to = (-170 * Math.PI) / 180
+    expect(turnToward(from, to, 0.5)).toBeCloseTo((180 * Math.PI) / 180, 6)
+    expect(Math.sin(turnToward(from, to, 1))).toBeCloseTo(Math.sin(to), 6)
+    expect(turnToward(from, to, 0)).toBe(from)
+    // どれだけ 大きな 量を わたしても、行きすぎない。
+    expect(Math.cos(turnToward(0.3, 1.2, 9))).toBeCloseTo(Math.cos(1.2), 6)
   })
 
-  test('すみを まがったあとは、カップの ほうへ むきなおす', () => {
-    const hole = holeById('candy-3')
-    const geometry = buildHoleGeometry(hole)
-    const ball = onFloor(geometry, { x: 2.55, z: -2.0 })
-    expect(lookTarget(ball, hole.cup, hole.route, geometry)).toEqual(hole.cup)
-  })
-
-  test('おすすめの うつ むきが カップの ほうから 大きく ずれるときは、おすすめの むきを 見る', () => {
-    const ball = { x: 0, z: 0 }
-    const cup = { x: 0, z: -6 }
-    // すこしの ずれなら カップの ほう。
-    const near = lookHeading(ball, cup, { x: Math.sin(MAX_LOOK_GAP * 0.8), z: -Math.cos(MAX_LOOK_GAP * 0.8) })
-    expect(near.x).toBeCloseTo(0, 6)
-    expect(near.z).toBeCloseTo(-1, 6)
-    // バンパーを よけて よこへ うつときは、よこを 見る（カップと うつ むきの あいだの なにもない ほうを 見ない）。
-    const side = lookHeading(ball, cup, { x: 1, z: 0.2 })
-    expect(side.x).toBeCloseTo(1 / Math.hypot(1, 0.2), 6)
-    // おすすめが まだ ないときは カップの ほう。
-    expect(lookHeading(ball, cup, null)).toEqual({ x: 0, z: -1 })
-    // そのまま おすすめの むきへ ねらえば、カメラは ねらいの まっすぐ うしろ。
-    const view = viewHeading(ball, { x: ball.x + side.x, z: ball.z + side.z }, { x: 1, z: 0.2 })
-    expect(view.x).toBeCloseTo(side.x, 6)
-    expect(view.z).toBeCloseTo(side.z, 6)
+  test('カップインの カメラは、カップを まん中に 見ながら まわりを まわる', () => {
+    const cup = { x: 1, y: 0.2, z: -4 }
+    for (const angle of [0, 1.3, 3.1, -2]) {
+      const pose = cupPose(cup, angle, 0.7)
+      const view = projectPoint(pose, cup, 0.7)!
+      expect(Math.abs(view.x)).toBeLessThan(0.01)
+      expect(Math.abs(view.y)).toBeLessThan(0.4)
+      expect(pose.position.y).toBeGreaterThan(cup.y + 1.5)
+    }
+    const a = cupPose(cup, 0, 1).position
+    const b = cupPose(cup, Math.PI, 1).position
+    expect(Math.hypot(a.x - cup.x, a.z - cup.z)).toBeCloseTo(Math.hypot(b.x - cup.x, b.z - cup.z), 6)
+    expect(a.z).toBeLessThan(cup.z)
+    expect(b.z).toBeGreaterThan(cup.z)
   })
 })
