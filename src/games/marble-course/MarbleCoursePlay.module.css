@@ -58,6 +58,7 @@
 @media (max-height: 740px) and (orientation: portrait) {
   .page { gap: 5px; }
   .header { flex-basis: 44px; }
+  .caption { top: 4px; left: 8px; padding: 5px 8px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .workbench { gap: 5px; max-height: 55dvh; overflow-y: auto; padding-bottom: 5px; }
   .palette svg { width: 38px; height: 38px; }
   .roll { min-height: 48px; }
