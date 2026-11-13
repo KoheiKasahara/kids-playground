@@ -125,3 +125,17 @@ it('uses keyboard tabs, announces a gadget hint once, and keeps additions undoab
   click('もどす')
   expect(engine.options!.course.startId).toBe(startId)
 })
+
+
+it('loads ready-made courses, allows empty construction and restores edits with undo', () => {
+  show()
+  const select = screen.getByRole('combobox', { name: 'あそぶ コース' })
+  fireEvent.change(select, { target: { value: 'adventure' } })
+  expect(engine.options!.course.parts.map(part => part.kind)).toEqual(['slope', 'spinner', 'funnel', 'wave', 'goal'])
+  fireEvent.change(select, { target: { value: 'empty' } })
+  expect(engine.options!.course.parts).toHaveLength(0)
+  expect(screen.getByRole('button', { name: 'ビーだま ころがす！' })).toBeDisabled()
+  click('もどす')
+  expect(engine.options!.course.parts).toHaveLength(5)
+  expect(select).toHaveValue('custom')
+})

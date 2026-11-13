@@ -6,12 +6,14 @@ import { appendPart, BOARD_LIMIT, GADGET_HINTS, hasConnectedInput, initialCourse
 import type { MarbleEvent, RunStatus } from './marbleWorld'
 import { useMarbleEngine } from './useMarbleEngine'
 import PartIcon from './PartIcon'
+import { COURSE_PRESETS, presetCourse } from './coursePresets'
 import { playMarbleEraseSound, playMarbleEventSound, playMarbleGoalSound, playMarbleMissSound, playMarblePlaceSound, playMarbleRollSound, playMarbleRotateSound, playMarbleSnapSound } from './sounds'
 import styles from './MarbleCoursePlay.module.css'
 
 export default function MarbleCoursePlay() {
   useGameIntroPlaying(true)
   const [course, setCourse] = useState(initialCourse)
+  const [preset, setPreset] = useState('custom')
   const [history, setHistory] = useState<Course[]>([])
   const [selectedId, setSelectedId] = useState<string | null>('part-0')
   const [phase, setPhase] = useState<RunStatus>('ready')
@@ -34,6 +36,7 @@ export default function MarbleCoursePlay() {
   const manualStop = useRef(false)
   const commit = useCallback((next: Course) => {
     if (next === course) return
+    setPreset('custom')
     setHistory(previous => [...previous.slice(-49), course])
     setCourse(next)
     setPhase('ready')
@@ -90,6 +93,7 @@ export default function MarbleCoursePlay() {
     if (!previous) return
     stop()
     sfx(playMarbleEraseSound)
+    setPreset('custom')
     setCourse(previous)
     setHistory(items => items.slice(0, -1))
     setSelectedId(previous.parts.at(-1)?.id ?? null)
@@ -150,7 +154,7 @@ export default function MarbleCoursePlay() {
       }
     }}>
       <div className={styles.caption} role="status">{rolling ? '● ころころ…' : phase === 'goal' ? '⭐ ゴール！ やったね！' : hint}</div>
-      {course.parts.length === 0 && <div className={styles.empty}><span aria-hidden="true">↓</span>したの パーツを<br />ここへ はこんでね</div>}
+      {course.parts.length === 0 && <div className={styles.empty}><span aria-hidden="true">↓</span>したの ボタンで<br />みちが つながるよ</div>}
       <div className={styles.camera} aria-label="カメラ">
         <button type="button" aria-label="ちかづく" onClick={() => zoom(0.2)}>＋</button>
         <button type="button" aria-label="はなれる" onClick={() => zoom(-0.2)}>−</button>
@@ -165,6 +169,22 @@ export default function MarbleCoursePlay() {
       <div className={styles.sceneFooter}><span>🚩 ここから スタート</span><span>{course.parts.length} / {MAX_PARTS}</span></div>
     </div>
     <section className={styles.workbench} aria-label="コースを つくる">
+      <label className={styles.courses}>あそぶ コース
+        <select aria-label="あそぶ コース" value={preset} disabled={locked} onChange={event => {
+          const id = event.target.value
+          const next = presetCourse(id)
+          stop()
+          commit(next)
+          setSelectedId(next.parts.at(-1)?.id ?? null)
+          setPreset(id)
+          setHint(id === 'empty' ? 'ボタンを おして つなごう！' : 'できあがり！ ころがして みよう！')
+          overview()
+        }}>
+          <option value="custom" disabled>じぶんの コース</option>
+          <option value="empty">からっぽから つくる</option>
+          {COURSE_PRESETS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
+      </label>
       <div className={styles.tools}>
         <button type="button" disabled={locked || !selected} onClick={rotate}><span aria-hidden="true">↻</span>まわす</button>
         <button type="button" disabled={locked || !selected || selected.kind === 'goal'} aria-pressed={Boolean(selected && selectedId === course.startId)} onClick={() => { commit({ ...course, startId: selectedId }); setHint('ここから ころがすよ！') }}><span aria-hidden="true">🚩</span>スタート</button>
