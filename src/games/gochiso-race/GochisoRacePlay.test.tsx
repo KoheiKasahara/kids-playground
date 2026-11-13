@@ -6,7 +6,7 @@ import App from '../../app/App'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import GochisoRacePlay from './GochisoRacePlay'
 import { READY_TIME } from './race'
-import { playBump, playJump, playLose, playReady, playSlide, playWin, startBgm } from './sounds'
+import { playBoost, playBump, playJump, playLose, playReady, playSlide, playWin, startBgm } from './sounds'
 
 vi.mock('./sounds', () => ({
   playTap: vi.fn(), playReady: vi.fn(), playJump: vi.fn(), playSlide: vi.fn(), playSpring: vi.fn(), playBoost: vi.fn(),
@@ -78,7 +78,7 @@ describe('gochiso-race play', () => {
     render(<MemoryRouter><GochisoRacePlay /></MemoryRouter>)
     expect(screen.getByRole('heading', { level: 1, name: 'ぱくぱく ごちそうレース' })).toBeInTheDocument()
     const animals = within(screen.getByRole('list', { name: 'どうぶつを えらぶ' })).getAllByRole('button')
-    expect(animals.map(button => button.textContent)).toEqual(['いぬ', 'ねこ', 'うさぎ', 'パンダ', 'ペンギン', 'ライオン', 'コアラ', 'ハムスター', 'キリン', 'ぞう', 'くま', 'きつね'])
+    expect(animals.map(button => button.getAttribute('aria-label'))).toEqual(['いぬ', 'ねこ', 'うさぎ', 'パンダ', 'ペンギン', 'ライオン', 'コアラ', 'ハムスター', 'キリン', 'ぞう', 'くま', 'きつね'])
 
     fireEvent.click(screen.getByRole('button', { name: 'パンダ' }))
     expect(store.get('gochiso-race-animal-v1')).toBe('panda')
@@ -220,4 +220,22 @@ describe('gochiso-race play', () => {
     await user.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
   })
+})
+
+test.each(['pointer', 'keyboard', 'accessible click'])('barrier via %s shows its cooldown and does not jump', input => {
+  startRace(/^1 れんしゅう/)
+  advance(seconds(READY_TIME) + 4)
+  const button = screen.getByRole('button', { name: /^バリア/ })
+  expect(button).toHaveTextContent('つかえる！')
+  if (input === 'pointer') fireEvent.pointerDown(button, { button: 0 })
+  else if (input === 'keyboard') fireEvent.keyDown(button, { key: 'Enter' })
+  else fireEvent.click(button, { detail: 0 })
+  advance(1)
+  expect(playBoost).toHaveBeenCalledTimes(1)
+  expect(playJump).not.toHaveBeenCalled()
+  expect(button).toHaveTextContent('まもってる！')
+  fireEvent.keyDown(window, { key: 'd' })
+  advance(seconds(1.6))
+  expect(playBoost).toHaveBeenCalledTimes(1)
+  expect(button).toHaveTextContent(/あと .*びょう/)
 })

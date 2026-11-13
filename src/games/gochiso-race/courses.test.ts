@@ -15,8 +15,8 @@ function onOneSpan(course: Course, pad: Pad): boolean {
 }
 
 describe('gochiso-race courses', () => {
-  test('three courses get harder in order', () => {
-    expect(COURSES.map(c => c.id)).toEqual(['meadow', 'sweets', 'starry'])
+  test('five courses get harder in order', () => {
+    expect(COURSES.map(c => c.id)).toEqual(['meadow', 'sweets', 'starry', 'seaside', 'snow'])
     expect(new Set(COURSES.map(c => c.name)).size).toBe(COURSES.length)
     const speeds = COURSES.map(c => c.rival.speed)
     expect([...speeds].sort()).toEqual(speeds)

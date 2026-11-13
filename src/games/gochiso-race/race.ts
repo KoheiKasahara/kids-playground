@@ -1,8 +1,8 @@
-import type { AnimalId } from './animals'
+import { traitOf, type AnimalId } from './animals'
 import type { Bee, Block, Course, Pad, RivalStyle, Span } from './courses'
 import { FOODS, type FoodKind } from './foods'
 
-// ごちそうレースの すすみかた。かってに はしる 2ひきが、ジャンプ と スライディング だけで コースを すすみ、
+// ごちそうレースの すすみかた。かってに はしる 2ひきが、ジャンプ・スライディング・バリアで コースを すすみ、
 // とちゅうの ごちそうを たべながら ゴールを めざす。絵も 音も もたない ので canvas なしで テストできる。
 // きょりは コースと おなじ たんい、じかんは びょう、y は うえむき。
 
@@ -19,6 +19,8 @@ export const SPRING_SPEED = 960
 /** かそくそうちの はやさの かけざん と つづく じかん[s]。 */
 export const BOOST_MUL = 1.6
 export const BOOST_TIME = 1.4
+export const GUARD_TIME = 1.2
+export const GUARD_COOLDOWN = 5
 /** スライディングの じかん[s]（トンネルの なかでは でるまで つづく）。 */
 export const SLIDE_TIME = .7
 const ACCEL = 720
@@ -81,6 +83,8 @@ export type Runner = {
   boost: number
   /** いま のっている かそくそうち（おなじ いたで なんども ならさない）。 */
   onBoost: boolean
+  guard: number
+  guardCooldown: number
   stun: number
   hurt: Hurt | null
   invuln: number
@@ -108,6 +112,7 @@ export type RaceEvent =
   | { type: 'go' }
   | { type: 'jump'; who: Who; air: boolean }
   | { type: 'slide'; who: Who }
+  | { type: 'guard'; who: Who }
   | { type: 'spring'; who: Who }
   | { type: 'boost'; who: Who }
   | { type: 'land'; who: Who }
@@ -179,7 +184,7 @@ export function seededRandom(seed: number): () => number {
 function createRunner(who: Who, animal: AnimalId, course: Course, speed: number, skips: readonly boolean[] | null): Runner {
   return {
     who, animal, x: course.start, y: 0, vx: 0, vy: 0, onGround: true, air: 0, airJumps: 1, jumpBuffer: 0,
-    slideBuffer: 0, slide: 0, boost: 0, onBoost: false,
+    slideBuffer: 0, slide: 0, boost: 0, onBoost: false, guard: 0, guardCooldown: 0,
     stun: 0, hurt: null, invuln: 0, fall: 0, waiting: false, stride: 0, speed,
     food: 0, eaten: 0, finishedAt: null, place: null, skips,
   }
@@ -247,6 +252,18 @@ export function pressSlide(race: Race): void {
   race.player.slideBuffer = SLIDE_BUFFER
 }
 
+/** はちを ふせぐ。あな と トンネルは ふせげない。 */
+function activateGuard(race: Race, r: Runner): void {
+  if (race.phase !== 'run' || r.guardCooldown > 0 || r.fall > 0 || r.stun > 0 || r.finishedAt !== null) return
+  r.guard = GUARD_TIME * traitOf(r.animal).guard
+  r.guardCooldown = GUARD_COOLDOWN
+  emit(race, { type: 'guard', who: r.who })
+}
+
+export function pressGuard(race: Race): void {
+  activateGuard(race, race.player)
+}
+
 /** いまの せの たかさ。 */
 export function heightOf(r: Runner): number {
   return r.slide > 0 ? SLIDE_H : RUNNER_H
@@ -301,7 +318,7 @@ function respawn(race: Race, r: Runner) {
   const next = spans.find(span => span.x0 > r.x - RUNNER_W && span.x1 - span.x0 > RUNNER_W + 24) ?? spans[spans.length - 1]
   r.x = Math.max(next.x0 + 12, Math.min(r.x, next.x1 - RUNNER_W - 12))
   r.y = next.top
-  r.vx = RUN_SPEED * r.speed * .5
+  r.vx = RUN_SPEED * r.speed * traitOf(r.animal).speed * .5
   r.vy = 0
   r.onGround = true
   r.air = 0
@@ -317,7 +334,7 @@ function respawn(race: Race, r: Runner) {
 }
 
 function hit(race: Race, r: Runner, cause: Hurt) {
-  r.stun = cause === 'bonk' ? BONK_TIME : STUN_TIME
+  r.stun = (cause === 'bonk' ? BONK_TIME : STUN_TIME) * traitOf(r.animal).recovery
   r.hurt = cause
   r.invuln = INVULN_TIME
   r.jumpBuffer = 0
@@ -328,6 +345,8 @@ function hit(race: Race, r: Runner, cause: Hurt) {
 
 function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
   const { course } = race
+  r.guard = Math.max(0, r.guard - dt)
+  r.guardCooldown = Math.max(0, r.guardCooldown - dt)
   if (r.fall > 0) {
     r.fall -= dt
     r.vy -= GRAVITY * dt
@@ -344,7 +363,7 @@ function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
   const stunned = r.stun > 0
   r.waiting = wait && !finished && !stunned
   r.boost = Math.max(0, r.boost - dt)
-  const target = finished || stunned || r.waiting ? 0 : RUN_SPEED * r.speed * (r.boost > 0 ? BOOST_MUL : 1)
+  const target = finished || stunned || r.waiting ? 0 : RUN_SPEED * r.speed * traitOf(r.animal).speed * (r.boost > 0 ? BOOST_MUL : 1)
   if (r.vx < target) r.vx = Math.min(target, r.vx + ACCEL * dt)
   else {
     const decel = finished ? AFTER_GOAL_DECEL : stunned || r.waiting ? STOP_DECEL : EASE_DECEL
@@ -370,14 +389,14 @@ function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
   if (r.jumpBuffer > 0 && !stunned && !finished) {
     if (r.slide > 0 && roofOver(course, r.x, r.y)) r.jumpBuffer = 0
     else if (r.onGround || r.air < COYOTE) {
-      r.vy = JUMP_SPEED
+      r.vy = JUMP_SPEED * traitOf(r.animal).jump
       r.onGround = false
       r.air = COYOTE
       r.jumpBuffer = 0
       r.slide = 0
       emit(race, { type: 'jump', who: r.who, air: false })
     } else if (r.airJumps > 0) {
-      r.vy = AIR_JUMP_SPEED
+      r.vy = AIR_JUMP_SPEED * traitOf(r.animal).jump
       r.airJumps--
       r.jumpBuffer = 0
       emit(race, { type: 'jump', who: r.who, air: true })
@@ -459,13 +478,13 @@ function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
     if (onBoost) {
       if (!r.onBoost) emit(race, { type: 'boost', who: r.who })
       r.boost = BOOST_TIME
-      r.vx = Math.max(r.vx, RUN_SPEED * r.speed * BOOST_MUL)
+      r.vx = Math.max(r.vx, RUN_SPEED * r.speed * traitOf(r.animal).speed * BOOST_MUL)
     }
     r.onBoost = onBoost
   } else if (!r.onGround) r.onBoost = false
 
   // はち。
-  if (r.invuln <= 0 && race.phase === 'run') {
+  if (r.invuln <= 0 && r.guard <= 0 && race.phase === 'run') {
     const hh = heightOf(r)
     for (const bee of course.bees) {
       if (Math.abs(bee.x - (r.x + RUNNER_W / 2)) > RUNNER_W + BEE_R) continue
@@ -500,6 +519,7 @@ function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
   }
 
   if (r.y < FALL_Y && r.fall <= 0) {
+    r.guard = 0
     r.fall = FALL_TIME
     r.stun = 0
     r.hurt = null
@@ -510,6 +530,7 @@ function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
   }
 
   if (race.phase === 'run' && r.finishedAt === null && r.x + RUNNER_W / 2 >= course.goal) {
+    r.guard = 0
     r.finishedAt = race.t
     const other = r.who === 'player' ? race.rival : race.player
     r.place = other.finishedAt === null ? 1 : 2
@@ -704,7 +725,7 @@ export function aiControl(race: Race, r: Runner, ai: Ai): boolean {
   if (race.clock < ai.waitUntil) return true
   const { course } = race
   const front = r.x + RUNNER_W
-  const vmax = RUN_SPEED * r.speed * (r.boost > 0 ? BOOST_MUL : 1)
+  const vmax = RUN_SPEED * r.speed * traitOf(r.animal).speed * (r.boost > 0 ? BOOST_MUL : 1)
   if (!r.onGround) {
     if (r.airJumps > 0 && r.vy < 140 && predictLanding(course, r) !== 'ok') r.jumpBuffer = JUMP_BUFFER
     return false
@@ -727,6 +748,7 @@ export function aiControl(race: Race, r: Runner, ai: Ai): boolean {
   }
   const threat = beeAhead(race, r, vmax, RUNNER_H)
   if (threat) {
+    if (threat.d < 50) activateGuard(race, r)
     if (jumpClearsBee(race, r, threat.bee)) r.jumpBuffer = JUMP_BUFFER
     else if (threat.d < 30 && slideClearsBee(race, r, threat.bee, vmax, threat.d)) r.slideBuffer = SLIDE_BUFFER
     return false
