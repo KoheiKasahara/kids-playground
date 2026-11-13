@@ -836,6 +836,68 @@ function capybara(pose: Pose, t: number) {
   })
 }
 
+// ふさふさの しっぽ、もこもこの け、こうらで 見わけられる なかま。
+function fox(pose: Pose, t: number) {
+  return quad({
+    body: { c: [0, .4, 0], r: [.3, .16, .15] },
+    hipY: .3, legLen: .3, legR: .045, fx: .2, bx: -.2, lz: .09,
+    legMat: 'body', footMat: 'dark', pivot: [.25, .5, 0], eatAngle: -deg(35),
+    head: (b, o) => {
+      const c: V3 = [.35, .57, 0], r: V3 = [.14, .14, .13]
+      b.e(c, r, 'body').e([.5, .51, 0], [.14, .06, .07], 'cream')
+      b.e([.63, .52, 0], [.025, .025, .025], 'dark')
+      for (const z of [-1, 1]) {
+        b.e([.3, .74, z * .09], [.045, .11, .045], 'body')
+        b.e([.32, .75, z * .09], [.025, .06, .025], 'cream')
+        b.mark(c, r, [.6, .4, z * .6], o.closed ? 'closedEye' : 'eye')
+      }
+    },
+    tail: (b, wag) => b.group([-.28, .43, 0], rotY(wag * .65), bb => {
+      bb.e([-.48, .45, 0], [.26, .12, .12], 'body', { fuzz: .4 })
+      bb.e([-.7, .47, 0], [.12, .09, .09], 'cream', { fuzz: .4 })
+    }),
+  }, pose, t).model({ body: mat('#df823b'), cream: mat('#fff0d4'), dark: mat('#43302a') })
+}
+
+function sheep(pose: Pose, t: number) {
+  const b = quad({
+    body: { c: [0, .52, 0], r: [.36, .27, .26] },
+    hipY: .34, legLen: .34, legR: .055, fx: .23, bx: -.23, lz: .14,
+    legMat: 'face', footMat: 'hoof', pivot: [.3, .6, 0], eatAngle: -deg(40),
+    head: (bb, o) => {
+      const c: V3 = [.43, .66, 0], r: V3 = [.16, .18, .13]
+      bb.e(c, r, 'face').e([.38, .83, 0], [.16, .08, .15], 'body', { fuzz: .8 })
+      for (const z of [-1, 1]) {
+        bb.e([.35, .73, z * .2], [.1, .04, .1], 'face')
+        bb.mark(c, r, [.7, .3, z * .6], o.closed ? 'closedEye' : 'eye')
+      }
+      if (o.open) bb.e([.56, .57, 0], [.04, .035, .04], 'mouth')
+    },
+    tail: (bb, wag) => bb.e([-.39, .53, wag * .03], [.09, .07, .07], 'body', { fuzz: .7 }),
+  }, pose, t)
+  for (const p of b.prims) if (p.mat === 'body') { p.fuzz = .8; p.bump = .7 }
+  return b.model({ body: mat('#f7efdb'), face: mat('#b19b84'), hoof: mat('#4b4143'), mouth: mat('#b96d79') })
+}
+
+function tortoise(pose: Pose, t: number) {
+  const b = new Builder()
+  const tucked = pose === 'sleep' ? .1 : pose === 'act' ? .55 + Math.sin(t * TAU) * .45 : 1
+  for (const x of [-1, 1]) for (const z of [-1, 1]) {
+    const sw = pose === 'walk' ? Math.sin(t * TAU + (x === z ? 0 : Math.PI)) * .04 : 0
+    b.e([x * .22 + sw, .075, z * .2], [.1, .075, .085], 'skin')
+  }
+  b.e([0, .16, 0], [.34, .12, .27], 'edge')
+  b.e([-.02, .27, 0], [.33, .23, .26], 'shell')
+  const c: V3 = [.23 + tucked * .19, pose === 'eat' ? .1 : .19, 0], r: V3 = [.12, .09, .09]
+  b.e(c, r, 'skin')
+  for (const z of [-1, 1]) b.mark(c, r, [.6, .4, z * .6], pose === 'sleep' ? 'closedEye' : 'eye')
+  b.e([-.36, .1, 0], [.08, .025, .025], 'skin')
+  return b.model({
+    shell: mat('#957343', { pattern: p => Math.abs(Math.sin(p[0] * 19)) < .16 || Math.abs(Math.sin(p[2] * 19)) < .16 ? 'edge' : null }),
+    edge: mat('#d0ac67'), skin: mat('#929655'),
+  })
+}
+
 export function animalModel(id: SpeciesId, pose: Pose, t: number): Model {
   switch (id) {
     case 'lion': return lion(pose, t)
@@ -856,6 +918,9 @@ export function animalModel(id: SpeciesId, pose: Pose, t: number): Model {
     case 'koala': return koala(pose, t)
     case 'rhino': return rhino(pose, t)
     case 'capybara': return capybara(pose, t)
+    case 'fox': return fox(pose, t)
+    case 'sheep': return sheep(pose, t)
+    case 'tortoise': return tortoise(pose, t)
   }
 }
 
