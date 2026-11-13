@@ -4,13 +4,14 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { chaseCameraPose, overviewCameraPose } from '../circuit-racing/raceCamera'
 import { createRaceEnvironment } from '../circuit-racing/carAppearance'
+import { tracksideCameraPose } from './journeyCamera'
 import { CITY_CROSSING } from './journeyCity'
 import { advanceJourney, boostJourney, CAR_SPACING, createJourneyMotion, MAPS, railOrientation, ROUTES, sampleJourney, TRAINS, upcomingSwitch, type JourneyCourse, type JourneyRoutes, type TrainId } from './journeyModel'
 import { createJourneyScene, disposeJourneyObject, type JourneyWorld } from './journeyScene'
 import { journeySound } from './journeySound'
 import { createMainPassStats } from '../../utils/mainPassStats'
 
-export type JourneyCamera = 'follow' | 'overview'
+export type JourneyCamera = 'follow' | 'overview' | 'trackside'
 export type JourneyStatus = 'loading' | 'ready' | 'error'
 /** `nextSwitch` is the point the train meets next, so its button can light up. */
 export type JourneyFeedback = { location: string; boosting: boolean; atStation: boolean; nextSwitch: number }
@@ -201,6 +202,12 @@ export function useTrainJourneyEngine(options: Options) {
       if (current.camera === 'overview') {
         if (changed) showOverview()
         controls.update()
+      } else if (current.camera === 'trackside') {
+        const pose = tracksideCameraPose(course, motion, camera.aspect)
+        camera.position.copy(pose.position)
+        lookTarget.copy(sampleJourney(motion, course, 2.5).position).addScaledVector(localUp, 0.8)
+        camera.lookAt(lookTarget)
+        host.dataset.cameraShot = pose.id
       } else {
         const sample = sampleJourney(motion, course, 1.8)
         const factor = Math.max(1, 0.78 / camera.aspect)
@@ -225,6 +232,8 @@ export function useTrainJourneyEngine(options: Options) {
         lookTarget.lerp(desiredTarget, blend)
         camera.lookAt(lookTarget)
       }
+      if (changed) dirty = true
+      host.dataset.camera = current.camera
       lastCamera = current.camera
     }
     function updateMarkers() {
