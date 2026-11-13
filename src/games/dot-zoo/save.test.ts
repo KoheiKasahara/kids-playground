@@ -44,3 +44,9 @@ describe('save', () => {
     expect(world.animals.some(a => a.species === 'penguin')).toBe(true)
   })
 })
+
+test('あたらしい なかまも ほぞんから ふくげんできる', () => {
+  const world = createWorld()
+  for (const [i, id] of (['fox', 'sheep', 'tortoise'] as const).entries()) addAnimal(world, id, i * 2, 3)
+  expect(restore(JSON.parse(JSON.stringify(serialize(world)))).animals.map(a => a.species)).toEqual(['fox', 'sheep', 'tortoise'])
+})

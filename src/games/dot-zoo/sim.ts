@@ -140,7 +140,7 @@ export function countKind(world: World, kind: ObjectKind) {
 
 export function counter(id: SpeciesId) {
   if (id === 'eagle') return 'わ'
-  return id === 'monkey' || id === 'rabbit' || id === 'penguin' || id === 'crocodile' || id === 'flamingo' || id === 'koala' || id === 'capybara' ? 'ひき' : 'とう'
+  return id === 'fox' || id === 'tortoise' || id === 'monkey' || id === 'rabbit' || id === 'penguin' || id === 'crocodile' || id === 'flamingo' || id === 'koala' || id === 'capybara' ? 'ひき' : 'とう'
 }
 
 // ---------------- おく・けす ----------------
@@ -298,6 +298,26 @@ export function dropFood(world: World, kind: FoodKind, x: number, z: number): Fo
     if (!likes && Math.hypot(a.x - x, a.z - z) < 3) setBubble(a, 'question', 1.6)
   }
   return food
+}
+
+/** えらんだ どうぶつの そばの、おける 場所に すきな えさを おく。 */
+export function offerFood(world: World, id: number): Check {
+  const animal = world.animals.find(a => a.id === id)
+  if (!animal) return { ok: false, reason: 'どうぶつを えらんでね' }
+  if (animal.state === 'sleep') return { ok: false, reason: 'ねているよ。あさまで まってね' }
+  const kind = speciesDef(animal.species).eats[0]
+  const spots = []
+  for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+    const x = Math.floor(animal.x) + dx + .5, z = Math.floor(animal.z) + dz + .5
+    spots.push({ x, z, distance: Math.hypot(x - animal.x, z - animal.z) })
+  }
+  spots.sort((a, b) => a.distance - b.distance)
+  for (const spot of spots) {
+    if (!checkFood(world, kind, spot.x, spot.z).ok) continue
+    dropFood(world, kind, spot.x, spot.z)
+    return { ok: true }
+  }
+  return { ok: false, reason: world.foods.length >= MAX_FOODS ? 'えさが いっぱいだよ。たべおわるまで まってね' : 'そばに えさを おけないよ。ひろい ところで あげてね' }
 }
 
 function releaseFood(world: World, a: Animal) {

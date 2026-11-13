@@ -435,7 +435,9 @@ button.window:focus-visible,
   position: absolute;
   right: calc(var(--safe-right) + 8px);
   top: calc(var(--safe-top) + 70px);
-  width: 200px;
+  width: 220px;
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 126px);
+  overflow-y: auto;
   padding: 8px 12px 10px;
   font-size: 13px;
   animation: pop2 .2s ease-out both;
@@ -536,3 +538,17 @@ button.window:focus-visible,
   user-select: none;
   -webkit-touch-callout: none;
 }
+
+.care { display: flex; gap: 6px; margin-top: 6px; }
+.care button {
+  flex: 1;
+  min-height: 44px;
+  border: 2px solid #c8d0ff;
+  border-radius: 6px;
+  background: #303c72;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.care button:focus-visible { outline: 3px solid #fff27a; outline-offset: 2px; }
