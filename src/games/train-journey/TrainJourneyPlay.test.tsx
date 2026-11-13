@@ -89,9 +89,23 @@ describe('でんしゃの たび controls', () => {
     expect(engine.options?.running).toBe(true)
     await user.click(screen.getByRole('button', { name: 'ぜんたい' }))
     expect(engine.options?.camera).toBe('overview')
+    await user.click(screen.getByRole('button', { name: 'えんせん' }))
+    expect(engine.options?.camera).toBe('trackside')
     await user.click(screen.getByRole('button', { name: 'おと' }))
     expect(engine.options?.sound).toBe(false)
     expect(engine.options?.running).toBe(true)
+  })
+  test.each([['snow', 'ゆきやま'], ['coast', 'うみべ'], ['farm', 'のうじょう']])('selects %s and resets its routes', async (id, label) => {
+    ready()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: `${label}の コースを えらぶ` }))
+    expect(engine.options?.course.id).toBe(id)
+    const initial = engine.options?.routes[0]
+    await user.click(screen.getByRole('button', { name: 'しゅっぱつ！' }))
+    await user.click(screen.getByRole('button', { name: 'ポイントを きりかえる' }))
+    expect(engine.options?.routes[0]).not.toBe(initial)
+    await user.click(screen.getByRole('button', { name: 'ポイントを きりかえる' }))
+    expect(engine.options?.routes[0]).toBe(initial)
   })
   test('model errors disable departure and expose retry', async () => {
     const user = userEvent.setup()

@@ -1,6 +1,6 @@
 import { CubicBezierCurve3, CurvePath, Euler, Quaternion, Vector3 } from 'three'
 
-export type MapId = 'island' | 'downtown'
+export type MapId = 'island' | 'downtown' | 'snow' | 'coast' | 'farm'
 /** Any named stretch of rail. Each map names its own trunks and branches. */
 export type JourneyEdge = string
 /** A branch a point can send the train down. */
@@ -23,6 +23,12 @@ type Branch = {
   faded: string
 }
 export const ROUTES: Record<JourneyRoute, Branch> = {
+  ranch: { label: 'ぼくじょう', icon: '🐄', color: '#6f9c42', hint: '🐄 ぼくじょうへ いこう', where: 'ぼくじょうを はしるよ！', bed: '#b7b4a0', glow: '#6f9c42', arrow: '#6f9c42', faded: '#d0d5cc' },
+  fields: { label: 'はたけ', icon: '🌻', color: '#ad9631', hint: '🌻 はたけへ いこう', where: 'はたけを はしるよ！', bed: '#b7b4a0', glow: '#ad9631', arrow: '#ad9631', faded: '#d0d5cc' },
+  cape: { label: 'とうだい', icon: '💡', color: '#298d9d', hint: '💡 とうだいへ いこう', where: 'とうだいを はしるよ！', bed: '#b7b4a0', glow: '#298d9d', arrow: '#298d9d', faded: '#d0d5cc' },
+  beach: { label: 'すなはま', icon: '🏖️', color: '#cb9642', hint: '🏖️ すなはまへ いこう', where: 'すなはまを はしるよ！', bed: '#b7b4a0', glow: '#cb9642', arrow: '#cb9642', faded: '#d0d5cc' },
+  lake: { label: 'こおりの いけ', icon: '🧊', color: '#269db5', hint: '🧊 こおりの いけへ いこう', where: 'こおりの いけを はしるよ！', bed: '#b7b4a0', glow: '#269db5', arrow: '#269db5', faded: '#d0d5cc' },
+  summit: { label: 'ゆきの おか', icon: '🏔️', color: '#688fc2', hint: '🏔️ ゆきの おかへ いこう', where: 'ゆきの おかを はしるよ！', bed: '#b7b4a0', glow: '#688fc2', arrow: '#688fc2', faded: '#d0d5cc' },
   bridge: { label: 'はし', icon: '🌉', color: '#287fca', hint: '🌉 あおい みちで はしへ', where: 'おそらの はしへ！', bed: '#4b98c6', glow: '#318dc9', arrow: '#147dd5', faded: '#b6c8d0' },
   forest: { label: 'トンネル', icon: '🌲', color: '#328555', hint: '🌲 みどりの みちで トンネルへ', where: 'もりを はしるよ！', bed: '#73a389', glow: '#519456', arrow: '#147e43', faded: '#bdcdb7' },
   city: { label: 'まち', icon: '🏙️', color: '#c4702c', hint: '🏙️ オレンジの みちで ビルの まちへ', where: 'ビルの まちを はしるよ！', bed: '#a9a69b', glow: '#c07a38', arrow: '#cf7220', faded: '#d8c5ae' },
@@ -51,10 +57,13 @@ type MapInfo = {
   tip: string
 }
 export const MAPS: Record<MapId, MapInfo> = {
+  farm: { label: 'のうじょう', icon: '🐄', description: 'はたけと ぼくじょう', station: 'のうじょうえき', trunks: { home: 'しゅっぱつ しんこう！' }, shoulder: 3, sky: '#d7edc6', points: [''], intro: 'はたけと ぼくじょう。すきな でんしゃで！', tip: 'ポイントで いきさきを えらぼう' },
+  coast: { label: 'うみべ', icon: '🏖️', description: 'すなはまと とうだい', station: 'うみべえき', trunks: { home: 'しゅっぱつ しんこう！' }, shoulder: 3, sky: '#bde9ef', points: [''], intro: 'すなはまと とうだい。すきな でんしゃで！', tip: 'ポイントで いきさきを えらぼう' },
+  snow: { label: 'ゆきやま', icon: '🏔️', description: 'ゆきと こおり', station: 'ゆきやまえき', trunks: { home: 'しゅっぱつ しんこう！' }, shoulder: 3, sky: '#d8eafa', points: [''], intro: 'ゆきと こおり。すきな でんしゃで！', tip: 'ポイントで いきさきを えらぼう' },
   island: { label: 'しま', icon: '🏝️', description: 'はし・もり・まち', station: 'にじいろえき', trunks: { common: 'しゅっぱつ しんこう！' }, shoulder: 5, sky: '#c3e5e9', points: [''], intro: 'はしも、もりも、まちも。すきな でんしゃで！', tip: 'ポイントを すぎたら つぎの いっしゅう' },
   downtown: { label: 'とかい', icon: '🌆', description: 'ビルと タワー', station: 'ひかりえき', trunks: { south: 'しゅっぱつ しんこう！', north: 'ビルの まちを すすむよ！' }, shoulder: -3.5, sky: '#bfdcf0', points: ['ひとつめ', 'ふたつめ'], intro: 'ビルに タワー、ちかてつも！ すきな でんしゃで！', tip: 'ポイントは ふたつ。ひかっている ほうが つぎだよ' },
 }
-export const MAP_ORDER = ['island', 'downtown'] as const
+export const MAP_ORDER = ['island', 'downtown', 'snow', 'coast', 'farm'] as const
 
 /** One big button per point cycles its branches and comes back round. */
 export function nextRoute(branches: readonly JourneyRoute[], route: JourneyRoute): JourneyRoute {
@@ -125,8 +134,25 @@ function downtownCourse() {
   return { curves: { south: trunkSouth, north: trunkNorth, skyway, subway, river, tower, harbor }, switches, station: new Vector3(-1, TRACK_Y, 19.5), bounds }
 }
 
+
+/** Separate landscapes share junction conventions, but have different rail layouts. */
+function countrysideCourse(id: 'snow' | 'coast' | 'farm') {
+  const north = new Vector3(0, 0, -2.8)
+  const south = new Vector3(0, 0, 2.8)
+  const home = path([[20, 0, 0], [20, 0, 12], [10, 0, 20], [-4, 0, 20], [-19, 0, 13], [-20, 0, 0]], south, north)
+  const layouts: Record<typeof id, { names: string[]; outer: Point[]; inner: Point[] }> = {
+    snow: { names: ['summit', 'lake'], outer: [[-20, 0, 0], [-21, 2, -12], [-12, 4, -22], [1, 4, -23], [15, 2, -17], [20, 0, 0]], inner: [[-20, 0, 0], [-13, 0, -8], [0, 0, -10], [12, 0, -6], [20, 0, 0]] },
+    coast: { names: ['beach', 'cape'], outer: [[-20, 0, 0], [-22, 0, -15], [-12, 0, -23], [5, 0, -22], [21, 0, -14], [20, 0, 0]], inner: [[-20, 0, 0], [-12, 0, -7], [-5, 0, -4], [5, 0, -9], [14, 0, -7], [20, 0, 0]] },
+    farm: { names: ['fields', 'ranch'], outer: [[-20, 0, 0], [-18, 0, -17], [-8, 0, -22], [10, 0, -22], [21, 0, -12], [20, 0, 0]], inner: [[-20, 0, 0], [-10, 0, -5], [-3, 0, -14], [7, 0, -14], [12, 0, -3], [20, 0, 0]] },
+  }
+  const { names, outer, inner } = layouts[id]
+  const curves = { home, [names[0]]: path(outer, north, south), [names[1]]: path(inner, north, south) }
+  const switches: JourneySwitch[] = [{ trunk: 'home', branches: names, next: 'home', lever: [-17, 1] }]
+  return { curves, switches, station: new Vector3(-4, TRACK_Y, 20), bounds: { min: { x: -29, z: -29 }, max: { x: 29, z: 30 } } }
+}
+
 export function createJourneyCourse(id: MapId = 'island') {
-  const { curves, switches, station, bounds } = id === 'downtown' ? downtownCourse() : islandCourse()
+  const { curves, switches, station, bounds } = id === 'downtown' ? downtownCourse() : id === 'island' ? islandCourse() : countrysideCourse(id)
   const lengths = Object.fromEntries(Object.entries(curves).map(([key, curve]) => [key, curve.getLength()])) as Record<JourneyEdge, number>
   const edges: Record<JourneyEdge, CurvePath<Vector3>> = curves
   const stationEdge = switches[0].trunk
