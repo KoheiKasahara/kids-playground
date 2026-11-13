@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { EXTRA_MOVES } from './extra'
 import { SPECIES } from './data'
 import { actSeconds, clipSeconds, createActor, frameAt, HABITS, profileOf, SIGNATURE_MOVES, stepActor, triggerAct } from './motion'
 import { renderFrame, rgbaOf } from './sprite'
@@ -13,6 +14,22 @@ const opaqueDiff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
 }
 
 describe('venom lab creature motion', () => {
+  test('all species have an additional visible clip distinct from both existing clips', () => {
+    expect(Object.keys(EXTRA_MOVES).sort()).toEqual(SPECIES.map(s => s.id).sort())
+    expect(new Set(Object.values(EXTRA_MOVES).map(m => m.label)).size).toBe(SPECIES.length)
+    for (const s of SPECIES) {
+      const frames = [.15, .4, .65].map(t => pixels(s, { clip: 'extra', t }))
+      for (const clip of ['idle', 'act', 'habit'] as const) {
+        expect(Math.max(...frames.map((frame, i) => opaqueDiff(frame, pixels(s, { clip, t: [.15, .4, .65][i] })))), `${s.id} extra vs ${clip}`).toBeGreaterThan(20)
+      }
+      expect(Math.max(...frames.slice(1).map(frame => opaqueDiff(frames[0], frame))), s.id).toBeGreaterThan(5)
+      const a = createActor(1), p = profileOf(s)
+      triggerAct(a, 'extra')
+      expect(frameAt(a, p).clip).toBe('extra')
+      for (let i = 0; i < 190; i++) stepActor(a, p, 1 / 60)
+      expect(a.mode).toBe('idle')
+    }
+  })
   test('every creature has its own signature move that visibly changes the sprite', () => {
     expect(Object.keys(SIGNATURE_MOVES).sort()).toEqual(SPECIES.map(s => s.id).sort())
     expect(new Set(Object.values(SIGNATURE_MOVES)).size).toBe(SPECIES.length)
@@ -57,7 +74,7 @@ describe('venom lab creature motion', () => {
     for (const s of SPECIES) {
       const p = profileOf(s)
       const a = createActor(SPECIES.indexOf(s) + 1)
-      let moved = false, acted = false, habit = false
+      let moved = false, acted = false, habit = false, extra = false
       for (let i = 0; i < 60 * 60; i++) {
         stepActor(a, p, 1 / 60)
         if (a.mode === 'move') {
@@ -66,6 +83,7 @@ describe('venom lab creature motion', () => {
         }
         if (a.mode === 'act') acted = true
         if (a.mode === 'habit') habit = true
+        if (a.mode === 'extra') extra = true
         expect(Math.abs(a.x), s.id).toBeLessThanOrEqual(p.range + p.stride + .01)
         const f = frameAt(a, p)
         expect(f.index, s.id).toBeGreaterThanOrEqual(0)
@@ -73,6 +91,7 @@ describe('venom lab creature motion', () => {
       }
       expect(acted, s.id).toBe(true)
       expect(habit, s.id).toBe(true)
+      expect(extra, s.id).toBe(true)
       expect(moved, s.id).toBe(p.gait !== 'sit')
       if (p.gait === 'sit') expect(a.x).toBe(0)
     }

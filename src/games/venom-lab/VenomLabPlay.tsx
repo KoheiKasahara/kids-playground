@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { HABITATS, LEVEL_LABELS, MAX_RESIDENTS, RANKING, RANKING_NOTE, RANK_FILTERS, SPECIES, addResident, createExhibits, matchesRankFilter, type HabitatId, type RankFilter, type Resident, type Species } from './data'
 import PixelCreature, { type Cue } from './PixelCreature'
+import LabDialog from './LabDialog'
+import { EXTRA_MOVES } from './extra'
 import HabitatScene from './HabitatScene'
 import { HABITS, SIGNATURE_MOVES } from './motion'
 import { playLabSound } from './sounds'
@@ -37,8 +39,7 @@ export default function VenomLabPlay() {
   const [message, setMessage] = useState('いきものを タップして かんさつしよう！')
   const [cue, setCue] = useState<Cue>({ clip: 'act', n: 0 })
   const [sound, toggleSound] = useSoundToggle()
-  const detailRef = useRef<HTMLElement>(null)
-  const revealNote = useRef(false)
+  const [panel, setPanel] = useState<'detail' | 'add' | null>(null)
   const habitat = HABITATS.find(h => h.id === habitatId)!
   const residents = exhibits[habitatId]
   const speciesInHabitat = SPECIES.filter(s => s.habitat === habitatId)
@@ -48,16 +49,10 @@ export default function VenomLabPlay() {
     try { localStorage.setItem(NOTEBOOK_KEY, JSON.stringify(observed)) } catch { /* Private browsing can still play. */ }
   }, [observed])
 
-  useEffect(() => {
-    if (tab === 'observe' && revealNote.current) {
-      revealNote.current = false
-      detailRef.current?.scrollIntoView?.({ block: 'center' })
-    }
-  }, [selected, tab])
-
   function inspect(species: Species, residentId: number | null) {
     const fresh = !observed.includes(species.id)
     playLabSound(fresh ? 'discover' : 'tap')
+    setPanel('detail')
     setSelected(species)
     setSelectedId(residentId)
     setCue(c => ({ clip: 'act', n: c.n + 1 }))
@@ -89,6 +84,7 @@ export default function VenomLabPlay() {
     playLabSound()
     setExhibits(current => ({ ...current, [habitatId]: current[habitatId].filter(r => r.id !== selectedId) }))
     setSelectedId(null)
+    setPanel(null)
     setMessage('1ぴき もどしたよ。また「＋」で よべるよ。')
   }
 
@@ -120,13 +116,16 @@ export default function VenomLabPlay() {
         <div className={styles.observationGrid}>
           <section className={styles.exhibit} aria-label={habitat.name}>
             <div className={styles.exhibitHeader}><div><p className={styles.eyebrow}>AREA {habitat.number}</p><h2>{habitat.name}</h2></div><button type="button" className={styles.smallButton} aria-pressed={paused} onClick={() => { setPaused(!paused); playLabSound() }}>{paused ? '▶ うごかす' : 'Ⅱ とめてみる'}</button></div>
-            <HabitatScene habitat={habitatId} residents={residents} selectedId={selectedId} paused={paused} onObserve={observe} />
+            <HabitatScene habitat={habitatId} residents={residents} selectedId={selectedId} paused={paused || panel !== null} onObserve={observe} />
+            <div className={styles.playTools}>
+              <button type="button" onClick={() => { setPanel('add'); playLabSound() }}>＋ なかまを よぶ</button>
+              <button type="button" disabled={!selected} onClick={() => { setPanel('detail'); playLabSound() }}>▤ かいせつ</button>
+            </div>
             <div className={styles.sceneFooter}><span>{habitat.subtitle}</span><b>{residents.length}<small> / {MAX_RESIDENTS} ひき</small></b></div>
             <div className={styles.mission}><span className={styles.missionIcon}>{nextDiscovery ? '⌕' : '✓'}</span><div><small>{nextDiscovery ? 'かんさつミッション' : 'このエリアは ぜんぶ はっけん！'}</small><p>{nextDiscovery ? residents.some(r => r.speciesId === nextDiscovery.id) ? nextDiscovery.clue : `「＋」で ${nextDiscovery.name}を よんでみよう` : 'すきな なかまを ふやして ながめよう。'}</p></div></div>
           </section>
 
-          <aside ref={detailRef} className={styles.detail} aria-label="いきものの かいせつ" aria-live="polite">
-            {selected ? <>
+          {panel === 'detail' && selected && <LabDialog title="いきものの かいせつ" onClose={() => setPanel(null)}><aside className={styles.detail} aria-label="いきものの かいせつ" aria-live="polite">
               <div className={styles.detailTop}><span className={styles.eyebrow}>FIELD NOTE / {String(SPECIES.indexOf(selected) + 1).padStart(2, '0')}</span><span className={styles.recorded}>✓ きろくずみ</span></div>
               <div className={styles.portrait}><PixelCreature species={selected} live cue={cue} /></div>
               <h2>{selected.name}</h2><p className={styles.scientific}>{selected.scientific}</p>
@@ -139,15 +138,21 @@ export default function VenomLabPlay() {
                 <span><small>くらしの ようす</small>{HABITS[selected.id]}</span>
                 <button type="button" onClick={() => { setCue(c => ({ clip: 'habit', n: c.n + 1 })); playLabSound() }} aria-label={`${selected.name}の くらしの ようすを みる`}>▶ みる</button>
               </div>
+              <div className={styles.signature}>
+                <span><small>もうひとつの うごき</small>{EXTRA_MOVES[selected.id].label}</span>
+                <button type="button" onClick={() => { setCue(c => ({ clip: 'extra', n: c.n + 1 })); playLabSound() }} aria-label={`${selected.name}の もうひとつの うごきを みる`}>▶ みる</button>
+              </div>
+              <details className={styles.more}><summary>くわしく しる</summary>
               <span className={styles.delivery}>{selected.delivery}</span>{selected.inJapan && <span className={styles.japanBadge}>日本にもいる</span>}
               <p className={styles.fact}>{selected.fact}</p>
               <dl className={styles.facts}><dt>すむところ</dt><dd>{selected.home}</dd><dt>たべもの</dt><dd>{selected.food}</dd></dl>
               <details className={styles.more} key={selected.id}><summary>毒のひみつ・出典をみる</summary><p>{selected.venom}</p><p className={styles.note}>毒のつよさは ゲーム内のめやす。詳しくは ランキングをみてね。</p><a href={selected.source.url} target="_blank" rel="noreferrer">{selected.source.label} ↗</a></details>
+              </details>
               {selectedId !== null && <button type="button" className={styles.removeButton} onClick={removeSelected}>− この1ぴきを もどす</button>}
-            </> : <div className={styles.detailEmpty}><span className={styles.eyebrow}>YOUR FIELD NOTES</span><div className={styles.emptyPortrait}><PixelCreature species={speciesInHabitat[0]} live small /></div><h2>どんな ひみつが<br />あるのかな？</h2><p>エリアの いきものを タップ！<br />ここに かいせつが でるよ。</p><span className={styles.emptyArrow}>← みつけてみよう</span></div>}
-          </aside>
 
-          <section className={styles.residentPicker} aria-label="いきものを ふやす">
+          </aside></LabDialog>}
+
+          {panel === 'add' && <LabDialog title="なかまを ふやそう" onClose={() => setPanel(null)}><section className={styles.residentPicker} aria-label="いきものを ふやす">
             <div className={styles.pickerHeading}><h2>なかまを ふやそう</h2><span>{residents.length >= MAX_RESIDENTS ? 'いっぱい！ 1ぴき もどすと よべるよ' : 'おなじ なかまも よべるよ'}</span></div>
             <div className={styles.speciesCards}>{speciesInHabitat.map(s => <div key={s.id} className={styles.speciesCard}>
               <div className={styles.cardArt}><PixelCreature species={s} small /><span className={styles.seen}>{observed.includes(s.id) ? '✓' : '?'}</span></div>
@@ -155,7 +160,7 @@ export default function VenomLabPlay() {
               <button type="button" onClick={() => add(s)} disabled={residents.length >= MAX_RESIDENTS} aria-label={`${s.name}を ふやす`}>＋ なかまにする</button>
             </div>)}</div>
             <p className={styles.habitatDescription}>{habitat.description}</p>
-          </section>
+          </section></LabDialog>}
         </div>
       </> : <section className={styles.rankPanel} aria-labelledby="ranking-title">
         <div className={styles.rankHeading}><span className={styles.eyebrow}>VENOM GUIDE</span><h2 id="ranking-title">毒のつよさランキング</h2><p>ふしぎな毒を くらべてみよう</p></div>
@@ -166,7 +171,7 @@ export default function VenomLabPlay() {
           const entries = group.species.filter(s => matchesRankFilter(s, rankFilter))
           return entries.length > 0 && <section key={group.level} className={styles.rankGroup} aria-label={`${index + 1}位 ${LEVEL_LABELS[group.level]}`}>
           <div className={styles.rankGroupTitle}><strong>{String(index + 1).padStart(2, '0')}<small>同順位</small></strong><div><h3>{LEVEL_LABELS[group.level]}</h3><span>ゲーム内のめやす {group.level} / 5</span></div></div>
-          <div className={styles.rankCards}>{entries.map(s => <button type="button" key={s.id} onClick={() => { revealNote.current = true; setHabitatId(s.habitat); setTab('observe'); inspect(s, exhibits[s.habitat].find(r => r.speciesId === s.id)?.id ?? null) }} aria-label={`${s.name}の かいせつをみる`}>
+          <div className={styles.rankCards}>{entries.map(s => <button type="button" key={s.id} onClick={() => { setHabitatId(s.habitat); setTab('observe'); inspect(s, exhibits[s.habitat].find(r => r.speciesId === s.id)?.id ?? null) }} aria-label={`${s.name}の かいせつをみる`}>
             <PixelCreature species={s} small /><span><b>{s.name}</b><small>{s.delivery}</small></span><span className={styles.rankGo}>↗</span>
           </button>)}</div>
         </section>})}
