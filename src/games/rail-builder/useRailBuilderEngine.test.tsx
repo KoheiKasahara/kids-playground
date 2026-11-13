@@ -1,4 +1,8 @@
 import type { Camera, Scene } from 'three'
+import { createRailCourse } from './railCourses'
+import type { RailFleetTrainSummary } from './railFleetModel'
+
+let renderedScene: Scene | undefined
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createRailPiece, type RailPiece } from './railModel'
@@ -14,6 +18,7 @@ vi.mock('three', async (importOriginal) => ({
     setClearColor() {}
     setSize() {}
     render(scene: Scene, camera: Camera) {
+      renderedScene = scene
       scene.updateMatrixWorld()
       camera.updateMatrixWorld()
     }
@@ -28,6 +33,7 @@ function setup(pieces: RailPiece[] = []) {
   let frame!: FrameRequestCallback
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { frame = callback; return 1 })
   let engine!: RailBuilderEngineHandle
+  const onFleetChange = vi.fn<(trains: RailFleetTrainSummary[]) => void>()
   const onPiecesChange = vi.fn()
   const onSelectPiece = vi.fn()
   const onZoomChange = vi.fn()
@@ -35,7 +41,7 @@ function setup(pieces: RailPiece[] = []) {
     engine = useRailBuilderEngine({
       pieces, selectedPieceId: null, selectedTrainId: null, zoom: 1,
       onPiecesChange, onSelectPiece, onSelectTrain: vi.fn(), onZoomChange,
-      soundEnabled: false,
+      soundEnabled: false, onFleetChange,
     })
     return <div ref={engine.registerContainer} data-testid="scene" />
   }
@@ -43,7 +49,7 @@ function setup(pieces: RailPiece[] = []) {
     x: 0, y: 0, left: 0, top: 0, width: 400, height: 600, right: 400, bottom: 600,
     toJSON: () => ({}),
   })
-  const { getByTestId, unmount } = render(<Harness />)
+  const { getByTestId, unmount, rerender } = render(<Harness />)
   act(() => frame(0))
   const host = getByTestId('scene')
   const capture = vi.fn()
@@ -63,7 +69,12 @@ function setup(pieces: RailPiece[] = []) {
     expect(engine.getCameraTarget()).not.toEqual(before)
     pointer('pointerup', id, 240)
   }
-  return { host, pointer, expectPan, capture, onZoomChange, onPiecesChange, onSelectPiece, unmount }
+  function replacePieces(next: RailPiece[]) {
+    pieces = next
+    rerender(<Harness />)
+    act(() => frame(0))
+  }
+  return { engine, replacePieces, onFleetChange, host, pointer, expectPan, capture, onZoomChange, onPiecesChange, onSelectPiece, unmount }
 }
 
 describe('線路づくりの操作中断からの復帰', () => {
@@ -135,3 +146,26 @@ describe('線路づくりの操作中断からの復帰', () => {
     expectPan()
   })
 })
+
+ test('course replacement clears old meshes and running trains, including empty and re-entry', () => {
+  const { engine, replacePieces, onFleetChange, unmount } = setup(createRailCourse('circle', 'old'))
+  expect(renderedScene?.fog).toBeNull()
+  expect(renderedScene?.getObjectByName('rail-old-0')).toBeDefined()
+  act(() => engine.startTrain('train-1'))
+  expect(onFleetChange.mock.lastCall?.[0][0]?.wantsToRun).toBe(true)
+  replacePieces(createRailCourse('bridge', 'new'))
+  expect(renderedScene?.getObjectByName('rail-old-0')).toBeUndefined()
+  expect(renderedScene?.getObjectByName('rail-new-0')).toBeDefined()
+  expect(onFleetChange.mock.lastCall?.[0]).toHaveLength(1)
+  expect(onFleetChange.mock.lastCall?.[0][0]?.wantsToRun).toBe(false)
+  replacePieces([])
+  expect(renderedScene?.getObjectByName('rail-new-0')).toBeUndefined()
+  expect(onFleetChange.mock.lastCall?.[0]).toEqual([])
+  replacePieces(createRailCourse('wide', 'again'))
+  expect(onFleetChange.mock.lastCall?.[0]).toHaveLength(1)
+  unmount()
+  expect(document.querySelector('canvas')).toBeNull()
+  const reentered = setup(createRailCourse('tour', 'reenter'))
+  expect(renderedScene?.getObjectByName('rail-reenter-0')).toBeDefined()
+  reentered.unmount()
+ })
