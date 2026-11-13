@@ -1,9 +1,10 @@
+import { ANIMALS, type AnimalId } from './animals'
 import { describe, expect, test } from 'vitest'
 import { COURSES, buildCourse, type Piece, type RivalStyle } from './courses'
 import { FOODS } from './foods'
 import {
   BOOST_MUL, BOOST_TIME, GOAL_BONUS, READY_TIME, RIVAL_GOAL_LIMIT, RUNNER_H, RUNNER_W, RUN_SPEED, SLIDE_H, SLIDE_TIME,
-  createRace, drainEvents, heightOf, pressJump, pressSlide, raceResult, stepRace,
+  createRace, drainEvents, heightOf, pressGuard, pressJump, pressSlide, raceResult, stepRace,
   type Race, type RaceEvent,
 } from './race'
 
@@ -375,5 +376,78 @@ describe('gochiso-race: コンピューターの はしりかた', () => {
     untilDone(b)
     expect(a.result).toEqual(b.result)
     expect(a.eatenBy).toEqual(b.eatenBy)
+  })
+})
+
+describe('barrier and animal traits', () => {
+  test('barrier blocks bees, expires, and cannot be refreshed by repeated input', () => {
+    const race = newRace([{ t: 'run', len: 5000 }])
+    pressGuard(race)
+    expect(race.player.guard).toBe(0)
+    go(race)
+    pressGuard(race)
+    const initial = race.player.guard
+    run(race, .2)
+    pressGuard(race)
+    expect(race.player.guard).toBeLessThan(initial)
+    const bee = { x: race.player.x + RUNNER_W / 2, y: 20, amp: 0, period: 2, phase: 0 }
+    race.course = { ...race.course, bees: [bee] }
+    expect(run(race, DT).some(e => e.type === 'bump' && e.who === 'player')).toBe(false)
+    run(race, 1.3)
+    expect(race.player.guard).toBe(0)
+    pressGuard(race)
+    expect(race.player.guard).toBe(0)
+    bee.x = race.player.x + RUNNER_W / 2
+    expect(run(race, DT).some(e => e.type === 'bump' && e.who === 'player')).toBe(true)
+    run(race, 4)
+    pressGuard(race)
+    expect(race.player.guard).toBeGreaterThan(0)
+  })
+
+  test('barrier cannot bypass a tunnel, a fall, a stun, or the finish', () => {
+    const race = newRace([{ t: 'run', len: 300 }, { t: 'tunnel', len: 200 }, { t: 'run', len: 500 }])
+    go(race)
+    runUntilFront(race, 300, 20)
+    pressGuard(race)
+    expect(run(race, .2).some(e => e.type === 'bump' && e.who === 'player' && e.cause === 'bonk')).toBe(true)
+    for (const patch of [{ fall: 1 }, { stun: 1 }, { finishedAt: 1 }]) {
+      Object.assign(race.player, { fall: 0, stun: 0, finishedAt: null, guard: 0, guardCooldown: 0 }, patch)
+      pressGuard(race)
+      expect(race.player.guard).toBe(0)
+    }
+  })
+
+  test('traits change real movement, protection, and recovery for both runners', () => {
+    const make = (player: AnimalId) => {
+      const race = createRace(course([{ t: 'run', len: 5000 }]), { player, rival: 'fox' })
+      go(race)
+      return race
+    }
+    const dog = make('dog'), fox = make('fox'), rabbit = make('rabbit'), panda = make('panda')
+    run(dog, 1); run(fox, 1)
+    expect(fox.player.vx / dog.player.vx).toBeCloseTo(1.05)
+    expect(fox.player.x).toBeGreaterThan(dog.player.x)
+    pressJump(dog); pressJump(rabbit)
+    stepRace(dog, DT); stepRace(rabbit, DT)
+    expect(rabbit.player.vy).toBeGreaterThan(dog.player.vy)
+    pressGuard(dog); pressGuard(panda)
+    expect(panda.player.guard - dog.player.guard).toBeCloseTo(.3)
+    expect(fox.rival.vx).toBeGreaterThan(RUN_SPEED * SLOW_RIVAL.speed * .92)
+    const sturdy = make('bear'), jumper = make('rabbit')
+    for (const race of [sturdy, jumper]) {
+      race.course = { ...race.course, bees: [{ x: race.player.x + RUNNER_W / 2, y: 20, amp: 0, period: 2, phase: 0 }] }
+      stepRace(race, DT)
+    }
+    expect(sturdy.player.stun).toBeGreaterThan(0)
+    expect(sturdy.player.stun / jumper.player.stun).toBeCloseTo(.8)
+  })
+
+  test.each(ANIMALS.map(a => a.id))('%s can finish both new courses with the same controls', animal => {
+    for (const c of COURSES.slice(3)) {
+      const race = createRace(c, { player: animal, rival: 'dog', seed: 5, autoPlayer: EXPERT })
+      untilDone(race)
+      expect(race.player.finishedAt).not.toBeNull()
+      expect(race.player.finishedAt).toBeLessThan(120)
+    }
   })
 })
