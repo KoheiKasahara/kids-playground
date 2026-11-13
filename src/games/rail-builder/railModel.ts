@@ -20,6 +20,10 @@ export type RailVec3 = {
 export type RailPieceKind =
   | 'straight'
   | 'short-straight'
+  | 'long-straight'
+  | 'wide-curve'
+  | 'gentle-curve'
+  | 'down-slope'
   | 'curve'
   | 'slope'
   | 'bridge'
@@ -193,10 +197,10 @@ export const DRAG_SNAP_DISTANCE = 1.6
 const AUTO_ROTATE_ANGLE_WEIGHT = 0.35
 
 /**
- * パレットから足したpieceを置ける範囲。100x100の地面からはみ出さないよう、
+ * パレットから足したpieceを置ける範囲。200x200の地面からはみ出さないよう、
  * 未接続で置くときのスポーン位置と同じ範囲に収める。
  */
-export const RAIL_APPEND_LIMIT = 40
+export const RAIL_APPEND_LIMIT = 90
 /**
  * 自動接続の置き先が既存パーツの真上になっていないかを見る、中心どうしの最小距離。
  * いちばん短いパーツ（みじかい線路）を端点でつないでも中心は長さ分だけ離れるため、
@@ -235,6 +239,7 @@ const LOOP_CLOSURE_FACILITY_KINDS: ReadonlySet<RailPieceKind> = new Set([
   'tunnel',
   'bridge',
   'slope',
+  'down-slope',
 ])
 
 const ZERO: RailVec3 = { x: 0, y: 0, z: 0 }
@@ -477,7 +482,11 @@ export function createRailPiece(
   curveDirection: CurveDirection = 'left',
   branchSide: RailBranchSide = DEFAULT_BRANCH_SIDE,
 ): RailPiece {
-  const path: RailPath = kind === 'straight'
+  const path: RailPath = kind === 'long-straight'
+    ? { kind: 'straight', length: RAIL_UNIT_LENGTH * 2 }
+    : kind === 'down-slope'
+      ? { kind: 'straight', length: SLOPE_LENGTH, startHeight: ELEVATED_HEIGHT, endHeight: 0, elevationCurve: 'smoothstep' }
+    : kind === 'straight'
     ? { kind: 'straight', length: STRAIGHT_LENGTH }
     : kind === 'short-straight'
       ? { kind: 'straight', length: SHORT_STRAIGHT_LENGTH }
@@ -515,8 +524,8 @@ export function createRailPiece(
                   }
                   : {
                     kind: 'curve',
-                    radius: CURVE_RADIUS,
-                    angle: CURVE_ANGLE,
+                    radius: kind === 'wide-curve' ? CURVE_RADIUS * 2 : CURVE_RADIUS,
+                    angle: kind === 'gentle-curve' ? CURVE_ANGLE / 2 : CURVE_ANGLE,
                     direction: curveDirection,
                   }
   const [connectorA, connectorB] = makeConnectors(path)

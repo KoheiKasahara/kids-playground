@@ -9,6 +9,10 @@ import type { RailPieceKind } from './railModel'
  */
 export const RAIL_HIT_AREA_WIDTH_SCALE_BY_KIND: Readonly<Record<RailPieceKind, number>> = {
   straight: 2.4,
+  'long-straight': 2.4,
+  'wide-curve': 2.4,
+  'gentle-curve': 2.4,
+  'down-slope': 2.2,
   'short-straight': 2.2,
   curve: 2.4,
   branch: 2.4,
