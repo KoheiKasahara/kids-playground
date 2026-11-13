@@ -1,6 +1,6 @@
 export type Vec3 = { x: number; y: number; z: number }
 export type GadgetKind = 'jump' | 'spinner' | 'funnel' | 'booster' | 'seesaw'
-export type PartKind = 'straight' | 'slope' | 'curve' | 'branch' | 'goal' | GadgetKind
+export type PartKind = 'straight' | 'slope' | 'curve' | 'curveRight' | 'long' | 'wave' | 'branch' | 'goal' | GadgetKind
 export type SpinnerSettings = { speed: 'slow' | 'fast'; reverse: boolean }
 export type MarblePart = { id: string; position: Vec3; rotation: number } & (
   { kind: 'spinner'; settings: SpinnerSettings } | { kind: Exclude<PartKind, 'spinner'> }
@@ -12,6 +12,9 @@ export const PARTS: { kind: PartKind; label: string; color: string }[] = [
   { kind: 'straight', label: 'まっすぐ', color: '#39b9cb' },
   { kind: 'slope', label: 'さかみち', color: '#f5b74a' },
   { kind: 'curve', label: 'カーブ', color: '#9c80df' },
+  { kind: 'curveRight', label: 'はんたいカーブ', color: '#af83d5' },
+  { kind: 'long', label: 'ながいみち', color: '#4ca8ca' },
+  { kind: 'wave', label: 'くねくね', color: '#e89b64' },
   { kind: 'branch', label: 'ぶんき', color: '#ee8caa' },
   { kind: 'goal', label: 'ゴール', color: '#64bc8a' },
   { kind: 'jump', label: 'ジャンプ', color: '#ee9850' },
@@ -54,8 +57,9 @@ export const SPINNER_BAR_Y = spinnerFloor(-SPINNER_BAR_REACH) + 0.26
 export const MAX_PARTS = 36
 export const BALL_RADIUS = 0.27
 export const MIN_HEIGHT = 0.5
-export const MAX_HEIGHT = 14
-export const BOARD_LIMIT = 28
+/** Enough room for a full palette-limit chain of the tallest drops / longest tracks. */
+export const MAX_HEIGHT = 128
+export const BOARD_LIMIT = 110
 /** New pieces start high enough that several drops still fit above the floor. */
 export const BUILD_HEIGHT = 5.4
 /** Small hands aim roughly, so a mouth within half a piece still clicks together. */
@@ -76,10 +80,11 @@ export function toLocal(part: MarblePart, point: Vec3): Vec3 {
 }
 
 export function connectors(part: MarblePart): Connector[] {
-  const length = isGadget(part.kind) && part.kind !== 'booster' ? 3 : 2
+  const length = (isGadget(part.kind) && part.kind !== 'booster') || part.kind === 'long' || part.kind === 'wave' ? 3 : 2
   const mouth = part.kind === 'slope' ? 1.6 : part.kind === 'funnel' ? FUNNEL_LIFT : 0
   const ends: Connector[] = [{ position: { x: -length, y: mouth, z: part.kind === 'funnel' ? FUNNEL_INLET_Z : 0 }, direction: { x: -1, y: 0, z: 0 } }]
-  if (part.kind === 'curve') ends.push({ position: { x: 0, y: 0, z: 2 }, direction: { x: 0, y: 0, z: 1 } })
+  if (part.kind === 'curveRight') ends.push({ position: { x: 0, y: 0, z: -2 }, direction: { x: 0, y: 0, z: -1 } })
+  else if (part.kind === 'curve') ends.push({ position: { x: 0, y: 0, z: 2 }, direction: { x: 0, y: 0, z: 1 } })
   else if (part.kind === 'branch') {
     for (const z of [-2, 2]) ends.push({ position: { x: 2, y: 0, z }, direction: { x: 1, y: 0, z: 0 } })
   } else if (part.kind !== 'goal') ends.push({ position: { x: length, y: part.kind === 'funnel' ? -FUNNEL_DROP : part.kind === 'spinner' ? -SPINNER_DROP : 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } })
@@ -90,8 +95,8 @@ const distance = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.
 const opposite = (a: Vec3, b: Vec3) => a.x * b.x + a.z * b.z < -0.99
 
 function footprint(part: MarblePart): { x: number; z: number } {
-  const halfLength = isGadget(part.kind) && part.kind !== 'booster' ? 3 : 2
-  const halfWidth = part.kind === 'funnel' ? 2.5 : part.kind === 'spinner' ? 2.3 : part.kind === 'jump' ? 1.32 : part.kind === 'seesaw' ? 1.1 : part.kind === 'branch' || part.kind === 'curve' ? 2.82 : part.kind === 'goal' ? 1.46 : 0.82
+  const halfLength = (isGadget(part.kind) && part.kind !== 'booster') || part.kind === 'long' || part.kind === 'wave' ? 3 : 2
+  const halfWidth = part.kind === 'funnel' ? 2.5 : part.kind === 'spinner' ? 2.3 : part.kind === 'jump' ? 1.32 : part.kind === 'seesaw' ? 1.1 : part.kind === 'wave' ? 1.6 : part.kind === 'branch' || part.kind === 'curve' || part.kind === 'curveRight' ? 2.82 : part.kind === 'goal' ? 1.46 : 0.82
   return part.rotation % 2 === 0 ? { x: halfLength, z: halfWidth } : { x: halfWidth, z: halfLength }
 }
 
@@ -159,7 +164,7 @@ function joinTarget(course: Course, selectedId: string | null): Connector | unde
   const selected = course.parts.find(item => item.id === selectedId)
   const ends = openConnectors(course.parts)
   const preferred = selected ? connectors(selected).slice(1).find(end => ends.some(open => distance(open.position, end.position) < 0.01)) : undefined
-  return preferred ?? ends.at(-1)
+  return preferred ?? [...course.parts].reverse().flatMap(part => connectors(part).slice(1)).find(end => ends.some(open => distance(open.position, end.position) < 0.01))
 }
 
 /** Every heading that would meet the mouth, before board limits decide which of them fit. */
@@ -181,13 +186,20 @@ function joinPoses(part: MarblePart, target: Connector): MarblePart[] {
 /**
  * The board has a floor but plenty of sky, so a piece whose drop would sink under the floor
  * takes the whole course up with it instead of refusing to join. Every piece keeps its place
- * relative to the others, so nothing that was connected comes apart.
+ * relative to the others, so nothing that was connected comes apart. At a board edge,
+ * recenter the entire assembly for the same reason.
  */
 function liftToFit(course: Course, addition: MarblePart): MarblePart[] | null {
-  const lift = MIN_HEIGHT - Math.min(...connectors(addition).map(end => end.position.y))
-  if (lift <= 0) return null
-  const raise = (part: MarblePart): MarblePart => ({ ...part, position: { ...part.position, y: part.position.y + lift } })
-  const parts = [...course.parts.map(raise), raise(addition)]
+  const all = [...course.parts, addition]
+  const low = Math.min(...all.flatMap(part => connectors(part).map(end => end.position.y)))
+  const bounds = all.map(part => ({ part, size: footprint(part) }))
+  const shift = (axis: 'x' | 'z') => {
+    const min = Math.min(...bounds.map(({ part, size }) => part.position[axis] - size[axis]))
+    const max = Math.max(...bounds.map(({ part, size }) => part.position[axis] + size[axis]))
+    return min < -BOARD_LIMIT || max > BOARD_LIMIT ? -(min + max) / 2 : 0
+  }
+  const x = shift('x'), z = shift('z'), y = Math.max(0, MIN_HEIGHT - low)
+  const parts = all.map(part => ({ ...part, position: { x: part.position.x + x, y: part.position.y + y, z: part.position.z + z } }))
   return parts.every(canPlace) ? parts : null
 }
 
@@ -207,7 +219,7 @@ export function appendPart(course: Course, kind: PartKind, id: string, selectedI
   const poses = target ? joinPoses(part, target) : []
   let placed = poses.filter(canPlace).at(-1) ?? part
   if (placed === part) {
-    for (const pose of poses.filter(insideBoard)) {
+    for (const pose of poses) {
       const lifted = liftToFit(course, pose)
       if (lifted) return { parts: lifted, startId: course.startId ?? (kind === 'goal' ? null : id) }
     }

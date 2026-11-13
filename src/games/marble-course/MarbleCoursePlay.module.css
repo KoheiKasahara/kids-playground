@@ -49,3 +49,22 @@
 @media (max-width: 430px) { .page { gap: 7px; padding-left: calc(8px + var(--safe-left)); padding-right: calc(8px + var(--safe-right)); } .header { flex-basis: 56px; } .header h1 .marbleIcon { display: none; } .palette { gap: 6px; } .workbench { gap: 9px; } .tools { gap: 5px; } .tools button { font-size: 10px; } .tools button span { font-size: 19px; } }
 @media (orientation: landscape) and (max-height: 600px) { .page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: 44px minmax(0, 1fr); gap: 5px 10px; } .header { grid-column: 1 / -1; } .header h1 { font-size: 19px; } .scene { min-height: 0; } .workbench { align-self: center; gap: 7px; max-height: 100%; overflow-y: auto; padding-bottom: 5px; } .tools { gap: 5px; } .tools button { gap: 0; min-height: 44px; font-size: 10px; } .tools button span { font-size: 18px; line-height: 1; } .tabs { padding: 2px; } .tabs button { min-height: 40px; } .palette { gap: 5px; } .palette svg { width: 43px; height: 43px; } .palette button { padding-bottom: 6px; } .roll { min-height: 48px; font-size: 14px !important; gap: 7px; } .settings button { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { .success strong, .success span { animation: none; } }
+
+.courses { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 800; }
+.courses select { flex: 1; min-width: 0; min-height: 44px; border: 1px solid #cdd8c8; border-radius: 12px; padding: 6px 10px; background: #fffef7; color: #344b51; font: inherit; }
+.courses select:focus-visible { outline: 3px solid #cf8510; }
+.palette { grid-template-columns: repeat(8, minmax(64px, 1fr)); overflow-x: auto; padding: 2px 2px 6px; }
+.palette:has(button:nth-child(5):last-child) { grid-template-columns: repeat(5, minmax(56px, 1fr)); }
+@media (max-height: 740px) and (orientation: portrait) {
+  .page { gap: 5px; }
+  .header { flex-basis: 44px; }
+  .workbench { gap: 5px; max-height: 55dvh; overflow-y: auto; padding-bottom: 5px; }
+  .palette svg { width: 38px; height: 38px; }
+  .roll { min-height: 48px; }
+}
+@media (min-width: 1000px) {
+  .page { display: grid; grid-template-columns: minmax(0, 1fr) 370px; grid-template-rows: 60px minmax(0, 1fr); }
+  .header { grid-column: 1 / -1; }
+  .workbench { align-self: center; max-height: 100%; overflow-y: auto; padding: 5px; }
+  .scene { min-height: 0; }
+}

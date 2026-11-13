@@ -1,7 +1,7 @@
 import type { PartKind } from './marbleModel'
 
 export default function PartIcon({ kind }: { kind: PartKind }) {
-  const path = kind === 'curve' ? 'M10 40H27Q45 40 45 21V10' : kind === 'branch' ? 'M8 28H22Q30 28 37 17L49 10M22 28Q30 28 37 39L49 46' : kind === 'slope' ? 'M7 16L49 40' : kind === 'jump' ? 'M7 36Q18 36 23 29M39 36H49' : kind === 'seesaw' ? 'M8 33L48 23' : 'M7 28H49'
+  const path = kind === 'curveRight' ? 'M10 16H27Q45 16 45 35V46' : kind === 'wave' ? 'M6 28C18 4 38 52 50 28' : kind === 'long' ? 'M3 28H53' : kind === 'curve' ? 'M10 40H27Q45 40 45 21V10' : kind === 'branch' ? 'M8 28H22Q30 28 37 17L49 10M22 28Q30 28 37 39L49 46' : kind === 'slope' ? 'M7 16L49 40' : kind === 'jump' ? 'M7 36Q18 36 23 29M39 36H49' : kind === 'seesaw' ? 'M8 33L48 23' : 'M7 28H49'
   return <svg viewBox="0 0 56 56" aria-hidden="true">
     <path d={path} fill="none" stroke="#29485b" strokeOpacity="0.13" strokeWidth="17" strokeLinecap="round" transform="translate(0 3)" />
     <path d={path} fill="none" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
