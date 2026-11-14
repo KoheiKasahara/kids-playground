@@ -260,7 +260,7 @@ export function sampleJourney(motion: JourneyMotion, course: JourneyCourse, behi
     edge = followingEdge(course, edge, routes)
   }
   const u = Math.max(0, Math.min(1, distance / course.lengths[edge]))
-  return { position: course.curves[edge].getPointAt(u), tangent: course.curves[edge].getTangentAt(u), edge }
+  return { position: course.curves[edge].getPointAt(u), tangent: course.curves[edge].getTangentAt(u), edge, distance: u * course.lengths[edge] }
 }
 
 /** Yaw then pitch, preserving world-up even on a northbound slope. */

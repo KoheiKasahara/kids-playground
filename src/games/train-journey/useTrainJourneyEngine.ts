@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { chaseCameraPose, overviewCameraPose } from '../circuit-racing/raceCamera'
 import { createRaceEnvironment } from '../circuit-racing/carAppearance'
-import { tracksideCameraPose } from './journeyCamera'
+import { createTracksideSearch, nextTracksideShot, SHOT_LEAD, SHOT_TRAIL, tracksideShotExpired, type TracksideShot } from './journeyCamera'
 import { CITY_CROSSING } from './journeyCity'
 import { advanceJourney, boostJourney, CAR_SPACING, createJourneyMotion, MAPS, railOrientation, ROUTES, sampleJourney, TRAINS, upcomingSwitch, type JourneyCourse, type JourneyRoutes, type TrainId } from './journeyModel'
 import { createJourneyScene, disposeJourneyObject, type JourneyWorld } from './journeyScene'
@@ -89,6 +89,8 @@ export function useTrainJourneyEngine(options: Options) {
     let lastTrain: TrainId | undefined
     let lastRoutes: JourneyRoutes | undefined
     let lastCamera: JourneyCamera | undefined
+    let tracksideShot: TracksideShot | undefined
+    let tracksidePlan: { search: ReturnType<typeof createTracksideSearch>, routes: string, finished: boolean } | undefined
     let dirty = true
     let railSoundDistance = 0
     let totalTime = 0
@@ -135,6 +137,7 @@ export function useTrainJourneyEngine(options: Options) {
       if (!renderer) return
       camera.aspect = Math.max(1, host.clientWidth) / Math.max(1, host.clientHeight)
       camera.updateProjectionMatrix()
+      tracksideShot = tracksidePlan = undefined
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7))
       renderer.setSize(Math.max(1, host.clientWidth), Math.max(1, host.clientHeight), false)
       if (optionsRef.current.camera === 'overview') showOverview()
@@ -190,6 +193,22 @@ export function useTrainJourneyEngine(options: Options) {
         smoke.instanceMatrix.needsUpdate = true
       }
     }
+    // Scenery between a tripod and the rails. Only run when a shot is chosen.
+    const sightRay = new THREE.Raycaster()
+    sightRay.camera = camera // sprites (labels) need it to be hit-tested
+    const sightDirection = new THREE.Vector3()
+    const shown = (object: THREE.Object3D | null): boolean => !object || (object.visible && shown(object.parent))
+    function hits(from: THREE.Vector3, to: THREE.Vector3) {
+      sightDirection.subVectors(to, from)
+      sightRay.far = Math.max(0.1, sightDirection.length() - 1.2)
+      sightRay.set(from, sightDirection.normalize())
+      return sightRay.intersectObject(world!.group, true).some(hit => shown(hit.object))
+    }
+    // Faces are one-sided, so a tripod inside a building cannot see its walls.
+    // Looking back from the rails catches that case too.
+    function sightBlocked(from: THREE.Vector3, to: THREE.Vector3) {
+      return !!world && (hits(from, to) || hits(to, from))
+    }
     function updateCamera(dt: number) {
       const current = optionsRef.current
       if (!controls || !cars[0]) return
@@ -203,7 +222,31 @@ export function useTrainJourneyEngine(options: Options) {
         if (changed) showOverview()
         controls.update()
       } else if (current.camera === 'trackside') {
-        const pose = tracksideCameraPose(course, motion, camera.aspect)
+        const routesKey = current.routes.join()
+        if (tracksidePlan && tracksidePlan.routes !== routesKey) tracksidePlan = undefined
+        if (changed || !tracksideShot || tracksideShotExpired(tracksideShot, course, motion, current.routes)) {
+          // Dense towns can need many rays; never stall a frame for long.
+          const deadline = performance.now() + 12
+          const outOfTime = () => performance.now() > deadline
+          if (!changed && tracksidePlan) {
+            while (!tracksidePlan.finished && !outOfTime()) tracksidePlan.finished = tracksidePlan.search.step()
+            tracksideShot = tracksidePlan.search.result()
+          } else {
+            tracksideShot = nextTracksideShot(course, motion, current.routes, camera.aspect, world?.tunnels, sightBlocked, outOfTime)
+          }
+          tracksidePlan = undefined
+        } else if (!tracksidePlan && motion.totalDistance > tracksideShot.anchorTotal) {
+          // Once the train has passed the tripod, plan the next one: it waits
+          // the usual lead beyond the point where this shot will end.
+          const lead = tracksideShot.anchorTotal + SHOT_TRAIL + SHOT_LEAD - motion.totalDistance
+          tracksidePlan = { search: createTracksideSearch(course, motion, current.routes, camera.aspect, world?.tunnels, sightBlocked, lead), routes: routesKey, finished: false }
+        } else if (tracksidePlan && !tracksidePlan.finished) {
+          // A few candidates per frame, within a small time slice.
+          const slice = performance.now() + 3
+          do tracksidePlan.finished = tracksidePlan.search.step()
+          while (!tracksidePlan.finished && performance.now() < slice)
+        }
+        const pose = tracksideShot
         camera.position.copy(pose.position)
         lookTarget.copy(sampleJourney(motion, course, 2.5).position).addScaledVector(localUp, 0.8)
         camera.lookAt(lookTarget)
