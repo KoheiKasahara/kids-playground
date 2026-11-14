@@ -151,26 +151,27 @@ function rail(f: Frame, mask: number, bridge: boolean, overRoad: boolean): void 
 
 export type Crossing = { index: number; center: Point; lamps: THREE.Mesh[] }
 
-/** ふみきりの けいほうき。でんしゃが ちかい ときに あかい ランプが こうごに ひかる。 */
+/**
+ * ふみきりの けいほうき。でんしゃが ちかい ときに あかい ランプが こうごに ひかる。
+ * はしらや ばってんは うごかないので まちと いっしょに まとめ、ランプは ひだり・みぎ の くみごとに 1つの Mesh に する。
+ */
 function crossingSignals(kit: TownKit, index: number, root: THREE.Group): Crossing {
   const center = tileCenter(index)
-  const lamps: THREE.Mesh[] = []
+  const sides: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[][] = [[], []]
   // かどは みち・せんろが とおらない（カーブも かどから 0.19 より うちがわ）。
   for (const [cx, cz] of [[0.4, -0.4], [-0.4, 0.4]] as const) {
-    const signal = new THREE.Group()
-    signal.position.set(center.x + cx, 0, center.z + cz)
-    signal.rotation.y = Math.atan2(-cx, -cz)
-    signal.add(kit.mesh(kit.cyl(8), '#3d3d3d', [0, 0, 0], [0.018, 0.44, 0.018]))
-    signal.add(kit.mesh(kit.box(), '#ffd43b', [0, 0.38, 0.02], [0.17, 0.035, 0.012], [0, 0, Math.PI / 4]))
-    signal.add(kit.mesh(kit.box(), '#ffd43b', [0, 0.38, 0.02], [0.17, 0.035, 0.012], [0, 0, -Math.PI / 4]))
-    signal.add(kit.mesh(kit.box(), '#3d3d3d', [0, 0.27, 0.01], [0.14, 0.03, 0.02]))
-    for (const side of [-0.05, 0.05]) {
-      const lamp = kit.mesh(kit.ball(1), '#5a1d1d', [side, 0.3, 0.03], [0.03, 0.03, 0.03], [0, 0, 0], false)
-      lamps.push(lamp)
-      signal.add(lamp)
-    }
-    root.add(signal)
+    const base = matrixOf([center.x + cx, 0, center.z + cz], [0, Math.atan2(-cx, -cz), 0])
+    const signal = new Frame(kit, base)
+    signal.cyl('#3d3d3d', 0.018, 0.44, [0, 0, 0], 8)
+    signal.box('#ffd43b', [0.17, 0.035, 0.012], [0, 0.38, 0.02], [0, 0, Math.PI / 4])
+    signal.box('#ffd43b', [0.17, 0.035, 0.012], [0, 0.38, 0.02], [0, 0, -Math.PI / 4])
+    signal.box('#3d3d3d', [0.14, 0.03, 0.02], [0, 0.27, 0.01])
+    ;[-0.05, 0.05].forEach((side, n) => {
+      sides[n].push({ geometry: kit.ball(1), matrix: base.clone().multiply(matrixOf([side, 0.3, 0.03], [0, 0, 0], [0.03, 0.03, 0.03])) })
+    })
   }
+  const lamps = sides.map((parts) => kit.joined(parts, '#5a1d1d'))
+  root.add(...lamps)
   return { index, center, lamps }
 }
 

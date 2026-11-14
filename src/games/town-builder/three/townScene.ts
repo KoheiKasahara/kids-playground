@@ -5,7 +5,7 @@ import type { TilePart } from '../parts'
 import { COLS, ROWS, type Ground, type Town } from '../town'
 import type { VehicleKind } from '../vehicles'
 import { buildTownModel, type TownModel } from './townModel'
-import { fitDistance, tileAt, tileCenter } from './townLayout'
+import { buildingCenter, fitDistance, tileAt } from './townLayout'
 import { advanceTracks, startTracks, trackPose, type Track } from './vehicleTracks'
 import { RIDE_HEIGHT, vehicleModel } from './vehicleModels'
 
@@ -61,7 +61,18 @@ const NOOP: TownSceneHandle = {
   setNight: () => {}, setTour: () => {}, turn: () => {}, zoom: () => {}, ride: () => false, land: () => {}, dispose: () => {},
 }
 
+/** これより せまい がめんは スマホと して かるく えがく。 */
+const PHONE_WIDTH = 768
+/** えがく ピクセルの かずの うえかぎり（おおきな がめんでも おもく なりすぎない）。 */
+const PIXEL_BUDGET = 2_500_000
+
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value))
+
+/** がめんの こまかさ。スマホは 1.5ばい、ほかは 2ばい まで、さらに ピクセルの かずで おさえる。 */
+export function pixelRatioFor(width: number, height: number, deviceRatio = window.devicePixelRatio || 1): number {
+  const cap = width < PHONE_WIDTH ? 1.5 : 2
+  return Math.max(1, Math.min(deviceRatio, cap, Math.sqrt(PIXEL_BUDGET / Math.max(1, width * height))))
+}
 const ease = (t: number) => 1 - Math.pow(1 - t, 3)
 
 function skyDecor(): { group: THREE.Group; stars: THREE.PointsMaterial; moon: THREE.MeshBasicMaterial; cloud: THREE.MeshStandardMaterial; dispose: () => void } {
@@ -94,22 +105,23 @@ function skyDecor(): { group: THREE.Group; stars: THREE.PointsMaterial; moon: TH
 
   const puffGeometry = new THREE.IcosahedronGeometry(1, 1)
   const cloud = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 })
-  const clouds = new THREE.Group()
-  clouds.name = 'town-clouds'
   // くもは ちずより したに うかべる（そらに うかぶ しまの まち）。うえに おくと まちを かくして しまう。
+  // 9この くも（4つずつの たま）を まとめて 1かいで えがく。
+  const clouds = new THREE.InstancedMesh(puffGeometry, cloud, 9 * 4)
+  clouds.name = 'town-clouds'
+  clouds.frustumCulled = false
+  const puff = new THREE.Object3D()
   for (let n = 0; n < 9; n += 1) {
-    const puffy = new THREE.Group()
     const angle = (n / 9) * Math.PI * 2 + random() * 0.4
     const radius = 9 + random() * 6
-    puffy.position.set(Math.cos(angle) * radius, -2.6 + random() * 1.1, Math.sin(angle) * radius)
+    const center = new THREE.Vector3(Math.cos(angle) * radius, -2.6 + random() * 1.1, Math.sin(angle) * radius)
     for (let p = 0; p < 4; p += 1) {
-      const puff = new THREE.Mesh(puffGeometry, cloud)
       const size = 0.55 + random() * 0.5
       puff.scale.set(size * 1.3, size, size)
-      puff.position.set((p - 1.5) * 0.7, random() * 0.3, (random() - 0.5) * 0.6)
-      puffy.add(puff)
+      puff.position.set(center.x + (p - 1.5) * 0.7, center.y + random() * 0.3, center.z + (random() - 0.5) * 0.6)
+      puff.updateMatrix()
+      clouds.setMatrixAt(n * 4 + p, puff.matrix)
     }
-    clouds.add(puffy)
   }
   group.add(clouds)
   return {
@@ -121,6 +133,7 @@ function skyDecor(): { group: THREE.Group; stars: THREE.PointsMaterial; moon: TH
       moon.dispose()
       puffGeometry.dispose()
       cloud.dispose()
+      clouds.dispose()
     },
   }
 }
@@ -149,7 +162,9 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
   const sun = new THREE.DirectionalLight(SUN.day, 2.4)
   sun.position.set(7, 14, 9)
   sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
+  // スマホの せまい がめんでは かげの こまかさを おとして かるく する。
+  const shadowSize = host.clientWidth > 0 && host.clientWidth < PHONE_WIDTH ? 1024 : 2048
+  sun.shadow.mapSize.set(shadowSize, shadowSize)
   sun.shadow.bias = -0.0004
   sun.shadow.normalBias = 0.02
   Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 45 })
@@ -385,7 +400,7 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
       offset.setLength(clamp(offset.length() * (fit / previous), controls.minDistance, controls.maxDistance))
       camera.position.copy(controls.target).add(offset)
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.setPixelRatio(pixelRatioFor(width, height))
     renderer.setSize(width, height, false)
   }
 
@@ -463,7 +478,7 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
     const index = tileAt(point.x, point.z)
     if (index === null) return
     const tile = town[index]
-    const center = tileCenter(index)
+    const center = buildingCenter(town, index)
     marker.position.set(center.x, 0.06, center.z)
     markerStart = seconds
     callbacks.pick(tile.part ? { kind: 'part', part: tile.part, bridge: tile.ground === 'water' } : { kind: 'ground', ground: tile.ground })

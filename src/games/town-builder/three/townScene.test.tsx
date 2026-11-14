@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
-import { applyTool, COLS, createEmptyTown, createTown, type Town } from '../town'
-import { createTownScene } from './townScene'
+import { createTown } from '../maps'
+import { applyTool, COLS, createEmptyTown, type Town } from '../town'
+import { createTownScene, pixelRatioFor } from './townScene'
 import { tileCenter } from './townLayout'
 
 const mock = vi.hoisted(() => ({ render: vi.fn(), dispose: vi.fn(), disconnect: vi.fn(), fail: false, resize: null as (() => void) | null }))
@@ -109,8 +110,10 @@ function trainTown(): Town {
 it('draws the town in a canvas, keeps animating, and leaves nothing behind after dispose', () => {
   const first = setup()
   expect(first.canvas).not.toBeNull()
-  expect(first.callbacks.ready).toHaveBeenCalledWith({ car: expect.any(Number), train: 0 })
+  // はじめの まちには さいしょから せんろの わが あり、でんしゃも はしる。
+  expect(first.callbacks.ready).toHaveBeenCalledWith({ car: expect.any(Number), train: expect.any(Number) })
   expect(first.callbacks.ready.mock.calls[0][0].car).toBeGreaterThan(0)
+  expect(first.callbacks.ready.mock.calls[0][0].train).toBeGreaterThan(0)
   advance(500)
   expect(lastScene().getObjectByName('town-3d')).toBeDefined()
   expect(frames.size).toBe(1)
@@ -250,14 +253,14 @@ it('tells what was tapped, and ignores drags and taps on the sky', () => {
   lastScene().getObjectByName('town-vehicles')!.position.y = -100
   lastScene().updateMatrixWorld(true)
 
-  // 5れつめ・7ぎょうめ（index 6*COLS+4）の あかい おうち。
-  const house = tileCenter(6 * COLS + 4)
+  // 5れつめ・10ぎょうめ（index 9*COLS+4）の あかい おうち。
+  const house = tileCenter(9 * COLS + 4)
   const point = screenOf(new THREE.Vector3(house.x, 0.2, house.z))
   tap(canvas!, point.x, point.y)
   expect(callbacks.pick).toHaveBeenLastCalledWith({ kind: 'part', part: 'house', bridge: false })
 
   // はしの うえの みち。
-  const bridge = tileCenter(7 * COLS + 10)
+  const bridge = tileCenter(7 * COLS + 9)
   const onBridge = screenOf(new THREE.Vector3(bridge.x, 0.03, bridge.z))
   tap(canvas!, onBridge.x, onBridge.y)
   expect(callbacks.pick).toHaveBeenLastCalledWith({ kind: 'part', part: 'road', bridge: true })
@@ -290,4 +293,14 @@ it('fades into the night sky with stars and back to day', () => {
   advance(50)
   expect((lastScene().getObjectByName('town-stars') as THREE.Points).material).toHaveProperty('opacity', 1)
   late.scene.dispose()
+})
+
+it('limits how finely it draws on phones and very large screens', () => {
+  expect(pixelRatioFor(390, 700, 3)).toBe(1.5)
+  expect(pixelRatioFor(900, 600, 2)).toBe(2)
+  const wide = pixelRatioFor(1280, 720, 2)
+  expect(1280 * 720 * wide * wide).toBeLessThanOrEqual(2_500_001)
+  expect(pixelRatioFor(1280, 720, 1)).toBe(1)
+  expect(pixelRatioFor(2560, 1440, 2)).toBeLessThan(1.3)
+  expect(pixelRatioFor(5000, 5000, 1)).toBe(1)
 })
