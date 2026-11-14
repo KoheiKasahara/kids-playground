@@ -28,8 +28,9 @@
  */
 .logical {
   position: absolute;
-  left: 0;
-  top: 0;
+  /* Match the one-pixel drawing inset reserved by useBoardScale. */
+  left: 1px;
+  top: 1px;
   transform-origin: top left;
   overflow: hidden;
   /* 空色の盤に、ふわっとした雲と光だまりを重ねて奥行きを出す */

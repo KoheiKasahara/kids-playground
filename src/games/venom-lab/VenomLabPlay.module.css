@@ -253,8 +253,13 @@
  .modeNav button { min-height: 44px; padding: 6px 0; }
 }
 @media (orientation: landscape) and (max-height: 560px) {
- .hero, .brand { display: none; }
- .header { float: left; width: 45%; }
+ .shell { position: relative; }
+ .brand { visibility: hidden; }
+ .hero { position: absolute; top: 0; left: 100px; width: calc(45% - 200px); height: 48px; padding: 0; }
+ .hero h1 { margin: 0; font-size: 12px; line-height: 1.25; }
+ .hero .notebook { display: none; }
+ .header { float: left; width: 45%; gap: 8px; }
+ .header .smallButton { flex-shrink: 0; }
  .modeNav { margin-left: 48%; min-height: 48px; }
  .habitats { clear: both; grid-template-columns: repeat(8, minmax(0, 1fr)); }
  .habitatIcon { display: none; }
@@ -264,4 +269,8 @@
  .dialog { width: min(720px, calc(100% - 24px)); }
  .dialog .portrait { float: left; width: 42%; height: 180px; margin-right: 16px; }
  .dialog .more { clear: both; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 650px) {
+ .hero { left: 104px; width: calc(45% - 185px); }
 }
