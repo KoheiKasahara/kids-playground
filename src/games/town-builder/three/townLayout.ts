@@ -1,4 +1,5 @@
-import { carriesRoad, colOf, COLS, neighborIndex, rowOf, ROWS, type Dir, type Town } from '../town'
+import { sizeOf } from '../parts'
+import { buildingCells, carriesRoad, colOf, COLS, neighborIndex, rowOf, ROWS, type Dir, type Town } from '../town'
 
 // 3D の まちの ならべかた。three.js を つかわない じゅんすいな かんすう だけを おく。
 // 1マスを 1 とし、ちずの まんなかが 0、きた（ちずの うえ）が -z、ひがし（みぎ）が +x。
@@ -20,11 +21,31 @@ export function tileAt(x: number, z: number): number | null {
 /** みなみ（はじめの カメラの がわ）→ ひがし → にし → きた の じゅんに みちを さがす。 */
 const FACING_ORDER: readonly Dir[] = [2, 1, 3, 0]
 
-/** たてものの しょうめんを むける ほう。となりの みちに むけ、なければ みなみ。 */
+/** たてものの まんなか。おおきな たてものは のって いる マス ぜんぶの まんなか。 */
+export function buildingCenter(town: Town, index: number): Point {
+  const cells = buildingCells(town, index)
+  const points = cells.map(tileCenter)
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    z: points.reduce((sum, point) => sum + point.z, 0) / points.length,
+  }
+}
+
+/**
+ * たてものの しょうめんを むける ほう。となりの みちに むけ、なければ みなみ。
+ * よこながの おおきな たてものは まわすと マスから はみでるので、みなみか きたに だけ むける。
+ */
 export function facingOf(town: Town, index: number): Dir {
-  for (const dir of FACING_ORDER) {
-    const next = neighborIndex(index, dir)
-    if (next !== null && carriesRoad(town[next].part)) return dir
+  const cells = buildingCells(town, index)
+  const part = town[index]?.part ?? null
+  const [cols, rows] = part ? sizeOf(part) : [1, 1]
+  const order = cols === rows ? FACING_ORDER : FACING_ORDER.filter((dir) => dir === 0 || dir === 2)
+  for (const dir of order) {
+    const facesRoad = cells.some((cell) => {
+      const next = neighborIndex(cell, dir)
+      return next !== null && !cells.includes(next) && carriesRoad(town[next].part)
+    })
+    if (facesRoad) return dir
   }
   return 2
 }

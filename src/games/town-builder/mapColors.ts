@@ -7,6 +7,7 @@ const GROUND_COLORS: Record<Ground, string> = { grass: '#93cf67', water: '#5bbde
 const NATURE_COLORS: Partial<Record<BuildingId, string>> = {
   tree: '#3f9d48', pine: '#2f7d4a', palm: '#4fae5b', cactus: '#5fa55a', sakura: '#f6a8c4', flowers: '#ff9fc0',
   farm: '#b07a4a', park: '#7cc35a', fountain: '#8fd3f4', snowman: '#dfe9f2', pyramid: '#d9a441', tent: '#ff922b',
+  forest: '#357f3c', mountain: '#7c9a5e', ranch: '#b2e08a', beach: '#f6dfa0', pool: '#4dc3f0',
 }
 
 function partColor(part: TilePart, bridge: boolean): string {

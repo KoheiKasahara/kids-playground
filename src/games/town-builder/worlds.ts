@@ -2,9 +2,10 @@ import type { BuildingId, NetworkId, TilePart } from './parts'
 import { COLS, ROWS, type Ground, type Tile, type Town } from './town'
 
 // はじめの せかいを つくる。たね（seed）が おなじなら おなじ せかい、ちがえば ちがう かたちに なる。
-// どの せかいも ちずの まんなかに ちいさな むらが あり、とおくに みつけて うれしい ものを かくして おく。
+// どの せかいも ちずの まんなかに ちいさな むらと、でんしゃが まわる せんろの わと えきが あり、
+// とおくに みつけて うれしい ものを かくして おく。まっさらな ちずは maps.ts が もつ。
 
-export type WorldId = 'river' | 'island' | 'forest' | 'city' | 'rail' | 'castle' | 'snow' | 'desert' | 'empty'
+export type WorldId = 'river' | 'island' | 'forest' | 'city' | 'rail' | 'castle' | 'snow' | 'desert'
 
 export const WORLDS: readonly { id: WorldId; icon: string; label: string }[] = [
   { id: 'river', icon: '🏞️', label: 'かわの まち' },
@@ -15,10 +16,9 @@ export const WORLDS: readonly { id: WorldId; icon: string; label: string }[] = [
   { id: 'castle', icon: '🏰', label: 'おしろの くに' },
   { id: 'snow', icon: '⛄', label: 'ゆきの くに' },
   { id: 'desert', icon: '🐫', label: 'さばくの オアシス' },
-  { id: 'empty', icon: '🌱', label: 'まっさら' },
 ]
 
-/** はじめて あそぶ ときの かわの まちの たね。 */
+/** えらぶ カードの みほんと、はじめて あそぶ ときの たね。 */
 export const STARTER_SEED = 2026
 
 type Random = () => number
@@ -191,6 +191,18 @@ function putAll(land: Land, items: readonly (readonly [number, number, BuildingI
   for (const [c, r, part] of items) land.put(c, r, part)
 }
 
+/**
+ * でんしゃが まわる せんろの わ（しかく）と えき。みちと かさなると ふみきり、みずの うえは はしに なる。
+ * えきは ひだりの せんろの すぐ うちがわ、まんなかの よこの みち（R）の うえに おく（みちと せんろの りょうほうに となる）。
+ */
+function railLoop(land: Land, c0: number, r0: number, c1: number, r1: number): void {
+  land.line('rail', c0, r0, c1, r0)
+  land.line('rail', c0, r1, c1, r1)
+  land.line('rail', c0, r0, c0, r1)
+  land.line('rail', c1, r0, c1, r1)
+  land.replace(c0 + 1, R - 1, 'station')
+}
+
 /** よこの みちと、その りょうがわに ならぶ たてもの。 */
 function street(land: Land, random: Random, c0: number, c1: number, r: number, parts: readonly BuildingId[], fill: number): void {
   land.line('road', c0, r, c1, r)
@@ -215,6 +227,7 @@ function riverWorld(random: Random): Land {
   land.clear(C, R, 6)
   land.line('road', 8, R, 44, R)
   land.line('road', C, R, C, 12)
+  railLoop(land, C - 8, R - 6, C + 6, R + 6)
   putAll(land, [
     [C - 4, R - 1, 'house'], [C - 2, R - 1, 'house-blue'], [C - 2, R + 1, 'shop'], [C - 5, R + 1, 'tree'], [C + 3, R + 2, 'flowers'],
     // きたの はたけと ふうしゃ、にしの ふんすい、はしの むこうの おしろ。
@@ -245,6 +258,7 @@ function islandWorld(random: Random): Land {
   land.clear(C, R, 4.5)
   land.line('road', C - 5, R, C + 5, R)
   putAll(land, [[C - 3, R - 1, 'house'], [C - 1, R - 1, 'house-blue'], [C + 2, R - 1, 'shop'], [C - 2, R + 1, 'house'], [C + 3, R + 1, 'tent']])
+  railLoop(land, C - 6, R - 6, C + 6, R + 6)
   // まんなかの しまの ひがしの はしに とうだい。
   for (let c = C + 12; c > C; c -= 1) {
     if (land.groundAt(c, R - 2) === 'sand' && land.put(c, R - 2, 'lighthouse')) break
@@ -273,6 +287,7 @@ function forestWorld(random: Random): Land {
   })
   land.clear(C, R, 6)
   land.line('road', 2, R, C + 6, R)
+  railLoop(land, C - 8, R - 6, C + 7, R + 6)
   putAll(land, [
     [C - 3, R - 1, 'house'], [C + 1, R - 1, 'house-blue'], [C - 1, R + 1, 'cake'], [C + 3, R + 1, 'tent'], [C + 4, R - 1, 'tent'],
     [C + 5, R - 2, 'windmill'], [C - 5, R + 2, 'farm'], [C - 4, R + 2, 'farm'], [C - 5, R + 3, 'farm'], [C - 4, R + 3, 'farm'], [C + 1, R + 2, 'fountain'],
@@ -299,7 +314,11 @@ function cityWorld(random: Random): Land {
     land.line('road', line, first, line, last)
   }
   land.line('road', 0, R, COLS - 1, R)
-  land.line('rail', 0, 37, COLS - 1, 37)
+  // まちの みなみを でんしゃが ぐるっと まわる（かわの うえは はし）。
+  land.line('rail', 2, 37, COLS - 3, 37)
+  land.line('rail', 2, 44, COLS - 3, 44)
+  land.line('rail', 2, 37, 2, 44)
+  land.line('rail', COLS - 3, 37, COLS - 3, 44)
   land.line('road', C, last, C, 40)
   for (let r = first + 1; r < last; r += 1) {
     for (let c = first + 1; c < last; c += 1) {
@@ -378,6 +397,7 @@ function castleWorld(random: Random): Land {
   })
   land.line('road', C - 9, R, C + 10, R)
   land.line('road', C, R - 8, C, R + 9)
+  railLoop(land, C - 6, R - 6, C + 6, R + 6)
   land.replace(C, R, 'castle')
   for (let r = R - 3; r <= R + 3; r += 1) {
     for (let c = C - 3; c <= C + 3; c += 1) {
@@ -413,6 +433,7 @@ function snowWorld(random: Random): Land {
   land.clear(C, R, 6)
   land.line('road', C - 8, R, C + 8, R)
   land.line('road', C, R, C, R + 9)
+  railLoop(land, C - 7, R - 5, C + 7, R + 6)
   putAll(land, [
     [C - 5, R - 1, 'igloo'], [C - 3, R - 1, 'igloo'], [C + 2, R - 1, 'igloo'], [C + 4, R - 1, 'house'], [C - 3, R + 1, 'shop'],
     [C - 1, R + 1, 'snowman'], [C + 2, R + 1, 'snowman'], [C + 5, R + 1, 'pine'], [C - 1, R + 9, 'windmill'], [C + 1, R + 8, 'igloo'],
@@ -445,6 +466,7 @@ function desertWorld(random: Random): Land {
   land.clear(C, R, 4.5)
   land.line('road', 2, R, C + 6, R)
   land.line('road', C, R, C, R - 3)
+  railLoop(land, C - 7, R - 2, C + 7, R + 7)
   putAll(land, [[C - 4, R - 1, 'house'], [C - 2, R - 1, 'house-blue'], [C + 2, R - 1, 'shop'], [C + 4, R + 1, 'tent'], [C - 3, R + 1, 'house']])
   const site = { c: int(random, 34, 40), r: int(random, 8, 14) }
   for (const [dc, dr] of [[0, 0], [2, 1], [-1, 3]] as const) {
@@ -464,16 +486,10 @@ const BUILDERS: Record<WorldId, (random: Random) => Land> = {
   castle: castleWorld,
   snow: snowWorld,
   desert: desertWorld,
-  empty: () => new Land('grass'),
 }
 
 export function createWorld(id: WorldId, seed: number): Town {
   return BUILDERS[id](randomOf(seed)).toTown()
-}
-
-/** はじめて あそぶ ときの まち（いつも おなじ かわの まち）。 */
-export function createTown(): Town {
-  return createWorld('river', STARTER_SEED)
 }
 
 export function randomSeed(): number {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createTown } from './maps'
 import { applyTool, carriesRail, carriesRoad, COLS, createEmptyTown, neighborIndex, type Dir, type Town } from './town'
-import { createTown } from './worlds'
 import { isOnTrack, stepVehicle, stepVehicles, syncVehicles, vehiclePose, vehicleTarget, type Vehicle } from './vehicles'
 
 const at = (col: number, row: number) => row * COLS + col

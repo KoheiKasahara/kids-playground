@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { isBuilding } from './parts'
 import { CENTER_INDEX, carriesRoad, COLS, colOf, decodeTown, encodeTown, populationOf, rankOf, RANKS, ROWS, rowOf } from './town'
-import { createTown, createWorld, randomSeed, STARTER_SEED, WORLDS } from './worlds'
+import { createWorld, randomSeed, STARTER_SEED, WORLDS } from './worlds'
 
 const SEEDS = [1, 7, 99, 2026, 123456789]
-const built = WORLDS.filter((world) => world.id !== 'empty')
 
 describe('worlds', () => {
   it('offers many different worlds with unique names and icons', () => {
@@ -26,17 +25,16 @@ describe('worlds', () => {
   })
 
   it('makes the same world from the same seed and a different one from another seed', () => {
-    for (const world of built) {
+    for (const world of WORLDS) {
       expect(createWorld(world.id, 5)).toEqual(createWorld(world.id, 5))
       expect(createWorld(world.id, 5)).not.toEqual(createWorld(world.id, 6))
     }
-    expect(createTown()).toEqual(createWorld('river', STARTER_SEED))
     const seed = randomSeed()
     expect(Number.isInteger(seed) && seed >= 0).toBe(true)
   })
 
   it('starts every world with a small village on a road in the middle of the map', () => {
-    for (const world of built) {
+    for (const world of WORLDS) {
       for (const seed of SEEDS) {
         const town = createWorld(world.id, seed)
         expect(populationOf(town), `${world.id} ${seed}`).toBeGreaterThan(0)
@@ -45,7 +43,6 @@ describe('worlds', () => {
         expect(nearRoad, `${world.id} ${seed}`).toBe(true)
       }
     }
-    expect(createWorld('empty', 1).every((tile) => tile.ground === 'grass' && tile.part === null)).toBe(true)
   })
 
   it('gives each world its own scenery', () => {
@@ -55,7 +52,7 @@ describe('worlds', () => {
 
     // かわの まち：かわに はしが かかり、はじめは ちいさな むら。
     expect(all(count('river', (tile) => tile.ground === 'water' && tile.part === 'road'), 1)).toBe(true)
-    expect(RANKS[rankOf(populationOf(createTown()))].label).toBe('むら')
+    expect(RANKS[rankOf(populationOf(createWorld('river', STARTER_SEED)))].label).toBe('むら')
     // しま：ほとんどが うみで、すなはまと やしのき、とうだいと おしろが ある。
     expect(all(count('island', (tile) => tile.ground === 'water'), COLS * ROWS * 0.5)).toBe(true)
     expect(all(count('island', (tile) => tile.ground === 'sand'), 30)).toBe(true)

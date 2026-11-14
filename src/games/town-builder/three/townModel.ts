@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import { findPart, isBuilding } from '../parts'
-import { isConnected, type Town } from '../town'
+import { isConnected, scaleOf, type Town } from '../town'
 import { buildBuilding, type Tick } from './buildingModels'
 import { buildGround, type Crossing } from './groundModels'
 import { Frame, matrixOf, TownKit } from './townKit'
-import { facingAngle, facingOf, tileCenter, tileNoise } from './townLayout'
+import { buildingCenter, facingAngle, facingOf, tileNoise } from './townLayout'
 
 // まち ぜんたいの 3D を くみたてる。うごかない ものは まとめ、うごく ものは ticks で うごかす。
 
@@ -30,8 +30,12 @@ export function buildTownModel(town: Town): TownModel {
   town.forEach((tile, index) => {
     const part = tile.part
     if (!isBuilding(part)) return
-    const center = tileCenter(index)
-    const base = matrixOf([center.x, 0, center.z], [0, facingAngle(facingOf(town, index)), 0])
+    // おおきな たてものは ひだりうえの マスで 1かい だけ つくる。
+    if (tile.anchor !== undefined && tile.anchor !== index) return
+    const center = buildingCenter(town, index)
+    // おおきく おいた たてものは かたちを まるごと ばいに する。
+    const scale = scaleOf(tile)
+    const base = matrixOf([center.x, 0, center.z], [0, facingAngle(facingOf(town, index)), 0], [scale, scale, scale])
     buildBuilding(part, new Frame(kit, base), {
       lit: !findPart(part)?.needsRoad || isConnected(town, index),
       noise: (salt) => tileNoise(index, salt),

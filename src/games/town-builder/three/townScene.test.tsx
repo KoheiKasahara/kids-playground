@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
+import { createTown } from '../maps'
 import { applyTool, COLS, createEmptyTown, type Town } from '../town'
-import { createTown } from '../worlds'
-import { createTownScene } from './townScene'
+import { createTownScene, pixelRatioFor } from './townScene'
 import { tileCenter } from './townLayout'
 
 const mock = vi.hoisted(() => ({ render: vi.fn(), dispose: vi.fn(), disconnect: vi.fn(), fail: false, resize: null as (() => void) | null }))
@@ -110,8 +110,10 @@ function trainTown(): Town {
 it('draws the town in a canvas, keeps animating, and leaves nothing behind after dispose', () => {
   const first = setup()
   expect(first.canvas).not.toBeNull()
-  expect(first.callbacks.ready).toHaveBeenCalledWith({ car: expect.any(Number), train: 0 })
+  // はじめの まちには さいしょから せんろの わが あり、でんしゃも はしる。
+  expect(first.callbacks.ready).toHaveBeenCalledWith({ car: expect.any(Number), train: expect.any(Number) })
   expect(first.callbacks.ready.mock.calls[0][0].car).toBeGreaterThan(0)
+  expect(first.callbacks.ready.mock.calls[0][0].train).toBeGreaterThan(0)
   advance(500)
   expect(lastScene().getObjectByName('town-3d')).toBeDefined()
   expect(frames.size).toBe(1)
@@ -292,4 +294,14 @@ it('fades into the night sky with stars and back to day', () => {
   advance(50)
   expect((lastScene().getObjectByName('town-stars') as THREE.Points).material).toHaveProperty('opacity', 1)
   late.scene.dispose()
+})
+
+it('limits how finely it draws on phones and very large screens', () => {
+  expect(pixelRatioFor(390, 700, 3)).toBe(1.5)
+  expect(pixelRatioFor(900, 600, 2)).toBe(2)
+  const wide = pixelRatioFor(1280, 720, 2)
+  expect(1280 * 720 * wide * wide).toBeLessThanOrEqual(2_500_001)
+  expect(pixelRatioFor(1280, 720, 1)).toBe(1)
+  expect(pixelRatioFor(2560, 1440, 2)).toBeLessThan(1.3)
+  expect(pixelRatioFor(5000, 5000, 1)).toBe(1)
 })

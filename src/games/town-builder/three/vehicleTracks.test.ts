@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
+import { createTown } from '../maps'
 import { applyTool, carriesRail, carriesRoad, COLS, createEmptyTown, type Town } from '../town'
-import { createTown } from '../worlds'
 import type { Vehicle } from '../vehicles'
 import { tileAt } from './townLayout'
 import { advanceTracks, headingOf, startTracks, trackPose, type Track } from './vehicleTracks'
