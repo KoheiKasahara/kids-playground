@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createCountrysideScene } from './journeyCountryside'
 import { CITY_CROSSING, createCityDistrict } from './journeyCity'
 import { createDowntownScene } from './journeyDowntown'
 import { type JourneyCourse, type JourneyRoutes, MAPS } from './journeyModel'
@@ -14,7 +15,7 @@ export type JourneyWorld = {
 }
 
 export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3D): JourneyWorld {
-  return course.id === 'downtown' ? createDowntownScene(course, sleeper) : createIslandScene(course, sleeper)
+  return course.id === 'downtown' ? createDowntownScene(course, sleeper) : course.id === 'island' ? createIslandScene(course, sleeper) : createCountrysideScene(course, sleeper)
 }
 
 function createIslandScene(course: JourneyCourse, sleeper: THREE.Object3D): JourneyWorld {

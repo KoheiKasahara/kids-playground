@@ -8,9 +8,9 @@ const MIN_ZOOM = 0.45
 const MAX_ZOOM = 3
 
 export function createMarbleScene(container: HTMLDivElement) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'low-power' })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6))
-  renderer.shadowMap.enabled = true
+  const renderer = new THREE.WebGLRenderer({ antialias: window.devicePixelRatio <= 1, alpha: false, powerPreference: 'low-power' })
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25))
+  renderer.shadowMap.enabled = container.clientWidth > 600
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.shadowMap.autoUpdate = false
   renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -25,14 +25,15 @@ export function createMarbleScene(container: HTMLDivElement) {
   scene.environmentIntensity = 0.5
   room.dispose()
   pmrem.dispose()
-  const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 180)
+  const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000)
   const target = new THREE.Vector3(0, 2, 0)
   const overviewTarget = target.clone()
   // What the fingers dragged the view by, kept on top of whatever the course bounds fit to.
   const panOffset = new THREE.Vector3()
-  const cameraOffset = new THREE.Vector3(10, 15, 18)
+  const cameraOffset = new THREE.Vector3(10, 15, 18).normalize().multiplyScalar(350)
   let viewSize = 14
   let overviewSize = 14
+  let followEnabled = true
   let zoom = 1
   let aspect = 1
   const light = new THREE.DirectionalLight(0xfff1d7, 2)
@@ -45,7 +46,7 @@ export function createMarbleScene(container: HTMLDivElement) {
   light.shadow.normalBias = 0.04
   scene.add(light, new THREE.HemisphereLight(0xd7f5ff, 0xc9c5ad, 0.85))
   const floorMaterial = new THREE.MeshStandardMaterial({ color: '#e5eee4', roughness: 0.95 })
-  const floorGeometry = new THREE.PlaneGeometry(120, 120)
+  const floorGeometry = new THREE.PlaneGeometry(BOARD_LIMIT * 2 + 24, BOARD_LIMIT * 2 + 24)
   const floor = new THREE.Mesh(floorGeometry, floorMaterial)
   floor.rotation.x = -Math.PI / 2
   floor.position.y = -0.09
@@ -202,6 +203,7 @@ export function createMarbleScene(container: HTMLDivElement) {
     overviewSize = Math.max(10, maxY * 2.7, maxX * 2.7 / aspect)
   }
   function update(course: Course, selectedId: string | null, fitCamera = true) {
+    followEnabled = true
     current = course
     const ids = new Set(course.parts.map(part => part.id))
     for (const [id, mesh] of meshes) if (!ids.has(id)) { root.remove(mesh); meshes.delete(id); moving.delete(id) }
@@ -254,6 +256,8 @@ export function createMarbleScene(container: HTMLDivElement) {
           mesh.add(arrow)
         }
       }
+      mesh.geometry = geometries[part.kind]
+      mesh.material = materials[part.kind]
       mesh.position.copy(part.position)
       mesh.rotation.y = -part.rotation * Math.PI / 2
       const mechanism = moving.get(part.id)
@@ -330,6 +334,7 @@ export function createMarbleScene(container: HTMLDivElement) {
     if (count) overlap.computeBoundingSphere()
   }
   function render(follow: Vec3 | null, reducedMotion: boolean) {
+    follow = followEnabled ? follow : null
     const destination = follow && !reducedMotion ? new THREE.Vector3(follow.x, Math.max(1, follow.y), follow.z) : overviewTarget.clone().add(panOffset)
     target.lerp(destination, reducedMotion ? 1 : 0.08)
     const nearJump = follow && current.parts.some(part => part.kind === 'jump' && Math.abs(toLocal(part, follow).x) < 4 && Math.abs(toLocal(part, follow).z) < 2)
@@ -368,7 +373,7 @@ export function createMarbleScene(container: HTMLDivElement) {
       const part = current.parts.find(item => item.id === event.id)
       if (part && boostGlow.visible) { boostGlow.position.copy(part.position); boostGlow.rotation.y = -part.rotation * Math.PI / 2 }
     },
-    zoom(delta: number) { zoom = THREE.MathUtils.clamp(zoom + delta, MIN_ZOOM, MAX_ZOOM); projection() },
+    zoom(delta: number) { followEnabled = false; zoom = THREE.MathUtils.clamp(zoom + delta, MIN_ZOOM, MAX_ZOOM); projection() },
     /** Pinching scales what is already on screen, so the same gesture works at any zoom. */
     zoomBy(factor: number) { zoom = THREE.MathUtils.clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM); projection() },
     /** Drags the board under the fingers: screen pixels become ground distance at the current zoom. */
@@ -384,7 +389,7 @@ export function createMarbleScene(container: HTMLDivElement) {
       panOffset.x = THREE.MathUtils.clamp(panOffset.x, -BOARD_LIMIT, BOARD_LIMIT)
       panOffset.z = THREE.MathUtils.clamp(panOffset.z, -BOARD_LIMIT, BOARD_LIMIT)
     },
-    overview() { zoom = 1; panOffset.set(0, 0, 0); fit() },
+    overview() { followEnabled = false; zoom = 1; panOffset.set(0, 0, 0); fit() },
     dispose() {
       observer.disconnect()
       for (const item of Object.values(geometries)) item.dispose()

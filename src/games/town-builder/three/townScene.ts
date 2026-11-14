@@ -5,7 +5,7 @@ import type { TilePart } from '../parts'
 import { COLS, ROWS, type Ground, type Town } from '../town'
 import type { VehicleKind } from '../vehicles'
 import { buildTownModel, type TownModel } from './townModel'
-import { buildingCenter, fitDistance, tileAt } from './townLayout'
+import { buildingCenter, farDistance, fitDistance, tileAt, tileCenter } from './townLayout'
 import { advanceTracks, startTracks, trackPose, type Track } from './vehicleTracks'
 import { RIDE_HEIGHT, vehicleModel } from './vehicleModels'
 
@@ -44,6 +44,10 @@ export type TownSceneHandle = {
 }
 
 const FOV = 42
+/** ほしと つきを おく そらの はんけい。ちず ぜんたいを はなれて みても そとがわに ある。 */
+const SKY_RADIUS = 240
+/** たいようの むき（かげの おちる ほう）。 */
+const SUN_OFFSET = new THREE.Vector3(7, 14, 9)
 const STEP_SECONDS = 1
 const INTRO_SECONDS = 1.8
 const NIGHT_SECONDS = 0.7
@@ -88,7 +92,7 @@ function skyDecor(): { group: THREE.Group; stars: THREE.PointsMaterial; moon: TH
     const angle = random() * Math.PI * 2
     const height = 0.15 + random() * 0.85
     const flat = Math.sqrt(1 - height * height)
-    positions.push(Math.cos(angle) * flat * 80, height * 80, Math.sin(angle) * flat * 80)
+    positions.push(Math.cos(angle) * flat * SKY_RADIUS, height * SKY_RADIUS, Math.sin(angle) * flat * SKY_RADIUS)
   }
   const starGeometry = new THREE.BufferGeometry()
   starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
@@ -97,23 +101,25 @@ function skyDecor(): { group: THREE.Group; stars: THREE.PointsMaterial; moon: TH
   points.name = 'town-stars'
   group.add(points)
 
-  const moonGeometry = new THREE.IcosahedronGeometry(2.4, 2)
+  const moonGeometry = new THREE.IcosahedronGeometry(SKY_RADIUS * 0.03, 2)
   const moon = new THREE.MeshBasicMaterial({ color: '#fff6c8', transparent: true, opacity: 0 })
   const moonMesh = new THREE.Mesh(moonGeometry, moon)
-  moonMesh.position.set(-30, 34, -46)
+  moonMesh.position.set(-SKY_RADIUS * 0.375, SKY_RADIUS * 0.425, -SKY_RADIUS * 0.575)
   group.add(moonMesh)
 
   const puffGeometry = new THREE.IcosahedronGeometry(1, 1)
   const cloud = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 })
   // くもは ちずより したに うかべる（そらに うかぶ しまの まち）。うえに おくと まちを かくして しまう。
-  // 9この くも（4つずつの たま）を まとめて 1かいで えがく。
-  const clouds = new THREE.InstancedMesh(puffGeometry, cloud, 9 * 4)
+  // ちずの まわりに ならべる くも（4つずつの たま）を まとめて 1かいで えがく。ひろい ちずほど おおく ならべる。
+  const edge = Math.max(COLS, ROWS) / 2
+  const count = Math.round(edge * 1.3)
+  const clouds = new THREE.InstancedMesh(puffGeometry, cloud, count * 4)
   clouds.name = 'town-clouds'
   clouds.frustumCulled = false
   const puff = new THREE.Object3D()
-  for (let n = 0; n < 9; n += 1) {
-    const angle = (n / 9) * Math.PI * 2 + random() * 0.4
-    const radius = 9 + random() * 6
+  for (let n = 0; n < count; n += 1) {
+    const angle = (n / count) * Math.PI * 2 + random() * 0.4
+    const radius = edge + 2 + random() * 6
     const center = new THREE.Vector3(Math.cos(angle) * radius, -2.6 + random() * 1.1, Math.sin(angle) * radius)
     for (let p = 0; p < 4; p += 1) {
       const size = 0.55 + random() * 0.5
@@ -138,7 +144,8 @@ function skyDecor(): { group: THREE.Group; stars: THREE.PointsMaterial; moon: TH
   }
 }
 
-export function createTownScene(host: HTMLDivElement, town: Town, night: boolean, callbacks: TownSceneCallbacks): TownSceneHandle {
+/** focus は はじめに ながめる マス（2D で みて いた ばしょ）。 */
+export function createTownScene(host: HTMLDivElement, town: Town, night: boolean, callbacks: TownSceneCallbacks, focus?: number): TownSceneHandle {
   let renderer: THREE.WebGLRenderer
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -157,18 +164,17 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
   const scene = new THREE.Scene()
   scene.background = SKY.day.clone()
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 300)
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 700)
   const hemi = new THREE.HemisphereLight(HEMI.day, HEMI.groundDay, 1.7)
   const sun = new THREE.DirectionalLight(SUN.day, 2.4)
-  sun.position.set(7, 14, 9)
+  sun.position.copy(SUN_OFFSET)
   sun.castShadow = true
   // スマホの せまい がめんでは かげの こまかさを おとして かるく する。
   const shadowSize = host.clientWidth > 0 && host.clientWidth < PHONE_WIDTH ? 1024 : 2048
   sun.shadow.mapSize.set(shadowSize, shadowSize)
   sun.shadow.bias = -0.0004
   sun.shadow.normalBias = 0.02
-  Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 45 })
-  sun.shadow.camera.updateProjectionMatrix()
+  let shadowSpan = 0
   scene.add(hemi, sun, sun.target)
 
   const model: TownModel = buildTownModel(town)
@@ -211,7 +217,8 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
   controls.maxPolarAngle = 1.38
   controls.autoRotateSpeed = 0.6
   controls.autoRotate = false
-  controls.target.set(0, 0.2, 0)
+  const home = focus === undefined ? { x: 0, z: 0 } : tileCenter(focus)
+  controls.target.set(home.x, 0.2, home.z)
 
   let disposed = false
   let failed = false
@@ -261,6 +268,20 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
     if (shift.lengthSq() === 0) return
     target.add(shift)
     camera.position.add(shift)
+  }
+
+  /** ひろい ちずでも かげが くっきり するよう、みて いる あたり だけに かげを おとす。 */
+  function updateShadow() {
+    const center = mode.kind === 'sky' ? controls.target : look
+    const span = clamp(camera.position.distanceTo(center) * 0.55, 9, 30)
+    if (Math.abs(span - shadowSpan) > shadowSpan * 0.15) {
+      shadowSpan = span
+      Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 60 })
+      sun.shadow.camera.updateProjectionMatrix()
+    }
+    // かげが ちらつかない よう、マスの はんぶんの きざみで うごかす。
+    sun.target.position.set(Math.round(center.x * 2) / 2, 0, Math.round(center.z * 2) / 2)
+    sun.position.copy(sun.target.position).add(SUN_OFFSET)
   }
 
   function trackOf(id: number): Track | undefined {
@@ -370,6 +391,7 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
     sky.group.rotation.y = reducedMotion ? 0 : seconds * 0.01
     updateMarker()
     updateCamera(dt)
+    updateShadow()
     renderer.render(scene, camera)
     raf = requestAnimationFrame(render)
   }
@@ -393,7 +415,7 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
     camera.updateProjectionMatrix()
     const previous = fit
     fit = fitDistance(aspect, FOV)
-    controls.maxDistance = fit * 1.4
+    controls.maxDistance = farDistance(aspect, FOV)
     if (mode.kind === 'sky' && !intro && previous !== fit) {
       // がめんの むきが かわったら、おなじ わりあいの きょりに する。
       const offset = camera.position.clone().sub(controls.target)
@@ -526,6 +548,7 @@ export function createTownScene(host: HTMLDivElement, town: Town, night: boolean
   controls.autoRotate = !intro && tourWanted
   controls.update()
   updateVehicles()
+  updateShadow()
   const stopObserving = observeGameActivity((active) => {
     if (active) start()
     else stop()

@@ -9,7 +9,7 @@ import { golfSound, type GolfSoundKind } from './golfSound'
 import { usePutterGolfEngine, type EngineEvent, type GolfCamera, type GolfFeedback, type GolfStatus } from './usePutterGolfEngine'
 import styles from './PutterGolfPlay.module.css'
 
-const EMPTY: GolfFeedback = { phase: 'ready', strokes: 0, power: 0.5, aiming: false, returning: false }
+const EMPTY: GolfFeedback = { phase: 'ready', strokes: 0, power: 0.5, aiming: false, returning: false, remaining: null }
 
 /** むきの ボタンを おしつづけている あいだ、この あいだかくで すこしずつ まわす。 */
 const TURN_REPEAT_MS = 110
@@ -327,7 +327,7 @@ export default function PutterGolfPlay() {
   const totals = roundTotals(round.scores)
   const caption = phase === 'select'
     ? 'すきな コースを えらんでね'
-    : message ?? (feedback.phase === 'rolling' ? 'ころころ…' : feedback.aiming ? 'はなすと うつよ！' : round.strokes === 0 ? hole.tip : 'ひっぱって はなすと うてるよ')
+    : message ?? (holed ? 'やったね！ カップイン！' : feedback.phase === 'rolling' ? 'ころころ…' : feedback.aiming ? 'はなすと うつよ！' : round.strokes === 0 ? hole.tip : 'ひっぱって はなすと うてるよ')
 
   return (
     <GamePlaySurface>
@@ -351,7 +351,14 @@ export default function PutterGolfPlay() {
             {phase !== 'select' && <aside className={styles.map} aria-label={`ホール ${holeIndex + 1}/${course.holes.length}「${hole.name}」の ちず`}>
               <HoleMap hole={hole} course={course} markerRef={registerMapMarker} />
               <span>ホール {holeIndex + 1}/{course.holes.length}</span>
+              {phase === 'play' && feedback.remaining !== null && !holed && <span className={styles.remaining} aria-label={`カップまで あと ${feedback.remaining}メートル`}>あと <strong>{feedback.remaining}</strong>m</span>}
             </aside>}
+            {/* ホールの はじめに、なまえを 大きく 出して すぐ 消す（かざり。なまえは 下の 行と ちずの ラベルにも ある）。 */}
+            {phase === 'play' && round.strokes === 0 && !holed && <div key={`${hole.id}:${attempt}`} className={styles.holeTitle} aria-hidden="true">
+              <span>ホール {holeIndex + 1}</span>
+              <b>{hole.name}</b>
+              <i>めやす {hole.par}かい</i>
+            </div>}
             {phase === 'play' && feedback.aiming && <div className={styles.powerMeter} aria-hidden="true"><span style={{ height: `${Math.round(feedback.power * 100)}%` }} /></div>}
             {phase === 'play' && holed && lastScore && <section className={styles.holeResult} aria-label="カップイン" data-stamp={lastScore.stamp}>
               <strong>{lastScore.stamp === 'hole-in-one' ? 'ホールインワン！' : 'カップイン！'}</strong>

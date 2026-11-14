@@ -94,15 +94,12 @@ import {
   RAIL_CAMERA_CLIP_NEAR,
 } from './railCameraFit'
 
-const WORLD_SIZE = 100
+const WORLD_SIZE = 200
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
 const PAN_LIMIT = WORLD_HALF_SIZE - 4
-export const ZOOM_STEP = 0.14
-// 元のズーム範囲(0.72〜1.75)の上下に、+/-ボタンぶん広げる。
-// マップが縦横2倍になった分、いちばん引いたときに全体を見渡せるよう
-// 縮小側だけ広めに(4段階ぶん)確保する。
-export const MIN_ZOOM = 0.72 - ZOOM_STEP * 4
-export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
+export const ZOOM_STEP = 0.05
+export const MIN_ZOOM = 0.1
+export const MAX_ZOOM = 2.2
 const DEFAULT_ZOOM = 1
 /** 遮断機が下りている間に「カン」を鳴らす間隔（秒）。 */
 const CROSSING_BELL_INTERVAL = 0.42
@@ -117,7 +114,7 @@ type CrossingGateVisual = {
   /** 走っている電車が近い間だけtrue。警報灯の点滅と警報音に使う。 */
   alarm: boolean
 }
-const BASE_VIEW_SIZE = 15
+export const BASE_VIEW_SIZE = 15
 const CAMERA_OFFSET = { x: 18, y: 23, z: 20 } as const
 const CAMERA_OVERVIEW_TARGET = { x: 0, y: 0, z: 0 } as const
 const WORLD_MIN_HEIGHT = -0.5
@@ -1942,6 +1939,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function setCameraTarget(next: RailVec3) {
+      const previousTarget = cameraTarget.clone()
       cameraTarget.x = Math.min(PAN_LIMIT, Math.max(-PAN_LIMIT, next.x))
       cameraTarget.y = 0
       cameraTarget.z = Math.min(PAN_LIMIT, Math.max(-PAN_LIMIT, next.z))
@@ -1950,7 +1948,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         y: cameraTarget.y,
         z: cameraTarget.z,
       }
-      updateCamera()
+      // Following only translates along the fixed camera plane; no layout read or projection rebuild.
+      if (camera !== null) {
+        camera.position.add(cameraTarget).sub(previousTarget)
+        const direction = new THREE.Vector3(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z).normalize()
+        camera.position.addScaledVector(direction, -cameraTarget.clone().sub(previousTarget).dot(direction))
+        camera.lookAt(cameraTarget)
+      }
     }
 
     function getPointerNdc(event: PointerEvent) {
@@ -3123,9 +3127,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       group.name = `rail-${piece.id}`
       group.userData.pieceId = piece.id
 
-      const segmentCount = piece.kind === 'curve' || piece.kind === 'branch'
+      const segmentCount = piece.path.kind === 'curve' || piece.kind === 'branch'
         ? 12
-        : piece.kind === 'slope'
+        : (piece.kind === 'slope' || piece.kind === 'down-slope')
           ? 24
           : piece.kind === 'station'
             ? 12
@@ -3218,9 +3222,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function syncPieces(pieces: readonly RailPiece[], selectedPieceId: string | null) {
+      const incomingIds = new Set(pieces.map((piece) => piece.id))
+      const replaced = trainPieces.length > 0 && !trainPieces.some((piece) => incomingIds.has(piece.id))
+      if (replaced) {
+        fleet = []
+        followedTrainId = null
+        setCameraTarget({ x: 0, y: 0, z: 0 })
+      }
       trainPieces = pieces
       if (fleet.length === 0 && pieces.length > 0) fleet = createInitialRailFleet(pieces, 1)
-      const incomingIds = new Set(pieces.map((piece) => piece.id))
       for (const [pieceId, object] of pieceObjects) {
         if (incomingIds.has(pieceId)) continue
         releaseRailPiece(object)
@@ -3711,7 +3721,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     try {
       scene = new THREE.Scene()
       scene.background = new THREE.Color('#cfeef3')
-      scene.fog = new THREE.Fog('#cfeef3', 38, 78)
+      scene.fog = null
       // マップが2倍に広がった分、遠くの端を見ているときにクリップされないよう far を広げる。
       camera = new THREE.OrthographicCamera(-1, 1, 1, -1, RAIL_CAMERA_CLIP_NEAR, RAIL_CAMERA_CLIP_FAR)
       camera.lookAt(cameraTarget)
@@ -3789,6 +3799,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       host.addEventListener('wheel', handleWheel, { passive: false })
       host.addEventListener('contextmenu', handleContextMenu)
 
+      let lastShadowTime = 0
+      renderer.shadowMap.autoUpdate = false
       const render = () => {
         if (released || renderer === null || scene === null || camera === null) return
         const now = typeof performance === 'undefined' ? lastFrameTime : performance.now()
@@ -3828,6 +3840,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           representative === undefined || representative.trainType === 'basic' ? 'local' : 'shinkansen',
         )
         updateTrainSelectionRing(optionsRef.current.selectedTrainId)
+        // Shadow rendering is a second scene pass; train movement still renders every frame.
+        renderer.shadowMap.needsUpdate = now - lastShadowTime >= 1000 / 30
+        if (renderer.shadowMap.needsUpdate) lastShadowTime = now
         renderer.render(scene, camera)
         rafId = window.requestAnimationFrame(render)
       }

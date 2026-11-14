@@ -17,7 +17,7 @@ const TOOLS: ToolId[] = [...PARTS.map((part) => part.id), 'erase']
 it.each(MAPS.map((map) => [map.id]))('updates only the changed tiles of %s, and the result matches a full redraw', (id) => {
   const random = seeded(id.length * 31 + 7)
   let board = boardOf(createMapTown(id))
-  for (let step = 0; step < 120; step += 1) {
+  for (let step = 1; step <= 120; step += 1) {
     const index = Math.floor(random() * COLS * ROWS)
     const tool = TOOLS[Math.floor(random() * TOOLS.length)]
     const scale = (1 + Math.floor(random() * 3)) as Scale

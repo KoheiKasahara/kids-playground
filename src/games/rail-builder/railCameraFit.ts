@@ -65,7 +65,7 @@ export const RAIL_CAMERA_FOG_NEAR_SPAN_RATIO = 0.1
 /** bounds の最深部から fog end までの割合。 */
 export const RAIL_CAMERA_FOG_FAR_SPAN_RATIO = 0.2
 export const RAIL_CAMERA_CLIP_NEAR = 0.1
-export const RAIL_CAMERA_CLIP_FAR = 220
+export const RAIL_CAMERA_CLIP_FAR = 440
 
 function add(a: RailCameraVector3, b: RailCameraVector3): RailCameraVector3 {
   return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }

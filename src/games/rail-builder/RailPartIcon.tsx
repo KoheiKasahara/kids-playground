@@ -27,6 +27,13 @@ type RailPartIconProps = {
 
 export default function RailPartIcon({ kind, branchSide = DEFAULT_BRANCH_SIDE }: RailPartIconProps) {
   switch (kind) {
+    case 'long-straight':
+      return <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M20 4V60 M44 4V60 M14 10H50 M14 20H50 M14 30H50 M14 40H50 M14 50H50" fill="none" stroke={RAIL_COLOR} strokeWidth="4" /></svg>
+    case 'wide-curve':
+    case 'gentle-curve':
+      return <svg viewBox="0 0 64 64" aria-hidden="true"><path d={kind === 'wide-curve' ? 'M8 60 Q8 8 60 8 M22 60 Q22 22 60 22' : 'M10 60 Q10 28 30 8 M24 60 Q24 34 44 18'} fill="none" stroke={RAIL_COLOR} strokeWidth="6" /></svg>
+    case 'down-slope':
+      return <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 12L52 52 M18 6L62 46 M38 54H56V36" fill="none" stroke={RAIL_COLOR} strokeWidth="6" /></svg>
     case 'straight':
       return (
         <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">

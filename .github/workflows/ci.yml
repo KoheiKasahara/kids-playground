@@ -176,6 +176,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      actions: write # Remove only this run's deployed Pages artifact
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -183,3 +184,27 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      # The Pages artifact is needed until deploy-pages finishes successfully.
+      # Keep test reports, failure diagnostics and caches untouched.
+      - name: Delete deployed Pages artifact
+        if: success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_ids=$(gh api --paginate \
+            "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name == "github-pages" and .expired == false) | .id')
+          if [[ -z "$artifact_ids" ]]; then
+            echo "No Pages artifact to remove for this run."
+            exit 0
+          fi
+          while IFS= read -r artifact_id; do
+            gh api -X DELETE "repos/$GH_REPO/actions/artifacts/$artifact_id"
+            echo "Deleted deployed Pages artifact ID $artifact_id"
+          done <<< "$artifact_ids"

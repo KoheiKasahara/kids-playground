@@ -1,14 +1,15 @@
 import {
-  findPart, fitScale, isBuilding, isLarge, scalesOf, spanOf,
+  currentPartId, findPart, fitScale, isBuilding, isGroundTool, isLarge, scalesOf, spanOf,
   type BuildingId, type NetworkId, type Scale, type TilePart, type ToolId,
 } from './parts'
 
 // まちの ちずの モデル。がめん（React）を もたない じゅんすいな かんすう だけを おく。
 
-export const COLS = 14
-export const ROWS = 14
+/** ちずの おおきさ。まえの 14×14 の まちや ちずは まんなかに おいて よみこむ。 */
+export const COLS = 48
+export const ROWS = 48
 
-export type Ground = 'grass' | 'water'
+export type Ground = 'grass' | 'water' | 'sand' | 'snow'
 /**
  * 1マスの ようす。
  * - anchor: 2マス いじょうを つかう たてものの ひだりうえの マスの ばんごう。
@@ -29,9 +30,16 @@ export const RANKS = [
   { min: 60, icon: '🏙️', label: 'とし' },
   { min: 140, icon: '🌆', label: 'だいとし' },
   { min: 300, icon: '🌟', label: 'きらきら メガシティ' },
+  { min: 700, icon: '🚀', label: 'みらいの とし' },
+  { min: 1500, icon: '👑', label: 'ゆめの おうこく' },
 ] as const
 
 export const GRASS: Tile = { ground: 'grass', part: null }
+
+export const GROUND_LABELS: Record<Ground, string> = { grass: 'くさはら', water: 'みず', sand: 'すな', snow: 'ゆき' }
+
+/** ちずの まんなかの マス。はじめに みえる ばしょで、どの せかいも ここに むらが ある。 */
+export const CENTER_INDEX = Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2)
 
 export function createEmptyTown(): Town {
   return Array.from({ length: COLS * ROWS }, () => GRASS)
@@ -125,31 +133,34 @@ function combineNetwork(part: TilePart | null, tool: NetworkId): TilePart {
 }
 
 function placeTile(tile: Tile, tool: ToolId): Tile {
-  switch (tool) {
-    case 'erase':
-      if (tile.part) return { ground: tile.ground, part: null }
-      return tile.ground === 'water' ? GRASS : tile
-    case 'water': {
-      // みちや せんろの したに かわを つくると はしに なる。
-      const keep = tile.part !== null && !isBuilding(tile.part) ? tile.part : null
-      if (tile.ground === 'water' && tile.part === keep) return tile
-      return { ground: 'water', part: keep }
-    }
-    case 'road':
-    case 'rail': {
-      const part = combineNetwork(tile.part, tool)
-      return part === tile.part ? tile : { ground: tile.ground, part }
-    }
-    default:
-      // たてものや しぜんは かわを うめたてて おく。おなじ ものなら かわらない。
-      if (tile.ground === 'grass' && tile.part === tool) return tile
-      return { ground: 'grass', part: tool }
+  if (tool === 'erase') {
+    if (tile.part) return { ground: tile.ground, part: null }
+    return tile.ground === 'grass' ? tile : GRASS
   }
+  if (isGroundTool(tool)) {
+    // みちや せんろの したに みずを つくると はしに なる。たてものは みずの うえに たてない。
+    const keep = tool === 'water' && isBuilding(tile.part) ? null : tile.part
+    if (tile.ground === tool && tile.part === keep) return tile
+    return { ground: tool, part: keep }
+  }
+  if (tool === 'road' || tool === 'rail') {
+    const part = combineNetwork(tile.part, tool)
+    return part === tile.part ? tile : { ground: tile.ground, part }
+  }
+  // たてものや しぜんは みずを うめたてて おく。おなじ ものなら かわらない。
+  const ground = tile.ground === 'water' ? 'grass' : tile.ground
+  if (tile.ground === ground && tile.part === tool) return tile
+  return { ground, part: tool }
 }
 
-/** おおきな たてものを まるごと どけて くさはらに する（copy を かきかえる）。 */
+/** じめん だけの マス（なにも のって いない）。 */
+function bare(ground: Ground): Tile {
+  return ground === 'grass' ? GRASS : { ground, part: null }
+}
+
+/** おおきな たてものを まるごと どけて、じめん だけに する（copy を かきかえる）。 */
 function clearLarge(copy: Tile[], index: number): void {
-  for (const cell of buildingCells(copy, index)) copy[cell] = GRASS
+  for (const cell of buildingCells(copy, index)) copy[cell] = bare(copy[cell].ground)
 }
 
 function placeLarge(town: Town, index: number, part: BuildingId, scale: Scale): Town {
@@ -162,8 +173,11 @@ function placeLarge(town: Town, index: number, part: BuildingId, scale: Scale): 
   // かさなる ものは うわがき。ほかの おおきな たてものに かかれば それも まるごと どける。
   const copy = town.slice()
   for (const cell of cells) if (copy[cell].anchor !== undefined) clearLarge(copy, cell)
-  const placed: Tile = scale > 1 ? { ground: 'grass', part, anchor, scale } : { ground: 'grass', part, anchor }
-  for (const cell of cells) copy[cell] = placed
+  // すな・ゆきの うえは その じめんの まま、みずは うめたてて くさはらに する。
+  for (const cell of cells) {
+    const ground = copy[cell].ground === 'water' ? 'grass' : copy[cell].ground
+    copy[cell] = scale > 1 ? { ground, part, anchor, scale } : { ground, part, anchor }
+  }
   return copy
 }
 
@@ -218,22 +232,56 @@ export function wantsRoad(town: Town, index: number): boolean {
   return isBuilding(part) && Boolean(findPart(part)?.needsRoad) && !isConnected(town, index)
 }
 
+// ---- ちいさい ちずを まんなかに おく ------------------------------------------
+
+/** かけたり ずれたり した おおきな たてものを とりのぞく（ちずを かさねた ときの さかいめ）。 */
+function dropBrokenLarge(tiles: Tile[]): void {
+  tiles.forEach((tile, index) => {
+    if (tile.anchor === undefined || !isBuilding(tile.part)) return
+    const cells = footprintOf(tile.anchor, tile.part, scaleOf(tile))
+    const intact = cells !== null && cells.includes(index)
+      && cells.every((cell) => tiles[cell].part === tile.part && tiles[cell].anchor === tile.anchor && scaleOf(tiles[cell]) === scaleOf(tile))
+    if (!intact) tiles[index] = bare(tile.ground)
+  })
+}
+
+/** cols×rows の ちいさな ちず（anchor は その ちずの ばんごう）を、base の まんなかに おいた まち。 */
+export function centerTown(base: Town, tiles: readonly Tile[], cols: number, rows: number): Town {
+  if (cols === COLS && rows === ROWS) return tiles
+  const town = base.slice()
+  const left = Math.floor((COLS - cols) / 2)
+  const top = Math.floor((ROWS - rows) / 2)
+  const place = (index: number) => (top + Math.floor(index / cols)) * COLS + left + (index % cols)
+  tiles.forEach((tile, index) => {
+    town[place(index)] = tile.anchor === undefined ? tile : { ...tile, anchor: place(tile.anchor) }
+  })
+  dropBrokenLarge(town)
+  return town
+}
+
 // ---- ほぞんの かたち ---------------------------------------------------------
-// マスは「g」「w:road」「g:stadium:31」「g:house:31:2」のように じめん・もの・ひだりうえの ばんごう・おおきさ を ならべる。
-// version 1 は おおきさの ない ふるい かたち。よみこみ だけ できる。
+// マスは「g」「w:road」「s:palm」「g:stadium:31」「g:house:31:2」のように じめん・もの・ひだりうえの ばんごう・おおきさ を ならべ、
+// おなじ マスが つづく ときは「g*20」のように「*かず」で まとめる。
+// よめる かたち:
+// - version 1: おおきさを えらべなかった ころ。じめん・もの（と 2マス いじょうの たてものの ひだりうえ）。
+// - version 2: ひろい ちずの「*かず」の かたちと、おおきな たてものの「ひだりうえ・おおきさ」の かたちの どちらも。
+// - version 3: いまの かたち（ぜんぶ まぜて つかえる）。
 
-type SavedTown = { version: 1 | 2; cols: number; rows: number; tiles: string[] }
+type SavedTown = { version: 1 | 2 | 3; cols: number; rows: number; tiles: string[] }
 
+const SAVE_VERSION = 3
+const GROUND_CODES: Record<Ground, string> = { grass: 'g', water: 'w', sand: 's', snow: 'n' }
+const GROUND_BY_CODE = new Map<string, Ground>(Object.entries(GROUND_CODES).map(([ground, code]) => [code, ground as Ground]))
 const TILE_PARTS = new Set<string>(['road', 'rail', 'crossing'])
 
 function isTilePart(value: string): value is TilePart {
   if (TILE_PARTS.has(value)) return true
   const part = findPart(value)
-  return part !== undefined && part.id !== 'water' && part.id !== 'road' && part.id !== 'rail'
+  return part !== undefined && !isGroundTool(part.id) && part.id !== 'road' && part.id !== 'rail'
 }
 
 export function encodeTile(tile: Tile): string {
-  let text = tile.ground === 'water' ? 'w' : 'g'
+  let text = GROUND_CODES[tile.ground]
   if (tile.part) text += `:${tile.part}`
   if (tile.anchor !== undefined) text += `:${tile.anchor}`
   if (tile.scale !== undefined && tile.scale > 1) text += `:${tile.scale}`
@@ -241,55 +289,92 @@ export function encodeTile(tile: Tile): string {
 }
 
 export function encodeTown(town: Town): string {
-  const saved: SavedTown = { version: 2, cols: COLS, rows: ROWS, tiles: town.map(encodeTile) }
+  const tiles: string[] = []
+  let run = 0
+  for (let index = 0; index < town.length; index += 1) {
+    run += 1
+    const code = encodeTile(town[index])
+    if (index + 1 < town.length && encodeTile(town[index + 1]) === code) continue
+    tiles.push(run > 1 ? `${code}*${run}` : code)
+    run = 0
+  }
+  const saved: SavedTown = { version: SAVE_VERSION, cols: COLS, rows: ROWS, tiles }
   return JSON.stringify(saved)
 }
 
-function decodeTile(value: unknown, version: 1 | 2): Tile | null {
-  if (typeof value !== 'string') return null
-  const [ground, part, anchor, scaleText, ...rest] = value.split(':')
-  if (rest.length || (ground !== 'g' && ground !== 'w')) return null
-  if (part === undefined) return ground === 'w' ? { ground: 'water', part: null } : GRASS
+/** 1マスを よむ。anchor は その ほぞんの ちずの ばんごう（count より ちいさい）。 */
+function decodeTile(value: string, version: 1 | 2 | 3, count: number): Tile | null {
+  const [code, partText, anchor, scaleText, ...rest] = value.split(':')
+  const ground = GROUND_BY_CODE.get(code)
+  if (rest.length || !ground || (version === 1 && ground !== 'grass' && ground !== 'water')) return null
+  if (partText === undefined) return bare(ground)
+  const part = currentPartId(partText)
   if (!isTilePart(part)) return null
-  if (ground === 'w' && isBuilding(part)) return null
+  if (ground === 'water' && isBuilding(part)) return null
   let scale: Scale = 1
   if (scaleText !== undefined) {
-    // おおきさは 2 か 3 だけ かく（ちいさい ときは かかない）。
+    // おおきさは 2 か 3 だけ かく（ちいさい ときは かかない）。version 1 には おおきさが ない。
     if (version === 1 || (scaleText !== '2' && scaleText !== '3')) return null
     scale = Number(scaleText) as Scale
     if (!isBuilding(part) || !scalesOf(part).includes(scale)) return null
   }
   // 2マス いじょうの たてものには anchor が かならず いる。1マスの ものには いらない。
   if (isLarge(part, scale) !== (anchor !== undefined)) return null
-  if (anchor === undefined) return { ground: ground === 'w' ? 'water' : 'grass', part }
-  if (!/^\d+$/.test(anchor)) return null
-  return scale > 1 ? { ground: 'grass', part, anchor: Number(anchor), scale } : { ground: 'grass', part, anchor: Number(anchor) }
+  if (anchor === undefined) return { ground, part }
+  if (!/^\d+$/.test(anchor) || Number(anchor) >= count) return null
+  return scale > 1 ? { ground, part, anchor: Number(anchor), scale } : { ground, part, anchor: Number(anchor) }
+}
+
+function decodeTiles(values: readonly unknown[], count: number, version: 1 | 2 | 3): Tile[] | null {
+  const tiles: Tile[] = []
+  for (const value of values) {
+    if (typeof value !== 'string') return null
+    const [code, length, ...rest] = value.split('*')
+    if (rest.length || (length !== undefined && (version === 1 || !/^[1-9]\d*$/.test(length)))) return null
+    const tile = decodeTile(code, version, count)
+    const run = length === undefined ? 1 : Number(length)
+    if (!tile || tiles.length + run > count) return null
+    for (let n = 0; n < run; n += 1) tiles.push(tile)
+  }
+  return tiles.length === count ? tiles : null
 }
 
 /** おおきな たてものの マスが そろって いるか（かけたり ずれたり して いない）。 */
-function largeBuildingsFit(tiles: readonly Tile[]): boolean {
+function largeBuildingsFit(tiles: readonly Tile[], cols: number, rows: number): boolean {
   return tiles.every((tile, index) => {
     if (tile.anchor === undefined || !isBuilding(tile.part)) return true
-    const cells = footprintOf(tile.anchor, tile.part, scaleOf(tile))
-    return cells !== null && cells.includes(index)
-      && cells.every((cell) => tiles[cell].part === tile.part && tiles[cell].anchor === tile.anchor && scaleOf(tiles[cell]) === scaleOf(tile))
+    const [width, height] = spanOf(tile.part, scaleOf(tile))
+    const col = tile.anchor % cols
+    const row = Math.floor(tile.anchor / cols)
+    if (col + width > cols || row + height > rows) return false
+    let inside = false
+    for (let dy = 0; dy < height; dy += 1) {
+      for (let dx = 0; dx < width; dx += 1) {
+        const cell = (row + dy) * cols + col + dx
+        const other = tiles[cell]
+        if (other.part !== tile.part || other.anchor !== tile.anchor || scaleOf(other) !== scaleOf(tile)) return false
+        if (cell === index) inside = true
+      }
+    }
+    return inside
   })
 }
 
-/** こわれた データや ちがう おおきさの データは null（その ちずの さいしょの まちで あそぶ）。 */
-export function decodeTown(raw: string | null): Town | null {
+/**
+ * こわれた データは null（その ちずの さいしょの まちで あそぶ）。
+ * ちいさい ちずの データは base（ない ときは くさはら）の まんなかに おく。
+ */
+export function decodeTown(raw: string | null, base: () => Town = createEmptyTown): Town | null {
   if (!raw) return null
   let data: unknown
   try { data = JSON.parse(raw) } catch { return null }
   if (!data || typeof data !== 'object') return null
   const saved = data as Partial<SavedTown>
-  if ((saved.version !== 1 && saved.version !== 2) || saved.cols !== COLS || saved.rows !== ROWS || !Array.isArray(saved.tiles)) return null
-  if (saved.tiles.length !== COLS * ROWS) return null
-  const tiles: Tile[] = []
-  for (const value of saved.tiles) {
-    const tile = decodeTile(value, saved.version)
-    if (!tile) return null
-    tiles.push(tile)
-  }
-  return largeBuildingsFit(tiles) ? tiles : null
+  const version = saved.version
+  if ((version !== 1 && version !== 2 && version !== 3) || !Array.isArray(saved.tiles)) return null
+  const { cols, rows } = saved
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || !cols || !rows || cols < 1 || rows < 1 || cols > COLS || rows > ROWS) return null
+  const tiles = decodeTiles(saved.tiles, cols * rows, version)
+  if (!tiles || !largeBuildingsFit(tiles, cols, rows)) return null
+  return cols === COLS && rows === ROWS ? tiles : centerTown(base(), tiles, cols, rows)
 }

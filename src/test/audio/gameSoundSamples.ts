@@ -45,6 +45,7 @@ import { playStarSound as playDrawGoalStarSound, playWarpSound as playDrawGoalWa
 import { playGlobeZoomSound } from '../../games/earth-globe/sounds'
 import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as flagPuzzle from '../../games/flag-roll-puzzle/sounds'
+import * as hanabi from '../../games/hanabi-don/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
 import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
@@ -108,6 +109,8 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select')),
     sample('そだつ', () => playCraftSound('grow')), sample('たから', () => playCraftSound('treasure')), sample('ぜんぶ みつけた', () => playCraftSound('complete')),
     sample('どうぶつ', () => playCraftSound('pet')), sample('あるく', () => playCraftSound('step')),
+    sample('ようがんが かたまる', () => playCraftSound('cool')), sample('こむぎ', () => playCraftSound('harvest')), sample('えさ', () => playCraftSound('feed')),
+    sample('あかちゃん', () => playCraftSound('baby')), sample('けいと', () => playCraftSound('shear')),
   ],
   'town-builder': [sample('おく', () => playTownSound('build')), sample('みち', () => playTownSound('road')), sample('けす', () => playTownSound('erase')), sample('そだつ', () => playTownSound('grow')), sample('3Dで みる', () => playTownSound('view')), sample('のる', () => playTownSound('ride'))],
   'iro-no-yuka': [
@@ -491,6 +494,14 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('はっけよい', sumo.playStartSound),
     sample('きまり', sumo.playFinishSound),
     background('BGM', 3, sumo.startBgm),
+  ],
+  'hanabi-don': [
+    sample('うちあげ', hanabi.playLaunch),
+    sample('どーん', () => hanabi.playBurst(1)),
+    sample('ほしが ともる', () => hanabi.playStarLit(3, 1)),
+    sample('えらぶ', hanabi.playSelect),
+    sample('クリア', hanabi.playClear),
+    background('BGM', 6, hanabi.startBgm),
   ],
   'shabon-pachin': [sample('ぱちん', shabon.playPopSound), sample('ぼよん', shabon.playBoingSound), sample('クリア', shabon.playClearSound)],
   'dot-bomb': [

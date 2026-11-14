@@ -1,7 +1,8 @@
 import type { TileArtProps } from './PartArt'
 import { findPart, isBuilding, partLabel, scaleLabel, spanOf } from './parts'
 import {
-  buildingCells, colOf, isConnected, neighborIndex, populationOf, railMask, roadMask, rowOf, scaleOf, wantsRoad, waterMask, type Town,
+  buildingCells, colOf, GROUND_LABELS, isConnected, neighborIndex, populationOf, railMask, roadMask, rowOf, scaleOf, wantsRoad, waterMask,
+  type Dir, type Ground, type Town,
 } from './town'
 
 // ちずの マスの みため（え に わたす かず と よみあげる なまえ）。がめんを もたない じゅんすいな かんすう だけを おく。
@@ -10,10 +11,19 @@ import {
 function tileLabel(town: Town, index: number): string {
   const tile = town[index]
   const place = `${colOf(index) + 1}-${rowOf(index) + 1}`
-  let name = tile.ground === 'water' ? 'かわ' : 'くさはら'
+  let name = GROUND_LABELS[tile.ground]
   if (tile.part) name = tile.ground === 'water' ? `${partLabel(tile.part)}の はし` : partLabel(tile.part)
   if (scaleOf(tile) > 1) name = `${scaleLabel(scaleOf(tile))} ${name}`
   return `${place} ${name}${wantsRoad(town, index) ? '・みちが ほしい' : ''}`
+}
+
+/** みずの かどから のぞく きしの じめん（となりの りくの じめん）。 */
+function bankOf(town: Town, index: number): Ground {
+  for (let dir = 0 as Dir; dir < 4; dir = (dir + 1) as Dir) {
+    const next = neighborIndex(index, dir)
+    if (next !== null && town[next].ground !== 'water') return town[next].ground
+  }
+  return 'grass'
 }
 
 export type TileView = Omit<TileArtProps, 'pop' | 'dust'> & { label: string }
@@ -28,12 +38,14 @@ export function describeTile(town: Town, index: number): TileView {
   const pieceRow = rowOf(index) - rowOf(anchor)
   // 「みちが ほしい」の しるしは おおきな たてものでも みぎうえの マスに 1つ だけ だす。
   const signTile = part === null || (pieceCol === spanOf(part, scale)[0] - 1 && pieceRow === 0)
+  const water = tile.ground === 'water'
   return {
     ground: tile.ground,
+    bank: water ? bankOf(town, index) : tile.ground,
     part,
     roadMask: part === 'road' || part === 'crossing' ? roadMask(town, index) : 0,
     railMask: part === 'rail' || part === 'crossing' ? railMask(town, index) : 0,
-    waterMask: tile.ground === 'water' ? waterMask(town, index) : 0,
+    waterMask: water ? waterMask(town, index) : 0,
     checker: (colOf(index) + rowOf(index)) % 2 === 0,
     lit: !needsRoad || isConnected(town, index),
     wantsRoad: signTile && wantsRoad(town, index),

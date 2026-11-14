@@ -69,7 +69,6 @@
     0 4px 6px -3px rgba(40, 104, 136, 0.18);
 }
 
-.startZone::before,
 .startZone::after {
   position: absolute;
   top: 27px;
@@ -85,13 +84,8 @@
   letter-spacing: 0.04em;
 }
 
-.startZone::before {
-  content: 'スタート';
-  left: 14px;
-}
-
 .startZone::after {
-  content: 'ここから ↓';
+  content: 'スタート ↓';
   right: 14px;
 }
 
@@ -130,7 +124,9 @@
 
 .startMarkerLabel {
   position: absolute;
-  top: -6px;
+  top: 50%;
+  left: calc(100% + 5px);
+  transform: translateY(-50%);
   padding: 2px 6px;
   border: 2px solid #f08c00;
   border-radius: var(--radius-sm);

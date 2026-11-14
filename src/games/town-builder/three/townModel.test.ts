@@ -69,9 +69,9 @@ it('builds every kind of part on the board, with bridges, crossings and moving p
   // ランプは ひだり・みぎの くみごとに 1つ（こうごに ひかる）。
   expect(model.crossings.every((crossing) => crossing.lamps.length === 2)).toBe(true)
 
-  // かんらんしゃ・ふうしゃ・ふんすい・けむり・プロペラ・とうだい・たきび・メリーゴーランド・ロケット・ジェットコースターが うごく。
-  expect(model.ticks).toHaveLength(10)
-  for (const id of ['ferris', 'windmill', 'fountain', 'factory', 'heliport', 'lighthouse', 'camp', 'merry', 'rocket', 'coaster']) {
+  // かんらんしゃ・ふうしゃ・ふんすい・けむり・プロペラ・とうだい・メリーゴーランド・ロケット・ジェットコースターが うごく。
+  expect(model.ticks).toHaveLength(9)
+  for (const id of ['ferris', 'windmill', 'fountain', 'factory', 'heliport', 'lighthouse', 'merry', 'rocket', 'coaster']) {
     expect(model.root.getObjectByName(`${id}-motion`), id).toBeDefined()
   }
   const wheel = model.root.getObjectByName('ferris-motion')!.children[0]

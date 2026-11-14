@@ -8,20 +8,24 @@ import { useGameInterval } from '../../utils/useGameInterval'
 import { vibrate } from '../../utils/haptics'
 import { SharedTileArt, TileArt, ToolIcon, TownPreview, VehicleArt } from './PartArt'
 import {
-  CATEGORIES, ERASE_LABEL, findPart, fitScale, isBuildingTool, isLarge, partsInCategory, scaleLabel, SCALES, scalesOf, spanOf,
+  CATEGORIES, ERASE_LABEL, findPart, fitScale, isBuildingTool, isGroundTool, isLarge, partsInCategory, scaleLabel, SCALES, scalesOf, spanOf,
   type CategoryId, type Scale, type ToolId,
 } from './parts'
 import { createMapTown, findMap, MAPS, type MapId } from './maps'
+import TownMap from './TownMap'
 import { sharedArtKeys } from './sharedArt'
 import { boardOf, type Board, type TileView } from './tileViews'
 import { clearSlot, migrateLegacySave, readAllSlots, readSlot, writeSlot } from './saves'
 import {
-  applyTool, buildingCells, COLS, colOf, rankOf, RANKS, ROWS, rowOf,
+  applyTool, buildingCells, CENTER_INDEX, COLS, colOf, rankOf, RANKS, ROWS, rowOf,
   type Town,
 } from './town'
 import { isOnTrack, stepVehicles, syncVehicles, vehiclePose } from './vehicles'
 import { playTownSound, type TownSound } from './sounds'
-import { comfortableZoom, tileSizeFor, ZOOM_LEVELS } from './zoom'
+import { randomSeed } from './worlds'
+import {
+  centerOfTile, comfortableZoom, tileAtCenter, tileSizeFor, visibleRange, ZOOM_LEVELS, type TileRange, type ViewCenter,
+} from './zoom'
 import styles from './TownBuilderPlay.module.css'
 
 // まちづくり。さいしょに ちずを えらぶ がめん、えらぶと まちを つくる がめんに なる。
@@ -30,28 +34,49 @@ import styles from './TownBuilderPlay.module.css'
 const Town3D = lazy(() => import('./Town3D'))
 
 const HISTORY_LIMIT = 50
-const START_CURSOR = Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2)
+const START_CENTER = centerOfTile(CENTER_INDEX)
 
 function soundFor(tool: ToolId): TownSound {
   if (tool === 'erase') return 'erase'
-  if (tool === 'water') return 'water'
+  if (isGroundTool(tool)) return 'water'
   if (tool === 'road' || tool === 'rail') return 'road'
   return 'build'
 }
 
 const TileButton = memo(function TileButton({ index, tabbable, view, pop, dust }: { index: number; tabbable: boolean; view: TileView; pop: number; dust: boolean }) {
   const { label, ...art } = view
-  return <button type="button" className={styles.tile} data-index={index} aria-label={label} tabIndex={tabbable ? 0 : -1}>
+  return <button type="button" className={styles.tile} data-index={index} aria-label={label} tabIndex={tabbable ? 0 : -1}
+    style={{ gridColumn: colOf(index) + 1, gridRow: rowOf(index) + 1 }}>
     <TileArt {...art} pop={pop} dust={dust} shared />
   </button>
 })
 
+function inRange(range: TileRange, index: number): boolean {
+  const col = colOf(index)
+  const row = rowOf(index)
+  return col >= range.col0 && col <= range.col1 && row >= range.row0 && row <= range.row1
+}
+
+function sameRange(a: TileRange, b: TileRange): boolean {
+  return a.col0 === b.col0 && a.col1 === b.col1 && a.row0 === b.row0 && a.row1 === b.row1
+}
+
+/** ひろい ちずでも かるいよう、みえて いる マス（と カーソルの マス）だけを ならべる。 */
+function visibleTiles(range: TileRange, cursor: number): number[] {
+  const tiles: number[] = []
+  for (let row = range.row0; row <= range.row1; row += 1) {
+    for (let col = range.col0; col <= range.col1; col += 1) tiles.push(row * COLS + col)
+  }
+  if (!inRange(range, cursor)) tiles.push(cursor)
+  return tiles
+}
+
 /** くるまと でんしゃ。1びょうに 1かい だけ すすめ、あいだの うごきは CSS に まかせる（まいコマ かきなおさない）。 */
-const Vehicles = memo(function Vehicles({ town, tile }: { town: Town; tile: number }) {
+const Vehicles = memo(function Vehicles({ town, tile, range }: { town: Town; tile: number; range: TileRange }) {
   const [vehicles, setVehicles] = useState(() => syncVehicles(town, [], Math.random))
   useGameInterval(() => setVehicles((current) => stepVehicles(town, current, Math.random)), 1000)
   return <div className={styles.vehicles} style={{ '--tile': `${tile}px` } as CSSProperties} aria-hidden="true">
-    {vehicles.filter((vehicle) => isOnTrack(town, vehicle)).map((vehicle) => {
+    {vehicles.filter((vehicle) => isOnTrack(town, vehicle) && inRange(range, vehicle.index)).map((vehicle) => {
       const pose = vehiclePose(vehicle)
       return <div key={vehicle.id} className={styles.vehicle} data-kind={vehicle.kind} style={{ '--x': pose.x, '--y': pose.y } as CSSProperties}>
         <div className={styles.vehicleBody} style={{ transform: `rotate(${pose.angle}deg)` }}>
@@ -210,13 +235,17 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
   /** null の あいだは がめんに あわせた ズーム。＋・− を おすと きまる。 */
   const [chosenZoom, setChosenZoom] = useState<number | null>(null)
   const [night, setNight] = useState(false)
-  const [cursor, setCursor] = useState(START_CURSOR)
+  const [cursor, setCursor] = useState(CENTER_INDEX)
   const [effect, setEffect] = useState<Effect | null>(null)
   const [bestRank, setBestRank] = useState(() => rankOf(board.population))
   const [celebration, setCelebration] = useState<number | null>(null)
-  const [confirming, setConfirming] = useState(false)
+  /** 「さいしょから」で つくる まち（せかいは きく たびに かたちが かわる）。null の あいだは きかない。 */
+  const [restartTown, setRestartTown] = useState<Town | null>(null)
+  const [mapOpen, setMapOpen] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
-  const [viewing3d, setViewing3d] = useState(false)
+  /** 3D で みて いる あいだ、2D で みて いた ばしょの マス。 */
+  const [focus3d, setFocus3d] = useState<number | null>(null)
+  const viewing3d = focus3d !== null
   const view3dButton = useRef<HTMLButtonElement>(null)
   const returnFocus = useRef(false)
 
@@ -225,10 +254,17 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
   const size = useViewportSize(viewportRef)
   const zoom = chosenZoom ?? comfortableZoom(size.width, size.height)
   const tile = tileSizeFor(size.width, size.height, zoom)
-  const center = useRef({ x: 0.5, y: 0.5 })
+  /** いま みて いる ばしょ。スクロールの たびに かわるので、えがきなおしには つかわない。 */
+  const center = useRef<ViewCenter>(START_CENTER)
+  /** えがく はんいを きめた ときの ばしょ。はんいが かわる ときだけ かえる。 */
+  const [anchor, setAnchor] = useState<ViewCenter>(START_CENTER)
+  const range = useMemo(() => visibleRange(anchor, size.width, size.height, tile), [anchor, size, tile])
+  const shown = useMemo(() => visibleTiles(range, cursor), [range, cursor])
   const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null)
   const suppressClick = useRef(false)
+  const focusCursor = useRef(false)
   const firstChoice = useRef<HTMLButtonElement>(null)
+  const mapClose = useRef<HTMLButtonElement>(null)
 
   // ちずで つかう え の なまえ。かわらない あいだは おなじ もじ なので <defs> は かきなおさない。
   const artKeys = useMemo(() => [...new Set(views.flatMap(sharedArtKeys))].sort().join(' '), [views])
@@ -240,13 +276,22 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
     mapRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true })
   }, [])
 
-  // ズームや がめんの おおきさが かわっても、みて いた ばしょを まんなかに たもつ。
-  useLayoutEffect(() => {
+  function scrollToCenter() {
     const viewport = viewportRef.current
     if (!viewport) return
     viewport.scrollLeft = center.current.x * viewport.scrollWidth - viewport.clientWidth / 2
     viewport.scrollTop = center.current.y * viewport.scrollHeight - viewport.clientHeight / 2
-  }, [tile])
+  }
+
+  // ズームや がめんの おおきさが かわっても、みて いた ばしょを まんなかに たもつ。
+  useLayoutEffect(scrollToCenter, [tile])
+
+  // やじるしキーで うごかした カーソルの マスへ フォーカスを うつす（みえて いなければ ブラウザが スクロール する）。
+  useEffect(() => {
+    if (!focusCursor.current) return
+    focusCursor.current = false
+    viewportRef.current?.querySelector<HTMLElement>(`[data-index="${cursor}"]`)?.focus()
+  }, [cursor])
 
   useEffect(() => {
     if (celebration === null) return
@@ -254,7 +299,9 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
     return () => clearTimeout(timer)
   }, [celebration])
 
+  const confirming = restartTown !== null
   useEffect(() => { if (confirming) firstChoice.current?.focus() }, [confirming])
+  useEffect(() => { if (mapOpen) mapClose.current?.focus() }, [mapOpen])
 
   // 3D から もどったら「3Dで みる」ボタンに フォーカスを もどす。
   useEffect(() => {
@@ -336,25 +383,60 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
     playTownSound('select')
   }
 
+  /** みる ばしょを うつす。 */
+  function lookAt(next: ViewCenter) {
+    center.current = next
+    setAnchor(next)
+    scrollToCenter()
+  }
+
   function open3d() {
     primeAudio()
-    setViewing3d(true)
+    setFocus3d(tileAtCenter(center.current))
     playTownSound('view')
     vibrate('tap')
   }
 
   function close3d() {
     returnFocus.current = true
-    setViewing3d(false)
+    setFocus3d(null)
+    playTownSound('select')
+  }
+
+  function openMap() {
+    primeAudio()
+    setMapOpen(true)
+    playTownSound('select')
+  }
+
+  function jumpTo(index: number) {
+    setMapOpen(false)
+    setCursor(index)
+    lookAt(centerOfTile(index))
+    playTownSound('view')
+    vibrate('tap')
+  }
+
+  /** 「さいしょから」を きく。せかいは あたらしい たねで つくった かたちを みほんに だす。 */
+  function askRestart() {
+    primeAudio()
+    setRestartTown(map.kind === 'world' ? createMapTown(mapId, randomSeed()) : createMapTown(mapId))
     playTownSound('select')
   }
 
   /** この ちずを さいしょの まちに もどす（ひとつ もどす で とりけせる）。 */
   function restart() {
-    setConfirming(false)
-    remember(createMapTown(mapId))
-    setSaveFailed(!clearSlot(mapId))
+    if (!restartTown) return
+    const next = restartTown
+    setRestartTown(null)
+    const nextBoard = remember(next)
+    // せかいは かたちが かわるので つくった まちを ほぞんし、てがきの ちずは つづきを けす。
+    setSaveFailed(!(map.kind === 'world' ? writeSlot(mapId, next) : clearSlot(mapId)))
     setEffect(null)
+    // さいしょから やりなおすので、おおきさの おいわいも やりなおす。
+    setBestRank(rankOf(nextBoard.population))
+    setCursor(CENTER_INDEX)
+    lookAt(START_CENTER)
     playTownSound('erase')
     vibrate('tap')
   }
@@ -372,9 +454,8 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
     event.preventDefault()
     const col = Math.max(0, Math.min(COLS - 1, colOf(cursor) + move[0]))
     const row = Math.max(0, Math.min(ROWS - 1, rowOf(cursor) + move[1]))
-    const next = row * COLS + col
-    setCursor(next)
-    event.currentTarget.querySelector<HTMLElement>(`[data-index="${next}"]`)?.focus()
+    focusCursor.current = true
+    setCursor(row * COLS + col)
   }
 
   // マウスでは ドラッグで ちずを うごかす（タッチは ブラウザの スクロールに まかせる）。
@@ -402,10 +483,12 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
   function onScroll() {
     const viewport = viewportRef.current
     if (!viewport || !viewport.scrollWidth || !viewport.scrollHeight) return
-    center.current = {
+    const next = {
       x: (viewport.scrollLeft + viewport.clientWidth / 2) / viewport.scrollWidth,
       y: (viewport.scrollTop + viewport.clientHeight / 2) / viewport.scrollHeight,
     }
+    center.current = next
+    if (!sameRange(range, visibleRange(next, size.width, size.height, tile))) setAnchor(next)
   }
 
   const rankInfo = RANKS[rank]
@@ -438,21 +521,22 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
             className={styles.map}
             ref={mapRef}
             // マスの おおきさは グリッドだけに わたす（--tile を ちず ぜんたいに うけつがせると、ズームの たびに ぜんぶの え の スタイルを けいさんしなおす）。
-            style={{ gridTemplateColumns: `repeat(${COLS}, ${tile}px)`, gridAutoRows: `${tile}px` }}
+            // ひろい ちずでも かるいよう、えがくのは みえて いる マスだけ（ばしょは グリッドの れつ・ぎょうで きめる）。
+            style={{ gridTemplateColumns: `repeat(${COLS}, ${tile}px)`, gridTemplateRows: `repeat(${ROWS}, ${tile}px)` }}
             role="group"
             aria-label={`まちの ちず。${toolLabel}を おく ばしょを えらんでね`}
             onClick={onMapClick}
             onKeyDown={onMapKeyDown}
           >
-            {views.map((view, index) => <TileButton
+            {shown.map((index) => <TileButton
               key={index}
               index={index}
-              view={view}
+              view={views[index]}
               tabbable={index === cursor}
               pop={effect?.cells.includes(index) ? effect.stamp : 0}
               dust={Boolean(effect?.cells.includes(index) && effect.dust)}
             />)}
-            {!viewing3d && <Vehicles town={town} tile={tile} />}
+            {!viewing3d && <Vehicles town={town} tile={tile} range={range} />}
             <SharedTileArt keys={artKeys} />
           </div>
         </div>
@@ -463,7 +547,8 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
 
         <div className={`${styles.mapTools} ${styles.mapToolsLeft}`}>
           <button type="button" onClick={undo} disabled={!history.length} aria-label="ひとつ もどす"><span aria-hidden="true">↩</span></button>
-          <button type="button" onClick={() => setConfirming(true)} aria-label="この まちを さいしょから"><span aria-hidden="true">🗑️</span></button>
+          <button type="button" onClick={askRestart} aria-label="この まちを さいしょから"><span aria-hidden="true">🗑️</span></button>
+          <button type="button" onClick={openMap} aria-label="ちずを みる"><span aria-hidden="true">🗺️</span></button>
         </div>
         <div className={styles.mapTools}>
           <button type="button" onClick={() => changeZoom(1)} disabled={zoom === ZOOM_LEVELS - 1} aria-label="おおきく みる"><span aria-hidden="true">＋</span></button>
@@ -481,15 +566,24 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
           </div>
         </div>}
 
-        {confirming && <div className={styles.dialogBackdrop}>
+        {restartTown && <div className={styles.dialogBackdrop}>
           <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="town-reset-title"
-            onKeyDown={(event) => { if (event.key === 'Escape') setConfirming(false) }}>
-            <span className={styles.dialogPreview}><TownPreview town={createMapTown(mapId)} /></span>
+            onKeyDown={(event) => { if (event.key === 'Escape') setRestartTown(null) }}>
+            <span className={styles.dialogPreview}><TownPreview town={restartTown} /></span>
             <p id="town-reset-title">{map.name}を さいしょから つくる？</p>
             <div className={styles.dialogChoices}>
               <button type="button" ref={firstChoice} onClick={restart}><span aria-hidden="true">🔄</span>さいしょから</button>
-              <button type="button" className={styles.cancel} onClick={() => setConfirming(false)}><span aria-hidden="true">✋</span>やめる</button>
+              <button type="button" className={styles.cancel} onClick={() => setRestartTown(null)}><span aria-hidden="true">✋</span>やめる</button>
             </div>
+          </div>
+        </div>}
+
+        {mapOpen && <div className={styles.dialogBackdrop}>
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="town-whole-map-title"
+            onKeyDown={(event) => { if (event.key === 'Escape') setMapOpen(false) }}>
+            <p id="town-whole-map-title">ちず</p>
+            <TownMap town={town} range={range} onJump={jumpTo} />
+            <button type="button" ref={mapClose} className={styles.cancel} onClick={() => setMapOpen(false)}>とじる</button>
           </div>
         </div>}
       </div>
@@ -497,8 +591,8 @@ function TownEditor({ mapId, sound, onToggleSound, onBack }: TownEditorProps) {
       <Palette category={category} tool={tool} chosenScale={chosenScale} onCategory={chooseCategory} onTool={chooseTool} onScale={chooseScale} />
     </div>
 
-    {viewing3d && <Suspense fallback={<p className={styles.loading3d} role="status">じゅんびちゅう…</p>}>
-      <Town3D town={town} night={night} onToggleNight={toggleNight} sound={sound} onToggleSound={onToggleSound} onClose={close3d} />
+    {focus3d !== null && <Suspense fallback={<p className={styles.loading3d} role="status">じゅんびちゅう…</p>}>
+      <Town3D town={town} focus={focus3d} night={night} onToggleNight={toggleNight} sound={sound} onToggleSound={onToggleSound} onClose={close3d} />
     </Suspense>}
   </>
 }

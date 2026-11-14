@@ -63,13 +63,23 @@ export function tileNoise(index: number, salt = 0): number {
   return (h >>> 0) / 4294967296
 }
 
-/** ちずの はんぶんの はば（すこし よゆうを もたせる）。 */
-const HALF_SPAN = Math.max(COLS, ROWS) / 2 + 0.6
+/** ちず ぜんたいの はんぶんの はば（すこし よゆうを もたせる）。 */
+const MAP_HALF_SPAN = Math.max(COLS, ROWS) / 2 + 0.6
+/** はじめに みえる まちの はんぶんの はば。ひろい ちずの うち、みて いた あたりを ながめる。 */
+const VIEW_HALF_SPAN = Math.min(MAP_HALF_SPAN, 7.6)
 
-/** カメラの きょり。たて・よこ どちらの がめんでも ちずの はばが だいたい おさまる。 */
-export function fitDistance(aspect: number, fovDegrees: number): number {
+function distanceFor(halfSpan: number, aspect: number, fovDegrees: number): number {
   const vertical = (fovDegrees * Math.PI) / 180
   const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * Math.max(0.2, aspect))
-  const distance = HALF_SPAN / Math.tan(Math.min(vertical, horizontal) / 2)
-  return Math.min(46, Math.max(14, distance))
+  return halfSpan / Math.tan(Math.min(vertical, horizontal) / 2)
+}
+
+/** はじめの カメラの きょり。たて・よこ どちらの がめんでも、みて いた あたりの まちが おさまる。 */
+export function fitDistance(aspect: number, fovDegrees: number): number {
+  return Math.min(46, Math.max(14, distanceFor(VIEW_HALF_SPAN, aspect, fovDegrees)))
+}
+
+/** いちばん はなれた ときの カメラの きょり。ちず ぜんたいが だいたい おさまる。 */
+export function farDistance(aspect: number, fovDegrees: number): number {
+  return Math.min(150, Math.max(fitDistance(aspect, fovDegrees) * 1.4, distanceFor(MAP_HALF_SPAN, aspect, fovDegrees)))
 }

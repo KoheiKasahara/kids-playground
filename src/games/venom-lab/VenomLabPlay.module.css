@@ -205,47 +205,63 @@
   .progress i { transition: none; }
 }
 
-/* Smartphone landscape play area. */
-@media (orientation: landscape) and (max-height: 560px) {
- .page { padding: 4px max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left)); }
- .shell { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 4px 12px; }
- .header { grid-column: 1; grid-row: 1; min-height: 48px; gap: 8px; }
- .hero { grid-column: 2; grid-row: 1; padding: 0; }
- .hero h1 { font-size: 21px; margin: 0; }
- .hero .eyebrow, .hero .lead, .notebook { display: none; }
- .modeNav { grid-column: 2; grid-row: 2; margin: 0; gap: 10px; }
- .modeNav button { padding: 4px 0; min-height: 44px; font-size: 12px; }
- .habitats { grid-column: 1; grid-row: 2; display: flex; overflow-x: auto; margin: 0; gap: 6px; }
- .habitats button { flex: 0 0 auto; min-height: 44px; padding: 4px 10px; }
- .habitats small, .habitats em, .habitatIcon, .habitatArrow { display: none; }
- .observationGrid { grid-column: 1 / -1; grid-row: 3; height: calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height: 0; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; overflow-y: auto; }
- .exhibit { min-width: 0; }
- .exhibitHeader { display: none; }
- .scene { height: calc(100dvh - 160px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height: 180px; }
- .sceneFooter { padding: 4px 8px; }
- .mission { padding: 6px 8px; }
- .detail { min-height: 0; height: 100%; overflow-y: auto; padding: 10px; }
- .portrait { height: 90px; margin: 4px 0; }
- .portrait .pixelBox { width: 120px; }
- .detail h2 { font-size: 17px; }
- .signature, .venomLine { margin-top: 6px; }
- .residentPicker { grid-column: 1; }
- .rankPanel, .status, .footer { grid-column: 1 / -1; }
-}
-
-@media (orientation: landscape) and (max-height: 560px) {
- .detailEmpty { padding: 4px; }
- .emptyPortrait { height: 80px; }
- .emptyPortrait .pixelBox { width: 100px; }
-}
-
-@media (orientation: landscape) and (max-height: 560px) {
+/* Keep observation and its controls together; optional content opens above it. */
+.hero { padding: 8px 0; }
+.hero .eyebrow, .lead { display: none; }
+.hero h1 { font-size: 24px; }
+.notebook { padding: 6px 12px; }
+.notebook strong { font-size: 23px; }
+.modeNav { margin-bottom: 8px; }
+.habitats { gap: 6px; margin-bottom: 8px; }
+.habitats button { min-height: 44px; padding: 7px; }
+.habitats small, .habitats em, .habitatArrow { display: none; }
+.observationGrid { display: block; }
+.exhibitHeader { padding: 6px 12px; }
+.exhibitHeader .eyebrow { display: none; }
+.exhibitHeader h2 { margin: 0; font-size: 17px; }
+.scene { height: clamp(260px, 39dvh, 440px); }
+.playTools { display: flex; gap: 8px; padding: 8px 12px; }
+.playTools button { flex: 1; min-height: 44px; border: 1px solid #829b71; border-radius: 9px; background: #cfdfa6; color: #263c32; font-weight: 800; }
+.sceneFooter { padding: 4px 12px; }
+.mission { padding: 8px 12px; }
+.status { padding: 8px 0; min-height: 36px; }
+.footer { padding-top: 8px; }
+.dialog { padding: 0 16px 16px; margin: auto; width: min(540px, calc(100% - 20px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); border: 1px solid #adc19a; border-radius: 16px; background: #eff0df; color: #243b3c; overscroll-behavior: contain; }
+.dialog::backdrop { background: #07141cbf; }
+.dialogHeader { position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; background: #eff0df; }
+.dialogHeader button { min-height: 44px; padding: 8px 12px; border-radius: 9px; border: 1px solid #7f9a70; background: #cfdfa6; }
+.dialog .detail { padding: 0; min-height: 0; border: 0; }
+.dialog .portrait { height: 150px; margin: 6px 0; }
+.dialog .portrait .pixelBox { width: 200px; }
+.dialog .signature { margin-top: 6px; padding: 5px 10px; }
+.dialog .venomLine { margin-top: 6px; padding-top: 6px; }
+.dialog .residentPicker { padding: 10px; border-radius: 10px; background: #1a2d37; color: #f4f3e5; }
+.dialog .speciesCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dialog .pickerHeading { flex-wrap: wrap; }
+@media (max-width: 650px) {
+ .page { padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+ .hero h1 { font-size: 20px; max-width: none; }
  .hero { gap: 6px; }
- .hero h1 { font-size: 19px; }
- .notebook { display: block; width: auto; padding: 2px; border: 0; background: transparent; }
- .notebook > span, .notebook .progress { display: none; }
- .notebook strong { font-size: 16px; white-space: nowrap; }
- .notebook small { font-size: 12px; }
+ .notebook { width: 86px; padding: 4px 6px; }
+ .notebook strong { font-size: 20px; }
+ .habitats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+ .habitats button { justify-content: center; text-align: center; padding: 5px 2px; }
+ .habitats b { font-size: 10px; }
+ .habitatIcon { display: none; }
+ .resident { --w: 120px; }
+ .modeNav { gap: 16px; }
+ .modeNav button { min-height: 44px; padding: 6px 0; }
 }
-
-@media (orientation: landscape) and (max-height: 560px) { .page { padding-top: max(4px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); } }
+@media (orientation: landscape) and (max-height: 560px) {
+ .hero, .brand { display: none; }
+ .header { float: left; width: 45%; }
+ .modeNav { margin-left: 48%; min-height: 48px; }
+ .habitats { clear: both; grid-template-columns: repeat(8, minmax(0, 1fr)); }
+ .habitatIcon { display: none; }
+ .habitats b { font-size: 10px; }
+ .scene { height: max(180px, calc(100dvh - 220px)); }
+ .resident { --w: 112px; }
+ .dialog { width: min(720px, calc(100% - 24px)); }
+ .dialog .portrait { float: left; width: 42%; height: 180px; margin-right: 16px; }
+ .dialog .more { clear: both; }
+}

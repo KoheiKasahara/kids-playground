@@ -8,6 +8,7 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import type { CourseDefinition, HoleDefinition, Vec2 } from './golfCourses'
 import type { HoleGeometry } from './golfGeometry'
+import { createNavField, type NavField } from './golfNav'
 import {
   BALL_RADIUS,
   BOOSTER,
@@ -82,7 +83,17 @@ export type GolfEvent =
   | { kind: 'lost'; position: Vec3 }
   | { kind: 'cup'; position: Vec3 }
   | { kind: 'rest'; position: Vec3 }
-export type ShotSuggestion = { direction: Vec2; power: number; target: Vec2 }
+/** みちすじの 点が 見とおせないときに ためす、うつ むきの 数と とどかせる きょり。 */
+const DETOUR_DIRECTIONS = 48
+const DETOUR_REACHES = [0.8, 1.2, 1.8, 2.5, 3.5, 4.5, 6, 7.5, 9] as const
+/** みちのりの ちずで、ボールと じゃま物の あいだに あける すきま。 */
+const NAV_CLEARANCE = 0.05
+
+/**
+ * おすすめの うち方。view は ねらう カメラが 向く ほう。ふだんは うつ むきと 同じで、
+ * うしろへ もどる・ふさがれた ほうへ うつ ときだけ、みちなりに すすむ ほうを 向く。
+ */
+export type ShotSuggestion = { direction: Vec2; power: number; target: Vec2; view: Vec2 }
 /** 動くしかけの いまの様子。見た目（golfScene）は これだけを受け取って動かす。 */
 export type GadgetMotion = {
   windmills: number[]
@@ -783,6 +794,29 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   }
 
   const leaps = (hole.features ?? []).some(feature => feature.kind === 'kicker') || warps.length > 0
+
+  /** まだ おしていない スイッチの、みちすじの 上の ばんごう（なければ -1）。 */
+  const pendingSwitch = () => hole.route.findIndex(point => switches.some(item => item.openedAt === null && onSwitch(item, point)))
+  const navProbe = new RAPIER.Ball(BALL_RADIUS + NAV_CLEARANCE)
+  // 歩く どうぶつは「待てば どく」ので、みちのりの ちずでは じゃま物に 数えない。
+  const blocksNav = (collider: RAPIER.Collider) => obstacleHandles.has(collider.handle) && roles.get(collider.handle)?.kind !== 'critter'
+  const navPassable = (x: number, z: number) => {
+    const floor = geometry.heightAt(x, z)
+    if (floor === null || geometry.waterAt(x, z, 0.1)) return false
+    // かべの ない ふち（がけ）の きわは とおらない。
+    for (const [dx, dz] of [[0.12, 0], [-0.12, 0], [0, 0.12], [0, -0.12]] as const) if (geometry.heightAt(x + dx, z + dz) === null) return false
+    return world.intersectionWithShape({ x, y: floor + BALL_RADIUS + 0.02, z }, IDENTITY, navProbe, undefined, undefined, ballCollider, ball, blocksNav) === null
+  }
+  let nav: { key: number; field: NavField } | null = null
+  /**
+   * みちのりの ちず。スイッチを おすまでは スイッチを ゴールに する（とびらの むこうへは まだ いけない）。
+   * とびらが ひらくと 作りなおす。
+   */
+  function navField(): NavField {
+    const gate = pendingSwitch()
+    if (nav?.key !== gate) nav = { key: gate, field: createNavField({ bounds: geometry.bounds, route: gate > 0 ? hole.route.slice(0, gate + 1) : hole.route, passable: navPassable }) }
+    return nav.field
+  }
   // Rapierの問い合わせ（ねらいの見通し）は、1ステップ進めて当たり判定の索引ができてから使える。
   world.step(queue)
   queue.drainCollisionEvents(() => {})
@@ -832,6 +866,11 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       emit({ kind: 'shot', power, position: position() })
       return true
     },
+    /**
+     * その場所（なければ ボールの いま いる 場所）から カップまでの みちのり[m]。かべや たにを まわりこむ ぶんも 数える。
+     * スイッチを おすまでは、スイッチまでの みちのり。たどりつけない 場所は Infinity。
+     */
+    distanceToCup(point?: Vec2): number { return navField().costAt(point ?? position()) },
     /** ボールを床の上へ置き直す（水に落ちたとき・おたすけ・やりなおし）。 */
     placeBall(point: Vec2): Vec3 { return place(point) },
     /** 水に落ちる前に止まっていた場所へ戻す。 */
@@ -879,19 +918,30 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         const dz = pad.to.z - p.z
         const distance = Math.hypot(dx, dz) || 1
         const speed = trampolineSpeedFor(distance, p.y, groundY(pad.to, p.y), course.gravity)
-        return { direction: { x: dx / distance, z: dz / distance }, power: Math.max(0.05, powerForSpeed(speed)), target: { x: pad.to.x, z: pad.to.z } }
-      }
-      let segment = 0
-      let nearest = Infinity
-      for (let index = 0; index < route.length - 1; index++) {
-        const distance = segmentDistance(p, route[index]!, route[index + 1]!)
-        if (distance <= nearest + 1e-6) { nearest = distance; segment = index }
+        const direction = { x: dx / distance, z: dz / distance }
+        return { direction, power: Math.max(0.05, powerForSpeed(speed)), target: { x: pad.to.x, z: pad.to.z }, view: direction }
       }
       // スイッチを まだ おしていなければ、スイッチより 先は ねらわない（とびらの むこうへは まだ いけない）。
       // スイッチを とばして 先へ 来てしまったときも、まず スイッチへ もどる。
-      const gate = route.findIndex(point => switches.some(item => item.openedAt === null && onSwitch(item, point)))
-      if (gate > 0 && gate <= segment) segment = gate - 1
+      const gate = pendingSwitch()
       const farthest = gate > 0 ? gate : route.length - 1
+      // いま いる 区間。みちのりの ちずで「ここより カップに 近い さいしょの 点」の 手前と する。
+      // まっすぐの 近さで えらぶと、かべや たにの むこうがわの みちを えらんで、うしろや よこを ねらってしまう。
+      const field = navField()
+      const here = field.costAt(p)
+      let segment = 0
+      if (Number.isFinite(here)) {
+        let ahead = farthest
+        for (let index = 1; index <= farthest; index++) if (field.remaining(index) < here - 0.3) { ahead = index; break }
+        segment = ahead - 1
+      } else {
+        let nearest = Infinity
+        for (let index = 0; index < route.length - 1; index++) {
+          const distance = segmentDistance(p, route[index]!, route[index + 1]!)
+          if (distance <= nearest + 1e-6) { nearest = distance; segment = index }
+        }
+        if (gate > 0 && gate <= segment) segment = gate - 1
+      }
       const aimAt = (target: Vec2, extra: number, lastPassed: number): ShotSuggestion => {
         const dx = target.x - p.x
         const dz = target.z - p.z
@@ -913,7 +963,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         }
         let power = jump?.power ?? powerToReach(p, direction, distance + extra + climb)
         for (let index = segment + 1; index <= lastPassed; index++) power = Math.max(power, route[index]!.minPower ?? 0)
-        return { direction, power: Math.min(1, Math.max(0.12, power)), target: { x: target.x, z: target.z } }
+        return { direction, power: Math.min(1, Math.max(0.12, power)), target: { x: target.x, z: target.z }, view: direction }
       }
       // はねかえし いたの手前の点は、いたで はねて その先の点まで ころがる強さにする。
       // はねると すこし おそくなるので、はねたあとの きょりは REFLECTOR.keep で わって 見つもる。
@@ -932,22 +982,34 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       for (let index = farthest; index > segment; index--) {
         if (clearLine(p, route[index]!)) return aimAtIndex(index)
       }
-      // 2. 次の点の向きを少しずつ ずらし、バンパーや いわ・とびらの よこを通す。
-      //    近くで ふさがれているときは、大きく ずらさないと すきまへ入らないので、角度は広めまで ためす。
+      // 2. みちすじの 点が どれも 見とおせなければ（じゃま物の かげ・みちすじから はなれた すみ など）、
+      //    まっすぐ ころがせる 場所の うち、カップまでの みちのりが いちばん みじかくなる 場所へ うつ。
+      //    じゃま物の よこを ぬける線も、Uの字の かどへ むかう線も、この えらび方で 見つかる。
+      const options: { target: Vec2; cost: number }[] = []
+      for (let step = 0; step < DETOUR_DIRECTIONS; step++) {
+        const angle = (step / DETOUR_DIRECTIONS) * Math.PI * 2
+        for (const reach of DETOUR_REACHES) {
+          const target = { x: p.x + Math.cos(angle) * reach, z: p.z + Math.sin(angle) * reach }
+          if (!field.clear(p, target)) break
+          const cost = field.costAt(target, false)
+          if (cost < here - 0.4) options.push({ target, cost })
+        }
+      }
+      options.sort((first, second) => first.cost - second.cost)
+      for (const option of options.slice(0, 60)) if (clearLine(p, option.target)) return aimAt(option.target, 0, segment)
       const next = route[segment + 1]!
       const toward = Math.atan2(next.z - p.z, next.x - p.x)
       const reach = Math.hypot(next.x - p.x, next.z - p.z)
-      for (const offset of [8, -8, 16, -16, 24, -24, 32, -32, 45, -45, 60, -60]) {
-        const angle = toward + (offset * Math.PI) / 180
-        const target = { x: p.x + Math.cos(angle) * reach, z: p.z + Math.sin(angle) * reach }
-        if (clearLine(p, target)) return aimAt(target, 0.6, segment + 1)
-      }
       // 3. ふうしゃの柱のかげなどでは、いまの区間の はじめの点（トンネルの入口など）へ戻る。
       //    ふさいでいるのが うごくカベなら、開くのを待てばよいので さがらない。
       const blocking = cast(p, { x: Math.cos(toward), z: Math.sin(toward) }, reach)
       const back = route[segment]!
-      if (blocking?.kind !== 'gate' && Math.hypot(back.x - p.x, back.z - p.z) > 0.4 && clearLine(p, back)) return aimAt(back, 0.25, segment)
-      return aimAt(next, 0.6, segment + 1)
+      // どちらも みちなりの むきでは ないので、カメラは みちなりに すすむ ほうを 向ける。
+      const ahead = field.lookAhead(p)
+      const length = ahead ? Math.hypot(ahead.x - p.x, ahead.z - p.z) : 0
+      const forward = (shot: ShotSuggestion): ShotSuggestion => (ahead && length > 0.3 ? { ...shot, view: { x: (ahead.x - p.x) / length, z: (ahead.z - p.z) / length } } : shot)
+      if (blocking?.kind !== 'gate' && Math.hypot(back.x - p.x, back.z - p.z) > 0.4 && clearLine(p, back)) return forward(aimAt(back, 0.25, segment))
+      return forward(aimAt(next, 0.6, segment + 1))
     },
     dispose() {
       queue.free()

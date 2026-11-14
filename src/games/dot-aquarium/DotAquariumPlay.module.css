@@ -590,3 +590,14 @@ button.window:focus-visible,
   user-select: none;
   -webkit-touch-callout: none;
 }
+
+.find { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 900; font-size: 14px; }
+.find img { width: 48px; max-height: 44px; object-fit: contain; image-rendering: pixelated; }
+.find small { display: block; font-size: 11px; color: #ffe9a0; }
+.nextFind { min-height: 44px; padding: 4px 8px; white-space: nowrap; }
+@media (max-width: 740px) {
+  .tabs[data-compact] { gap: 4px; }
+  .tabs[data-compact] .tab { width: 44px; }
+  .find { gap: 4px; font-size: 12px; }
+  .find img { width: 32px; }
+}

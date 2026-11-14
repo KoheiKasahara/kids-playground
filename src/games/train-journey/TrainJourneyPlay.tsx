@@ -13,7 +13,7 @@ function courseFor(id: MapId) {
   return course
 }
 // The course map frames each board's rails.
-const MAP_VIEWS: Record<MapId, string> = { island: '-26 -28 52 51', downtown: '-26 -28 54 50' }
+const MAP_VIEWS: Record<MapId, string> = { island: '-26 -28 52 51', downtown: '-26 -28 54 50', snow: '-26 -28 52 52', coast: '-26 -28 52 52', farm: '-26 -28 52 52' }
 const NUMBERS = ['①', '②', '③']
 
 /** The point sign, drawn as one trunk with a branch per destination. */
@@ -132,6 +132,7 @@ export default function TrainJourneyPlay() {
           </div>
           <div className={styles.tools}>
             <button type="button" aria-pressed={camera === 'follow'} onClick={() => setCamera('follow')}><span aria-hidden="true">🚃</span>おいかける</button>
+            <button type="button" aria-pressed={camera === 'trackside'} onClick={() => setCamera('trackside')}><span aria-hidden="true">🎥</span>えんせん</button>
             <button type="button" aria-pressed={camera === 'overview'} onClick={() => setCamera('overview')}><span aria-hidden="true">🗺️</span>ぜんたい</button>
             <button type="button" aria-label="ふえを ならす" disabled={status !== 'ready'} onClick={() => playSound('horn')}><span aria-hidden="true">📯</span>ふえ</button>
             <button type="button" aria-label={paused ? 'はしる' : 'とまる'} aria-pressed={paused} onClick={() => setPaused(value => !value)}><span aria-hidden="true">{paused ? '▶' : '⏸'}</span>{paused ? 'はしる' : 'とまる'}</button>

@@ -679,6 +679,43 @@ function lionfish(f: number): Model {
   return { w, h, prims }
 }
 
+function dolphin(f: number): Model {
+  const wag = Math.sin(f / 4 * TAU) * 2
+  return { w: 48, h: 25, prims: [
+    { t: 'poly', pts: [[12, 12], [2, 5 + wag], [5, 12 + wag], [2, 19 + wag]], ramp: R.neon },
+    { t: 'poly', pts: [[20, 10], [25, 2], [29, 11]], ramp: R.neon },
+    { t: 'ell', x: 25, y: 13, rx: 16, ry: 7, ramp: R.neon, gloss: .4, pat: s => s.v > .35 ? { ramp: R.silver } : undefined },
+    { t: 'cap', x1: 36, y1: 15, x2: 45, y2: 15, r1: 3, r2: 1.5, ramp: R.neon },
+    { t: 'poly', pts: [[29, 15], [23 + wag, 23], [34, 17]], ramp: R.royal },
+    { t: 'eye', x: 37, y: 11, r: 1.3 },
+  ] }
+}
+
+function penguin(f: number): Model {
+  const flap = Math.sin(f / 4 * TAU) * 3
+  return { w: 33, h: 27, prims: [
+    { t: 'poly', pts: [[9, 13], [2, 9], [3, 17]], ramp: R.gold },
+    { t: 'ell', x: 16, y: 13, rx: 11, ry: 7, ramp: R.navy },
+    { t: 'ell', x: 18, y: 15, rx: 8, ry: 4.5, ramp: R.white },
+    { t: 'ell', x: 25, y: 10, rx: 5, ry: 5, ramp: R.navy },
+    { t: 'ell', x: 27, y: 11, rx: 2.5, ry: 3, ramp: R.white },
+    { t: 'poly', pts: [[28, 11], [32, 13], [28, 14]], ramp: R.gold },
+    { t: 'cap', x1: 18, y1: 12, x2: 12, y2: 22 + flap, r1: 2.5, r2: 1, ramp: R.navy },
+    { t: 'eye', x: 27, y: 9, r: 1 },
+  ] }
+}
+
+function starfish(f: number): Model {
+  const prims: Prim[] = []
+  for (let i = 0; i < 5; i++) {
+    const angle = i * TAU / 5 - Math.PI / 2 + Math.sin(f / 4 * TAU) * .06
+    prims.push({ t: 'cap', x1: 13, y1: 13, x2: 13 + Math.cos(angle) * 10, y2: 13 + Math.sin(angle) * 10, r1: 4, r2: 1.1, ramp: R.orange })
+  }
+  prims.push({ t: 'ell', x: 13, y: 13, rx: 4.5, ry: 4.5, ramp: R.orange, gloss: .25,
+    pat: s => (Math.floor(s.px) + Math.floor(s.py) * 2) % 5 === 0 ? { ramp: R.cream } : undefined })
+  return { w: 26, h: 26, prims }
+}
+
 export const FRAMES = 4
 
 export function creatureModel(id: SpeciesId, f: number): Model {
@@ -702,5 +739,8 @@ export function creatureModel(id: SpeciesId, f: number): Model {
     case 'butterfly': return butterfly(f)
     case 'boxfish': return boxfish(f)
     case 'lionfish': return lionfish(f)
+    case 'dolphin': return dolphin(f)
+    case 'penguin': return penguin(f)
+    case 'starfish': return starfish(f)
   }
 }

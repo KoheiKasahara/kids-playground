@@ -253,14 +253,15 @@ it('tells what was tapped, and ignores drags and taps on the sky', () => {
   lastScene().getObjectByName('town-vehicles')!.position.y = -100
   lastScene().updateMatrixWorld(true)
 
-  // 5れつめ・10ぎょうめ（index 9*COLS+4）の あかい おうち。
-  const house = tileCenter(9 * COLS + 4)
+  // はじめの まちの あかい おうち。
+  const town = createTown()
+  const house = tileCenter(town.findIndex((tile) => tile.part === 'house'))
   const point = screenOf(new THREE.Vector3(house.x, 0.2, house.z))
   tap(canvas!, point.x, point.y)
   expect(callbacks.pick).toHaveBeenLastCalledWith({ kind: 'part', part: 'house', bridge: false })
 
   // はしの うえの みち。
-  const bridge = tileCenter(7 * COLS + 9)
+  const bridge = tileCenter(town.findIndex((tile) => tile.ground === 'water' && tile.part === 'road'))
   const onBridge = screenOf(new THREE.Vector3(bridge.x, 0.03, bridge.z))
   tap(canvas!, onBridge.x, onBridge.y)
   expect(callbacks.pick).toHaveBeenLastCalledWith({ kind: 'part', part: 'road', bridge: true })
