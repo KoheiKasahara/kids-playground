@@ -57,6 +57,25 @@ test('touch-drag adds a part, cancellation rolls back, and rotation/keyboard pla
   await page.screenshot({ path: testInfo.outputPath('parts-portrait.png') })
 })
 
+test('swipes the path palette sideways without adding a part', async ({ page }) => {
+  await page.goto('/games/marble-course')
+  const palette = page.locator('#part-palette')
+  await expect(page.getByRole('button', { name: 'カーブを ついか', exact: true })).toBeEnabled({ timeout: 20_000 })
+  expect(await palette.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+  const box = (await palette.boundingBox())!
+  const client = await page.context().newCDPSession(page)
+  const y = box.y + box.height / 2
+  let x = box.x + box.width * 0.85
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+  for (let step = 0; step < 15; step++) {
+    x -= 15
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] })
+  }
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect.poll(() => palette.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+  await expect(page.getByText('1 / 36', { exact: true })).toBeVisible()
+})
+
 for (const label of ['ジャンプ', 'くるくる', 'ぐるぐる', 'ぎったん']) {
   test(`${label}: adds from a tab, rolls to the goal and retries in portrait/landscape`, async ({ page }, testInfo) => {
     test.setTimeout(75_000)
