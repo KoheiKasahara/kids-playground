@@ -16,7 +16,7 @@ export type EngineOptions = {
   onHint?: (hint: string) => void
   onEvent?: (event: MarbleEvent) => void
 }
-type Drag = { pointerId: number; x: number; y: number; original: Course; part: MarblePart; offset: THREE.Vector3; moved: boolean; palette: boolean; snapped: boolean }
+type Drag = { pointerId: number; x: number; y: number; original: Course; part: MarblePart; offset: THREE.Vector3; moved: boolean; palette: boolean; snapped: boolean; hint: string | null }
 /** A one-finger drag on empty board, or the two-finger spread that also zooms. */
 type View = { pointerId: number | null; x: number; y: number; spread: number }
 type Runtime = { scene: MarbleScene; run: MarbleWorld | null; drag: Drag | null; dirty: number; phase: RunStatus; accumulator: number }
@@ -125,7 +125,7 @@ export function useMarbleEngine(options: EngineOptions) {
       }
       plane.constant = -part.position.y
       if (!raycaster.ray.intersectPlane(plane, planePoint)) return
-      rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: latest.current.course, part, offset: new THREE.Vector3().copy(part.position).sub(planePoint), moved: false, palette: false, snapped: false }
+      rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: latest.current.course, part, offset: new THREE.Vector3().copy(part.position).sub(planePoint), moved: false, palette: false, snapped: false, hint: null }
       rt.scene.renderer.domElement.setPointerCapture(event.pointerId)
       rt.dirty = 90
     }
@@ -150,6 +150,8 @@ export function useMarbleEngine(options: EngineOptions) {
       if (!raycaster.ray.intersectPlane(plane, planePoint)) return
       const position = planePoint.clone().add(drag.offset)
       const result = snapPart({ ...drag.part, position: { x: THREE.MathUtils.clamp(position.x, -BOARD_LIMIT, BOARD_LIMIT), y: drag.part.position.y, z: THREE.MathUtils.clamp(position.z, -BOARD_LIMIT, BOARD_LIMIT) } }, drag.original.parts, { turn: drag.palette })
+      // A palette press may still turn into a sideways palette swipe, so its hint waits for the board.
+      if (!drag.moved && drag.hint) latest.current.onHint?.(drag.hint)
       drag.moved = true
       drag.snapped = result.snapped
       const parts = drag.palette ? [...drag.original.parts, result.part] : drag.original.parts.map(part => part.id === drag.part.id ? result.part : part)
@@ -182,6 +184,7 @@ export function useMarbleEngine(options: EngineOptions) {
         const next = appendPart(drag.original, drag.part.kind, drag.part.id, latest.current.selectedId)
         latest.current.onCommit(next)
         latest.current.onSelect(drag.part.id)
+        if (drag.hint) latest.current.onHint?.(drag.hint)
         if (hasConnectedInput(next.parts.at(-1)!, next.parts)) latest.current.onSnap()
       }
       preview = null
@@ -264,12 +267,21 @@ export function useMarbleEngine(options: EngineOptions) {
     if (!rt || status !== 'ready' || rt.phase === 'rolling' || rt.drag || event.button !== 0) return
     const course = latest.current.course
     const appended = appendPart(course, kind, `part-${sequence.current++}`, latest.current.selectedId)
-    if (appended === course) { latest.current.onHint?.('あいている ところへ うごかそう！'); return }
+    // Show nothing until the press becomes a tap or reaches the board: a sideways swipe only scrolls the palette.
+    if (appended === course) {
+      const release = (end: PointerEvent) => {
+        if (end.pointerId !== event.pointerId) return
+        window.removeEventListener('pointerup', release)
+        window.removeEventListener('pointercancel', release)
+        if (end.type === 'pointerup') latest.current.onHint?.('あいている ところへ うごかそう！')
+      }
+      window.addEventListener('pointerup', release)
+      window.addEventListener('pointercancel', release)
+      return
+    }
     const part = appended.parts.at(-1)!
-    rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: course, part, offset: new THREE.Vector3(), moved: false, palette: true, snapped: false }
-    rt.scene.update(appended, part.id, false)
-    rt.dirty = 90
-    if (course.parts.length && !hasConnectedInput(part, appended.parts)) latest.current.onHint?.('ここに おけるよ。みちを つなぎなおそう！')
+    const hint = course.parts.length && !hasConnectedInput(part, appended.parts) ? 'ここに おけるよ。みちを つなぎなおそう！' : null
+    rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: course, part, offset: new THREE.Vector3(), moved: false, palette: true, snapped: false, hint }
   }, [status])
   const nextId = useCallback(() => `part-${sequence.current++}`, [])
   const retry = useCallback(() => { setStatus('loading'); setAttempt(value => value + 1) }, [])
