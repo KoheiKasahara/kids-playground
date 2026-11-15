@@ -5,41 +5,80 @@ import VenomLabPlay from './VenomLabPlay'
 import App from '../../app/App'
 import { isSoundEnabled } from '../../audio/sound'
 import { HABITATS, SPECIES } from './data'
+import { EXTRA_MOVES } from './extra'
 import { HABITS, SIGNATURE_MOVES } from './motion'
 
-beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: function (this: HTMLDialogElement) { this.open = true } })
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: function (this: HTMLDialogElement) { this.open = false } })
+  localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
+afterEach(() => {
+  cleanup(); vi.restoreAllMocks()
+  Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal')
+  Reflect.deleteProperty(HTMLDialogElement.prototype, 'close')
+})
 
 const openLab = () => render(<MemoryRouter><VenomLabPlay /></MemoryRouter>)
-const area = () => screen.getByRole('group', { name: 'かんさつエリア' })
+const closePanel = () => {
+  const close = screen.queryByRole('button', { name: /とじる/ })
+  if (close) fireEvent.click(close)
+}
+const area = () => { closePanel(); return screen.getByRole('group', { name: 'かんさつエリア' }) }
+const addButton = (name: string) => {
+  closePanel()
+  fireEvent.click(screen.getByRole('button', { name: /なかまを よぶ/ }))
+  return screen.getByRole('button', { name })
+}
 const animalButtons = () => within(area()).getAllByRole('button')
 
 describe('どくの いきものラボ', () => {
+  test('optional panels close without losing selection and restore scrolling', () => {
+    openLab()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(animalButtons()[0])
+    expect(screen.getByRole('dialog', { name: 'いきものの かいせつ' })).toBeVisible()
+    expect(document.body.style.overflow).toBe('hidden')
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(document.body.style.overflow).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: /▤ かいせつ/ }))
+    expect(screen.getByRole('heading', { name: SPECIES[0].name })).toBeVisible()
+    closePanel()
+    closePanel()
+    fireEvent.click(screen.getByRole('button', { name: /AREA 02/ }))
+    expect(screen.getByRole('button', { name: /▤ かいせつ/ })).toBeDisabled()
+  })
+
   test('observe, add another of the same species, remove one, and preserve each habitat', () => {
     openLab()
     expect(animalButtons()).toHaveLength(3)
     fireEvent.click(animalButtons()[0])
     expect(screen.getByRole('heading', { name: 'ヒョウモンダコのなかま' })).toBeVisible()
     expect(screen.getByLabelText('かんさつずかん 1 / 40')).toBeVisible()
+    fireEvent.click(screen.getByText('くわしく しる'))
     fireEvent.click(screen.getByText('毒のひみつ・出典をみる'))
     expect(screen.getByRole('link', { name: /海洋科学研究所/ })).toHaveAttribute('href', SPECIES[0].source.url)
-    fireEvent.click(screen.getByRole('button', { name: 'ヒョウモンダコのなかまを ふやす' }))
+    fireEvent.click(addButton('ヒョウモンダコのなかまを ふやす'))
     expect(animalButtons()).toHaveLength(4)
     fireEvent.click(animalButtons()[3])
     expect(screen.getByLabelText('かんさつずかん 1 / 40')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: /この1ぴきを もどす/ }))
     expect(animalButtons()).toHaveLength(3)
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /AREA 02 あめのもり/ }))
     expect(animalButtons().every(button => button.getAttribute('aria-label')?.includes('ガエル'))).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'モウドクフキヤガエルを ふやす' }))
+    fireEvent.click(addButton('モウドクフキヤガエルを ふやす'))
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /AREA 01 サンゴのうみ/ }))
     expect(animalButtons()).toHaveLength(3)
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /AREA 02 あめのもり/ }))
     expect(animalButtons()).toHaveLength(4)
   })
 
   test('tapping a creature shows its own signature move and everyday habit, which can be replayed', () => {
     openLab()
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /AREA 03 世界のさばく/ }))
     fireEvent.click(within(area()).getByRole('button', { name: /ニシダイヤガラガラヘビを かんさつ/ }))
     expect(screen.getByText(SIGNATURE_MOVES.rattlesnake)).toBeVisible()
@@ -51,6 +90,8 @@ describe('どくの いきものラボ', () => {
     const habit = screen.getByRole('button', { name: 'ニシダイヤガラガラヘビの くらしの ようすを みる' })
     fireEvent.click(habit)
     expect(habit).toBeEnabled()
+    expect(screen.getByText(EXTRA_MOVES.rattlesnake.label)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'ニシダイヤガラガラヘビの もうひとつの うごきを みる' }))
     fireEvent.click(within(area()).getByRole('button', { name: /アメリカドクトカゲを かんさつ/ }))
     expect(screen.getByText(SIGNATURE_MOVES.gila)).toBeVisible()
     expect(screen.getByText(HABITS.gila)).toBeVisible()
@@ -62,19 +103,21 @@ describe('どくの いきものラボ', () => {
 
   test('capacity prevents adding, and removing the selected animal opens a place', () => {
     openLab()
-    const add = screen.getByRole('button', { name: 'ヒョウモンダコのなかまを ふやす' })
+    const add = addButton('ヒョウモンダコのなかまを ふやす')
     for (let i = 0; i < 8; i++) fireEvent.click(add)
     expect(animalButtons()).toHaveLength(9)
-    expect(add).toBeDisabled()
+    expect(addButton('ヒョウモンダコのなかまを ふやす')).toBeDisabled()
     fireEvent.click(animalButtons()[0])
     fireEvent.click(screen.getByRole('button', { name: /この1ぴきを もどす/ }))
-    expect(add).toBeEnabled()
-    fireEvent.click(add)
+    const reopened = addButton('ヒョウモンダコのなかまを ふやす')
+    expect(reopened).toBeEnabled()
+    fireEvent.click(reopened)
     expect(animalButtons()).toHaveLength(9)
   })
 
   test('ranking explains its limits and opens the right habitat and facts', () => {
     openLab()
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /毒のつよさランキング/ }))
     expect(screen.getByText(/科学的な順位ではありません/)).toBeVisible()
     const entries = screen.getAllByRole('button', { name: /の かいせつをみる/ })
@@ -96,9 +139,10 @@ describe('どくの いきものラボ', () => {
 
   test('different snakes and repeated individuals can share the Japanese exhibit', () => {
     openLab()
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /AREA 04 日本のさとやま/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'ニホンマムシを ふやす' }))
-    fireEvent.click(screen.getByRole('button', { name: 'ヤマカガシを ふやす' }))
+    fireEvent.click(addButton('ニホンマムシを ふやす'))
+    fireEvent.click(addButton('ヤマカガシを ふやす'))
     expect(within(area()).getAllByRole('button', { name: /ニホンマムシを かんさつ/ })).toHaveLength(2)
     expect(within(area()).getAllByRole('button', { name: /ヤマカガシを かんさつ/ })).toHaveLength(2)
     expect(animalButtons()).toHaveLength(5)
@@ -108,6 +152,7 @@ describe('どくの いきものラボ', () => {
 
   test('ranking filters domestic animals and families, retaining filter on return', () => {
     openLab()
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /毒のつよさランキング/ }))
     fireEvent.click(screen.getByRole('button', { name: '日本にもいる17' }))
     expect(screen.getAllByRole('button', { name: /の かいせつをみる/ })).toHaveLength(17)
@@ -117,6 +162,7 @@ describe('どくの いきものラボ', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ガンガサヘビの かいせつをみる' }))
     expect(screen.getByRole('heading', { name: 'アジアのもり' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'ガンガサヘビ' })).toBeVisible()
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /毒のつよさランキング/ }))
     expect(screen.getByRole('button', { name: 'ヘビ21' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: 'サソリ3' }))
@@ -127,9 +173,10 @@ describe('どくの いきものラボ', () => {
     localStorage.setItem('venom-lab-observed-v1', JSON.stringify(SPECIES.slice(0, -1).map(s => s.id)))
     const view = openLab()
     expect(screen.getByLabelText('かんさつずかん 39 / 40')).toBeVisible()
+    closePanel()
     fireEvent.click(screen.getByRole('button', { name: /AREA 08 アジアのもり/ }))
     expect(screen.queryByText('ずかん かんせい')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'マングローブクサリヘビを ふやす' }))
+    fireEvent.click(addButton('マングローブクサリヘビを ふやす'))
     fireEvent.click(within(area()).getByRole('button', { name: /マングローブクサリヘビを かんさつ/ }))
     expect(screen.getByRole('status')).toHaveTextContent('ずかん かんせい')
     view.unmount()
@@ -144,7 +191,7 @@ describe('どくの いきものラボ', () => {
       fireEvent.click(screen.getByRole('button', { name: /この1ぴきを もどす/ }))
     }
     expect(within(area()).queryAllByRole('button')).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: 'オニダルマオコゼを ふやす' }))
+    fireEvent.click(addButton('オニダルマオコゼを ふやす'))
     expect(animalButtons()).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /とめてみる/ }))
     expect(area()).toHaveAttribute('data-paused', 'true')

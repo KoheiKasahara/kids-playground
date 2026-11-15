@@ -24,6 +24,10 @@ const SEA_Y = -0.62
 /** ボールより FADE_MARGIN 手前から 景色を消しはじめ、FADE_DEPTH 手前より カメラ側は すっかり消す。 */
 const FADE_MARGIN = 0.8
 const FADE_DEPTH = 2.6
+/** かぜで ゆれる 葉や 草の、てっぺんの ゆれはば[m]。 */
+const SWAY_REACH = 0.05
+/** かぜに ゆれる 形（葉・もみの木の えだ・草）。 */
+const SWAYING: ReadonlySet<string> = new Set(['blob', 'cone', 'blade'])
 
 /** keep に入れた もよう（ホールを こえて 使いまわす もの）は 捨てない。 */
 function disposeTree(root: THREE.Object3D, keep?: ReadonlySet<THREE.Texture>) {
@@ -59,13 +63,28 @@ function bufferGeometry(buffers: MeshBuffers): THREE.BufferGeometry {
  * こうすると おくゆきの記録も そのままで、後ろの景色が 透けて見えることもない。
  * reach は「カメラからボールまでの距離」。0 なら どこも 消さない。
  */
-function fadeInFront(material: THREE.Material, reach: { value: number }) {
+function fadeInFront(material: THREE.Material, reach: { value: number }, sway?: { value: number }) {
   material.onBeforeCompile = shader => {
     shader.uniforms.uReach = reach
     shader.vertexShader = `varying float vCameraDistance;\n${shader.vertexShader}`.replace(
       '#include <project_vertex>',
       '#include <project_vertex>\n\tvCameraDistance = length(mvPosition.xyz);',
     )
+    if (sway) {
+      // 葉や 草を かぜで ゆらす。ねもとは うごかさず、上へ いくほど 大きく（おおよそ 数cm）ゆれる。
+      // ゆれは 形の 大きさに よらず 同じ はばに なるよう、インスタンスの 大きさで わる。
+      shader.uniforms.uSway = sway
+      shader.vertexShader = `uniform float uSway;\n${shader.vertexShader}`.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          float swayLift = position.y + 0.5;
+          float swayPhase = instanceMatrix[3].x * 0.7 + instanceMatrix[3].z * 0.9;
+          transformed.x += sin(uSway * 1.7 + swayPhase) * ${SWAY_REACH.toFixed(3)} * swayLift / max(0.05, length(instanceMatrix[0].xyz));
+          transformed.z += sin(uSway * 1.3 + swayPhase * 1.3) * ${(SWAY_REACH * 0.6).toFixed(3)} * swayLift / max(0.05, length(instanceMatrix[2].xyz));
+        #endif`,
+      )
+    }
     shader.fragmentShader = `varying float vCameraDistance;\nuniform float uReach;\n${shader.fragmentShader}`.replace(
       '#include <clipping_planes_fragment>',
       `#include <clipping_planes_fragment>
@@ -76,7 +95,7 @@ function fadeInFront(material: THREE.Material, reach: { value: number }) {
       }`,
     )
   }
-  material.customProgramCacheKey = () => 'golf-fade-v1'
+  material.customProgramCacheKey = () => (sway ? 'golf-fade-sway-v1' : 'golf-fade-v1')
 }
 
 /**
@@ -147,7 +166,7 @@ function createBatch() {
       items.set(shape, item)
     },
     /** style: 光の あたらない がわも あかるく したい もの（くも）は emissive と low で あかるく、smooth で なめらかに する。 */
-    build(parent: THREE.Object3D, shadows: boolean, fade: { value: number }, style: { emissive?: string; low?: number; smooth?: boolean } = {}) {
+    build(parent: THREE.Object3D, shadows: boolean, fade: { value: number }, style: { emissive?: string; low?: number; smooth?: boolean; sway?: { value: number } } = {}) {
       // なにも ない ときは 材質も 作らない（どこにも つながらず、すてられなくなる）。
       if (!items.size) return
       const shapes: Record<Shape, () => THREE.BufferGeometry> = {
@@ -165,8 +184,11 @@ function createBatch() {
       // 景色は 数が 多いので、光の 計算が かるい Lambert で えがく。
       const material = new THREE.MeshLambertMaterial({ flatShading: !style.smooth, vertexColors: true, emissive: style.emissive ?? '#000000' })
       fadeInFront(material, fade)
+      // 葉と 草だけ、かぜで ゆれる 材質に する（いえや いわは ゆらさない）。
+      const swaying = style.sway && [...items.keys()].some(shape => SWAYING.has(shape)) ? material.clone() : null
+      if (swaying && style.sway) fadeInFront(swaying, fade, style.sway)
       for (const [shape, item] of items) {
-        const mesh = new THREE.InstancedMesh(shadeFromBelow(shapes[shape](), shape === 'blade' ? 0.45 : style.low ?? 0.66), material, item.matrices.length)
+        const mesh = new THREE.InstancedMesh(shadeFromBelow(shapes[shape](), shape === 'blade' ? 0.45 : style.low ?? 0.66), swaying && SWAYING.has(shape) ? swaying : material, item.matrices.length)
         item.matrices.forEach((matrix, index) => { mesh.setMatrixAt(index, matrix); mesh.setColorAt(index, item.colors[index]!) })
         mesh.castShadow = shadows
         mesh.receiveShadow = true
@@ -716,12 +738,12 @@ function cliff(points: readonly Vec2[], top: number, bottom: number, strata: rea
 
 /** かべの もよう。木の いたの コースと、いわ・こおり・クッキーの コースがある。 */
 const WALL_PATTERN: Record<CourseId, keyof GolfTextures> = {
-  meadow: 'wood', beach: 'wood', moon: 'rock', snow: 'ice', candy: 'sand', dino: 'rock', forest: 'wood', downhill: 'wood', river: 'wood', canyon: 'rock', factory: 'powder', sky: 'wood',
+  meadow: 'wood', beach: 'wood', moon: 'rock', snow: 'ice', candy: 'sand', dino: 'rock', forest: 'wood', downhill: 'wood', river: 'wood', canyon: 'rock', factory: 'powder', sky: 'wood', journey: 'wood',
 }
 
 /** コースの 床の もよう。芝の コースは 芝、ゆきと 月は こなの ような じめん。 */
 const FLOOR_PATTERN: Record<CourseId, keyof GolfTextures> = {
-  meadow: 'grass', beach: 'grass', moon: 'powder', snow: 'powder', candy: 'grass', dino: 'grass', forest: 'grass', downhill: 'grass', river: 'grass', canyon: 'grass', factory: 'grass', sky: 'grass',
+  meadow: 'grass', beach: 'grass', moon: 'powder', snow: 'powder', candy: 'grass', dino: 'grass', forest: 'grass', downhill: 'grass', river: 'grass', canyon: 'grass', factory: 'grass', sky: 'grass', journey: 'grass',
 }
 
 /** まわりの じめんの もようと もりあがり。うみべ・おつきさま・そらのしまは じめんが ない。 */
@@ -735,6 +757,7 @@ const TERRAIN: Partial<Record<CourseId, { pattern: keyof GolfTextures; hills: nu
   river: { pattern: 'grass', hills: 1.1 },
   canyon: { pattern: 'rock', hills: 9 },
   factory: { pattern: 'powder', hills: 0.35 },
+  journey: { pattern: 'grass', hills: 1.4 },
 }
 
 /**
@@ -817,6 +840,39 @@ export function createGolfScene(container: HTMLElement) {
   hintRing.rotation.x = -Math.PI / 2
   hintRing.visible = false
   scene.add(hintRing)
+  // ころがる ボールの うしろに のこる ひかりの あと。はやいほど 長く のびる。
+  const TRAIL = 22
+  const trail = new THREE.InstancedMesh(new THREE.SphereGeometry(BALL_RADIUS * 0.62, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.42, depthWrite: false }), TRAIL)
+  trail.frustumCulled = false
+  trail.count = 0
+  trail.renderOrder = 2
+  scene.add(trail)
+  const trailList: { position: THREE.Vector3; life: number }[] = []
+  const trailLast = new THREE.Vector3()
+  let trailGap = 0
+  // カップの 目じるし。ながい ホールで 遠くからでも ゴールが わかるように、ひかりの はしらと わを 立てる。
+  const beaconGeometry = new THREE.CylinderGeometry(0.5, 0.2, 5.5, 20, 1, true)
+  beaconGeometry.translate(0, 2.75, 0)
+  // 下が 明るく、上へ いくほど そらに とけて 消える。
+  const beaconGlow = canvasTexture(4, 64, ctx => {
+    const gradient = ctx.createLinearGradient(0, 64, 0, 0)
+    gradient.addColorStop(0, '#ffffff')
+    gradient.addColorStop(0.35, '#8a8a8a')
+    gradient.addColorStop(1, '#000000')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 4, 64)
+  })
+  const beaconMaterial = new THREE.MeshBasicMaterial({ color: '#fff0a0', map: beaconGlow, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false, toneMapped: false })
+  const beacon = new THREE.Mesh(beaconGeometry, beaconMaterial)
+  beacon.renderOrder = 2
+  beacon.visible = false
+  scene.add(beacon)
+  const beaconRing = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 40), new THREE.MeshBasicMaterial({ color: '#fff3a6', transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }))
+  beaconRing.rotation.x = -Math.PI / 2
+  beaconRing.renderOrder = 2
+  beaconRing.visible = false
+  scene.add(beaconRing)
+  let beaconShow = 0
   // パター。うしろから見てボールや矢印をかくさないよう、柄は横へたおしておく。
   const club = new THREE.Group()
   const clubMaterial = new THREE.MeshStandardMaterial({ color: '#dfe6ee', roughness: 0.25, metalness: 0.7 })
@@ -884,6 +940,8 @@ export function createGolfScene(container: HTMLElement) {
   let hole: HoleContent | null = null
   // カメラとボールのあいだの景色を消すための距離。ホールが変わっても作り直さない。
   const fade = { value: 0 }
+  /** 葉や 草を ゆらす かぜの 時計。動きを 減らす 設定では 進めない。 */
+  const sway = { value: 0 }
   const seeThroughHit = new THREE.Vector3()
   let flagLift = 0
   let flagLifted = false
@@ -1247,7 +1305,7 @@ export function createGolfScene(container: HTMLElement) {
         const group = new THREE.Group()
         group.position.set(gadget.x, ground, gadget.z)
         const r = gadget.radius
-        if (course.id === 'meadow') {
+        if (course.id === 'meadow' || course.id === 'journey') {
           // きのこ
           const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r * 0.86, BUMPER_HEIGHT * 0.7, 16), new THREE.MeshStandardMaterial({ color: look.bumperCap, roughness: 0.6 }))
           stem.position.y = BUMPER_HEIGHT * 0.35
@@ -1953,7 +2011,52 @@ export function createGolfScene(container: HTMLElement) {
         for (let k = 0; k < 4; k++) soft.add('sphere', '#ffffff', x + (k - 1.5) * 1.6, y + (k % 2) * 0.5, z + hash(i * 4 + k) * 1.2, 2.6 + hash(k + i) * 1.6, 1.6, 2.2)
       }
     }
-    if (course.id === 'meadow') {
+    if (course.id === 'journey') {
+      // あきの おか。あかや きいろに いろづいた 木と、そらに うかぶ ききゅう。ながい ホールに あわせて ひろく まく。
+      const width = bounds.maxX - bounds.minX
+      const depth = bounds.maxZ - bounds.minZ
+      const autumn = ['#e0662f', '#f0a030', '#d9452f', '#f2c83e', '#b8552a', '#8fae4a']
+      for (let i = 0; i < 150; i++) {
+        const x = cx + (hash(i * 1.9 + 5) - 0.5) * (width + 46)
+        const z = cz + (hash(i * 2.7 + 9) - 0.5) * (depth + 46)
+        const size = 0.8 + hash(i + 3) * 0.9
+        if (!clear(x, z, 1.6 + size * 0.6)) continue
+        if (i % 4) broadleafTree(solid, x, groundAt(x, z), z, size * 0.9, i, autumn)
+        else pineTree(solid, x, groundAt(x, z), z, size * 0.85, i)
+      }
+      // おちば と きのこ。
+      for (let i = 0; i < 150; i++) {
+        const x = cx + (hash(i * 3.1 + 500) - 0.5) * (width + 16)
+        const z = cz + (hash(i * 4.3 + 700) - 0.5) * (depth + 16)
+        if (!clear(x, z, 0.7)) continue
+        const y = groundAt(x, z)
+        if (i % 5) solid.add('sphere', autumn[i % 4]!, x, y + 0.03, z, 0.3, 0.05, 0.22, 0, hash(i) * 3, 0)
+        else {
+          solid.add('cylinder', '#fff3e0', x, y + 0.12, z, 0.12, 0.24, 0.12)
+          solid.add('sphere', '#c8472f', x, y + 0.26, z, 0.36, 0.26, 0.36)
+        }
+      }
+      scatterTufts(150, 18, '#b7b055')
+      for (const [x, z, s] of [[-44, -30, 13], [-10, -62, 16], [34, -48, 13], [50, 12, 11], [-46, 26, 12]] as const) {
+        soft.add('sphere', '#c9a85a', cx + x, groundAt(cx + x, cz + z) - s * 0.2, cz + z, s * 2.4, s, s * 2)
+      }
+      // ききゅう。ゆっくり うかんで ゆれる。
+      for (const [index, [x, y, z, color]] of ([[-14, 9, -12, '#ff6f61'], [16, 12, -26, '#ffd23f'], [20, 8, 10, '#5fb8ff']] as const).entries()) {
+        const balloon = new THREE.Group()
+        const envelope = new THREE.Mesh(new THREE.SphereGeometry(1.6, 20, 14), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }))
+        envelope.scale.y = 1.15
+        const band = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.12, 8, 24), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 }))
+        band.rotation.x = Math.PI / 2
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.8, 12, 1, true), new THREE.MeshStandardMaterial({ color, roughness: 0.5, side: THREE.DoubleSide }))
+        neck.position.y = -1.9
+        const basket = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.6), new THREE.MeshStandardMaterial({ color: '#8a5a34', roughness: 0.8 }))
+        basket.position.y = -2.9
+        balloon.add(envelope, band, neck, basket)
+        balloon.position.set(cx + x, y, cz + z)
+        root.add(balloon)
+        floaters.push({ object: balloon, base: y, phase: index * 2.1 })
+      }
+    } else if (course.id === 'meadow') {
       const greens = ['#4f9d5b', '#62aa62', '#7cb867', '#3f8a5a', '#8fc26a']
       for (let i = 0; i < 90; i++) {
         const angle = hash(i + 1) * Math.PI * 2
@@ -2571,8 +2674,8 @@ export function createGolfScene(container: HTMLElement) {
         floaters.push({ object: balloon, base: balloon.position.y, phase: k * 2.1 })
       }
     }
-    solid.build(root, true, fade)
-    soft.build(root, false, fade)
+    solid.build(root, true, fade, { sway })
+    soft.build(root, false, fade, { sway })
     clouds.build(root, false, fade, { emissive: '#c9d8ea', low: 0.86, smooth: true })
     root.traverse(child => { if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial && !child.material.transparent) child.receiveShadow = true })
 
@@ -2585,7 +2688,7 @@ export function createGolfScene(container: HTMLElement) {
     sun.shadow.camera.updateProjectionMatrix()
     const moon = course.id === 'moon'
     hemisphere.color.set(moon ? '#b3b8ff' : '#eef8ff')
-    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : course.id === 'factory' ? '#a9b3c2' : course.id === 'sky' ? '#cfe8ff' : '#7fa35a')
+    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : course.id === 'factory' ? '#a9b3c2' : course.id === 'sky' ? '#cfe8ff' : course.id === 'journey' ? '#b89a58' : '#7fa35a')
     // まわりからの 明かりを ひかえめにして、日なたと かげの 差で 立体感を 出す。
     hemisphere.intensity = moon ? 0.8 : 0.75
     sun.color.set(moon ? '#f2f0ff' : '#fff1d6')
@@ -2641,7 +2744,15 @@ export function createGolfScene(container: HTMLElement) {
       hintTarget = null
       bitList.length = 0
       puffList.length = 0
+      trailList.length = 0
+      trailGap = 0
       pulses.clear()
+      const { cup } = geometry
+      beacon.position.set(cup.x, cup.y, cup.z)
+      beaconRing.position.set(cup.x, cup.y + 0.02, cup.z)
+      beacon.visible = true
+      beaconRing.visible = true
+      beaconShow = 0
     },
     setBallStyle(id: GolfBallId) {
       if (id === ballStyle) return
@@ -2784,6 +2895,41 @@ export function createGolfScene(container: HTMLElement) {
     resize,
     render(dt: number, reducedMotion: boolean) {
       clock += dt
+      if (!reducedMotion) sway.value = clock
+      // ひかりの あと。ボールが はやく うごいた ぶんだけ つぶを 置き、すぐ 小さく して 消す。
+      const moved = ball.position.distanceTo(trailLast)
+      const fast = dt > 0 && ball.visible && moved / dt > 1.4 && moved < 1.5
+      trailGap = fast ? trailGap + moved : 0
+      if (fast && !reducedMotion && trailGap > 0.11) {
+        trailGap = 0
+        if (trailList.length >= TRAIL) trailList.shift()
+        trailList.push({ position: ball.position.clone(), life: 0 })
+      }
+      trailLast.copy(ball.position)
+      for (let i = trailList.length - 1; i >= 0; i--) {
+        trailList[i]!.life += dt
+        if (trailList[i]!.life > 0.38) trailList.splice(i, 1)
+      }
+      trail.count = trailList.length
+      trailList.forEach((item, index) => {
+        dummy.position.copy(item.position)
+        dummy.rotation.set(0, 0, 0)
+        dummy.scale.setScalar(Math.max(0.01, 1 - item.life / 0.38))
+        dummy.updateMatrix()
+        trail.setMatrixAt(index, dummy.matrix)
+      })
+      trail.instanceMatrix.needsUpdate = true
+      // ねらいの 矢じるしと 点線は、ゆっくり いきを するように 明るさを 変える。
+      const breath = reducedMotion ? 1 : 0.5 + 0.5 * Math.sin(clock * 4.2)
+      arrowMaterial.opacity = 0.8 + 0.14 * breath
+      ;(dots.material as THREE.MeshBasicMaterial).opacity = 0.72 + 0.26 * breath
+      // カップの 目じるし。ボールが 近づいたら（はたが 上がったら）消して、カップを かくさない。
+      beaconShow += ((flagLifted || !hole ? 0 : 1) - beaconShow) * Math.min(1, dt * 5)
+      const pulse = reducedMotion ? 0.5 : (clock * 0.55) % 1
+      beaconMaterial.opacity = 0.26 * beaconShow
+      beacon.scale.set(1, 1, 1)
+      beaconRing.scale.setScalar(0.5 + pulse * 0.9)
+      ;(beaconRing.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - pulse) * beaconShow
       if (hole) {
         for (const item of hole.seeThrough) item.keep.value = Math.abs(item.goal - item.keep.value) < 0.01 ? item.goal : item.keep.value + (item.goal - item.keep.value) * Math.min(1, dt * 8)
         flagLift += ((flagLifted ? 1 : 0) - flagLift) * Math.min(1, dt * 6)
@@ -2811,6 +2957,12 @@ export function createGolfScene(container: HTMLElement) {
             flakes.needsUpdate = true
           }
           hole.floaters.forEach(item => { item.object.position.y = item.base + Math.sin(clock * 1.1 + item.phase) * 0.35 })
+          // 歩く どうぶつは、ぴょこぴょこ はねながら からだを ゆらす（syncGadgets が 毎フレーム 置きなおす 高さに 足す）。
+          hole.critters.forEach((object, index) => {
+            const step = clock * 9 + index * 1.7
+            object.position.y += Math.abs(Math.sin(step)) * 0.045
+            object.rotation.z = Math.sin(step) * 0.09
+          })
         }
         // かぜの すじ。動きを減らす設定では その場に とめておく。
         const flow = reducedMotion ? 0 : clock

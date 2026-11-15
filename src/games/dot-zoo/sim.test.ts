@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { FOODS, GRID, MAX_ANIMALS, OBJECTS, SPECIES } from './data'
 import {
-  addAnimal, addObject, checkAnimal, checkFood, checkObject, createWorld, dropFood, drainEvents, isNightClock, removeAt, removeObject,
+  addAnimal, addObject, offerFood, checkAnimal, checkFood, checkObject, createWorld, dropFood, drainEvents, isNightClock, removeAt, removeObject,
   ringPoint, stepWorld, zooRating, DAY_SECONDS, RING, type World,
 } from './sim'
 import { fromView, groundAt, toScreen, toView, viewDir } from './iso'
@@ -239,5 +239,40 @@ describe('iso', () => {
     const [x1, z1] = ringPoint(1 + RING)
     expect(x1).toBeCloseTo(x0)
     expect(z1).toBeCloseTo(z0)
+  })
+})
+
+describe('どうぶつの そばで えさやり', () => {
+  test.each(['fox', 'sheep', 'tortoise'] as const)('%s は すきな えさを たべる', id => {
+    const world = createWorld(7)
+    const a = addAnimal(world, id, 5, 5)
+    a.hunger = .8
+    expect(offerFood(world, a.id).ok).toBe(true)
+    run(world, 18)
+    expect(a.hunger).toBeLessThan(.5)
+    expect(world.foods).toHaveLength(0)
+  })
+
+  test('ねている とき・いっぱいの とき・いない ときは ふやさない', () => {
+    const world = createWorld()
+    const a = addAnimal(world, 'fox', 5, 5)
+    a.state = 'sleep'
+    expect(offerFood(world, a.id).ok).toBe(false)
+    expect(world.foods).toHaveLength(0)
+    a.state = 'idle'
+    for (let i = 0; i < 6; i++) expect(offerFood(world, a.id).ok).toBe(true)
+    expect(offerFood(world, a.id).ok).toBe(false)
+    expect(offerFood(world, -1).ok).toBe(false)
+    expect(world.foods).toHaveLength(6)
+  })
+
+  test('いけの カピバラには きしに くさを おく', () => {
+    const world = createWorld()
+    addObject(world, 'pond', 4, 4)
+    const a = addAnimal(world, 'capybara', 5, 5)
+    expect(offerFood(world, a.id).ok).toBe(true)
+    const f = world.foods[0]
+    expect(f.kind).toBe('grass')
+    expect(f.x < 4 || f.x >= 7 || f.z < 4 || f.z >= 7).toBe(true)
   })
 })

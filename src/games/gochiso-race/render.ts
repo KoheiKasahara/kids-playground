@@ -91,6 +91,17 @@ type Palette = {
 }
 
 const PALETTES: Record<ThemeId, Palette> = {
+  seaside: {
+    sky: ['#38aee8', '#67caf1', '#9addf7', '#c2ecfa', '#e5f8ff'], sun: '#fff1a0',
+    top: '#ffe49a', topDark: '#d7b966', body: '#efd29a', stripe: '#f9e4b5', speck: '#cba76c', under: '#168dcc', underLight: '#80e0ed',
+    far: '#78d1df', near: '#39abc9', cloud: '#ffffff', cloudShade: '#c2ecfa', line: '#475965',
+  },
+  snow: {
+    sky: ['#809ed8', '#a1b9e7', '#c0d5f0', '#d9e8fa', '#eff7ff'], sun: '#fffce8',
+    top: '#ffffff', topDark: '#b9dbf1', body: '#96bed8', stripe: '#c3e2f3', speck: '#7ca7c4', under: '#496895', underLight: '#a8cee9',
+    far: '#d4e7f4', near: '#96b8d5', cloud: '#ffffff', cloudShade: '#d0e4f7', line: '#344d70',
+  },
+
   meadow: {
     sky: ['#5fb8ff', '#7cc8ff', '#9fd8ff', '#c4e8ff', '#e2f4ff'], sun: '#fff3a0',
     top: '#6cc24a', topDark: '#3f8f2e', body: '#c08347', stripe: '#a86d36', speck: '#8a5528', under: '#3d9be9', underLight: '#9fd3ff',
@@ -257,6 +268,18 @@ function decoImage(theme: ThemeId, variant: number): Img | null {
     g.ellipse(12, 9, 8, 8, candy)
     for (let a = 0; a < 9; a += .25) g.set(Math.floor(12 + Math.cos(a) * a * .8), Math.floor(9 + Math.sin(a) * a * .8), '#ffffff')
     g.outline('#8a3a5a')
+  } else if (theme === 'seaside') {
+    g.rect(11, 11, 2, 19, '#bf874b')
+    g.triangle(1, 13, 12, 3, 23, 13, variant ? '#ff9671' : '#55cfe4')
+    g.triangle(8, 13, 12, 3, 16, 13, '#fff6d9')
+    g.rect(2, 28, 20, 2, '#ffe49a')
+    g.outline('#856544')
+  } else if (theme === 'snow') {
+    g.rect(10, 19, 4, 11, '#7f6f66')
+    g.triangle(2, 24, 12, 5, 22, 24, '#568b91')
+    g.triangle(4, 17, 12, 1, 20, 17, '#ffffff')
+    g.rect(2, 28, 20, 2, '#ffffff')
+    g.outline('#597c98')
   } else {
     g.rect(3, 14, 18, 16, '#2b2a62')
     g.triangle(1, 15, 12, 4, 23, 15, '#3a3780')
@@ -323,12 +346,12 @@ function drawBackground(ctx: CanvasRenderingContext2D, view: View, cam: Cam, the
     const shift = Math.round(camX * factor)
     ctx.fillStyle = color
     for (let x = 0; x < view.bw; x++) {
-      const h = Math.round(hillHeight(x + shift, seed, height))
+      const h = Math.round(hillHeight(x + shift, seed, theme === 'seaside' ? 3 : height))
       ctx.fillRect(x, base - h, 1, view.bh - base + h)
     }
     ctx.fillStyle = shade(color, -.18)
     for (let x = 0; x < view.bw; x++) {
-      const h = Math.round(hillHeight(x + shift, seed, height))
+      const h = Math.round(hillHeight(x + shift, seed, theme === 'seaside' ? 3 : height))
       ctx.fillRect(x, base - h, 1, 1)
     }
   }
@@ -671,6 +694,15 @@ function drawRunner(ctx: CanvasRenderingContext2D, race: Race, r: Runner, fx: Fx
         }
       }
     } else ctx.drawImage(img, x, y)
+  }
+  if (r.guard > 0) {
+    ctx.strokeStyle = '#00ddff'
+    ctx.fillStyle = 'rgba(100, 230, 255, .22)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.ellipse(cx, feet - 12, 19, 24, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
   }
   // ふらふら の ほし。
   if (r.stun > 0) {

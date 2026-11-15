@@ -31,15 +31,24 @@ function sweep(points: PathPoint[]): THREE.BufferGeometry {
   return result
 }
 
-export function trackGeometry(kind: 'straight' | 'slope' | 'curve'): THREE.BufferGeometry {
+export function trackGeometry(kind: 'straight' | 'slope' | 'curve' | 'curveRight' | 'long' | 'wave'): THREE.BufferGeometry {
   const points: PathPoint[] = []
-  const segments = kind === 'curve' ? 28 : 1
+  const curved = kind === 'curve' || kind === 'curveRight'
+  const sign = kind === 'curveRight' ? -1 : 1
+  const length = kind === 'long' || kind === 'wave' ? 3 : 2
+  const segments = curved || kind === 'wave' ? 24 : 1
   for (let i = 0; i <= segments; i++) {
     const t = i / segments
     const a = t * Math.PI / 2
-    points.push(kind === 'curve'
-      ? { x: -2 + 2 * Math.sin(a), y: 0, z: 2 - 2 * Math.cos(a), nx: -Math.sin(a), nz: Math.cos(a) }
-      : { x: -2 + 4 * t, y: kind === 'slope' ? 1.6 * (1 - t) : 0, z: 0, nx: 0, nz: 1 })
+    if (kind === 'wave') {
+      const z = 0.7 * Math.sin(2 * Math.PI * t) * Math.sin(Math.PI * t) ** 2
+      const dz = 0.7 * Math.PI * (2 * Math.cos(2 * Math.PI * t) * Math.sin(Math.PI * t) ** 2 + Math.sin(2 * Math.PI * t) ** 2) / 6
+      points.push({ x: -3 + 6 * t, y: 0, z, nx: -dz / Math.hypot(1, dz), nz: 1 / Math.hypot(1, dz) })
+      continue
+    }
+    points.push(curved
+      ? { x: -2 + 2 * Math.sin(a), y: 0, z: sign * (2 - 2 * Math.cos(a)), nx: -sign * Math.sin(a), nz: Math.cos(a) }
+      : { x: -length + 2 * length * t, y: kind === 'slope' ? 1.6 * (1 - t) : 0, z: 0, nx: 0, nz: 1 })
   }
   return sweep(points)
 }
@@ -137,6 +146,7 @@ export function compactGroups(source: THREE.BufferGeometry): THREE.BufferGeometr
 
 export function createPartGeometries(): Record<PartKind, THREE.BufferGeometry> {
   return {
+    curveRight: compactGroups(trackGeometry('curveRight')), long: compactGroups(trackGeometry('long')), wave: compactGroups(trackGeometry('wave')),
     straight: compactGroups(trackGeometry('straight')), slope: compactGroups(trackGeometry('slope')), curve: compactGroups(trackGeometry('curve')), branch: compactGroups(branchGeometry()), goal: compactGroups(goalGeometry()),
     jump: compactGroups(jumpGeometry()), spinner: compactGroups(trayGeometry()), funnel: compactGroups(funnelGeometry()), booster: compactGroups(trackGeometry('straight')), seesaw: compactGroups(seesawGeometry()),
   }

@@ -24,7 +24,7 @@ const TITLE = 'ドットの すいぞくかん'
 /** スマホを たてに もっている とき（よこむきに してもらう）。 */
 const PORTRAIT_QUERY = '(orientation: portrait) and (pointer: coarse)'
 
-type Tab = 'creature' | 'decor' | 'food' | 'wipe' | 'remove'
+type Tab = 'creature' | 'decor' | 'food' | 'wipe' | 'remove' | 'find'
 type Pick = { tab: 'creature'; id: SpeciesId } | { tab: 'decor'; id: DecorKind } | { tab: 'food'; id: FoodKind } | null
 
 function reducedMotion() {
@@ -102,6 +102,9 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
   const pointer = useRef<{ id: number | null; x: number; y: number; touch: boolean; wiped: number }>({ id: null, x: 0, y: 0, touch: false, wiped: 0 })
   const [tab, setTab] = useState<Tab | null>(null)
   const [pick, setPick] = useState<Pick>(null)
+  const [target, setTarget] = useState<SpeciesId | null>(null)
+  const [found, setFound] = useState(false)
+  const [findCount, setFindCount] = useState(0)
   const [hidden, setHidden] = useState(false)
   const [hud, setHud] = useState<Hud>(() => hudOf(initial))
   const [message, setMessage] = useState<{ id: number; text: string; bad?: boolean } | null>(null)
@@ -275,6 +278,22 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
   function act(px: number, py: number) {
     const world = worldRef.current
     const t = tabRef.current, p = pickRef.current
+    if (t === 'find') {
+      if (!target || found) return
+      const c = creatureAt(world, px, py)
+      if (c?.species === target) {
+        setFound(true)
+        setFindCount(n => n + 1)
+        poke(world, c)
+        playHappySound()
+        renderer.burst('heart', c.x, c.y - 8, 4)
+        say(`${speciesDef(target).name}、みつけた！`)
+      } else {
+        playTapSound()
+        say(c ? `${speciesDef(c.species).name}だね。もういちど さがそう！` : 'いきものを タップしてね')
+      }
+      return
+    }
     if (t === 'wipe') { doWipe(px, py, true); return }
     if (t === 'remove') {
       const c = creatureAt(world, px, py)
@@ -422,6 +441,15 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
     hoverRef.current = null
   }
 
+  function nextFind() {
+    const ids = [...new Set(worldRef.current.creatures.map(c => c.species))]
+    const others = ids.filter(id => id !== target)
+    const choices = others.length ? others : ids
+    setTarget(choices[Math.floor(Math.random() * choices.length)] ?? null)
+    setFound(false)
+    playTapSound()
+  }
+
   function chooseTab(next: Tab) {
     playTapSound()
     const same = tab === next
@@ -430,7 +458,8 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
     hoverRef.current = null
     showInfo(null)
     if (same) return
-    if (next === 'remove') say('かたづけたい いきものや ものを タップしてね')
+    if (next === 'find') { nextFind(); setFindCount(0) }
+    else if (next === 'remove') say('かたづけたい いきものや ものを タップしてね')
     else if (next === 'food') say('えさを えらんで、いれたい ところを タップしてね')
     else if (next === 'wipe') say(worldRef.current.moss.length ? 'みどりの コケを こすって ふいてね' : 'いまは ピカピカ！ コケが ついたら ふいてね')
   }
@@ -472,6 +501,7 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
     { id: 'decor', label: 'もの', mark: '🪨' },
     { id: 'food', label: 'えさ', mark: '🦐' },
     { id: 'wipe', label: 'そうじ', mark: '🧽' },
+    { id: 'find', label: 'さがそう', mark: '🔎' },
     { id: 'remove', label: 'かたづけ', mark: '↩' },
   ]
 
@@ -529,9 +559,16 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
           <span aria-hidden="true">{t.mark}</span>{t.label}
         </button>)}
       </div>
+      {tab === 'find' && <div className={styles.find} aria-live="polite">
+        {target ? <>
+          {icons[`creature:${target}`] && <img src={icons[`creature:${target}`]} alt="" />}
+          <span>{found ? 'みつけた！' : `${speciesDef(target).name}は どこ？`}<small>⭐ {findCount} みつけた</small></span>
+          {found && <button type="button" className={`${styles.window} ${styles.nextFind}`} onClick={nextFind}>つぎへ</button>}
+        </> : <span>いきものを いれてから あそぼう</span>}
+      </div>}
       {tab === 'wipe' && <p className={styles.hint}>みどりの コケを ゆびで こすって ピカピカに しよう</p>}
       {tab === 'remove' && <p className={styles.hint}>かたづけたい いきものや ものを タップしてね</p>}
-      {tab && tab !== 'remove' && tab !== 'wipe' && <div className={`${styles.window} ${styles.tray}`} role="group" aria-label={tabs.find(t => t.id === tab)?.label}>
+      {tab && tab !== 'remove' && tab !== 'wipe' && tab !== 'find' && <div className={`${styles.window} ${styles.tray}`} role="group" aria-label={tabs.find(t => t.id === tab)?.label}>
         {trayItems.map(item => <button key={item.key} type="button" className={styles.item} data-active={item.active || undefined} data-full={item.full ? true : undefined}
           aria-pressed={item.active} aria-label={`${item.name}${item.badge ? ` ${item.badge}` : ''}${item.full ? ' いっぱい' : ''}`} onClick={item.onClick}>
           <span className={styles.itemIcon}>{item.icon ? <img src={item.icon} alt="" /> : <span aria-hidden="true">{item.name.slice(0, 1)}</span>}</span>

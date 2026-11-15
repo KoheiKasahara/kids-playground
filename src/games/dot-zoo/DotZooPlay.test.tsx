@@ -116,3 +116,25 @@ describe('dot-zoo play', () => {
     expect(screen.queryByRole('button', { name: /まっさらから/ })).not.toBeInTheDocument()
   })
 })
+
+test('あたらしい なかまを えらび、ようすから なでる・えさやりが できる', () => {
+  render(<MemoryRouter><DotZooPlay /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: /まっさらから/ }))
+  fireEvent.click(screen.getByRole('button', { name: /どうぶつ$/ }))
+  for (const name of ['キツネ', 'ヒツジ', 'リクガメ']) expect(screen.getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^キツネ/ }))
+  tapCenter()
+  fireEvent.click(screen.getByRole('button', { name: /どうぶつ$/ }))
+  tapCenter()
+  const animal = zoo().animals[0]
+  const mood = animal.mood
+  fireEvent.click(screen.getByRole('button', { name: /なでる/ }))
+  expect(animal.mood).toBeGreaterThan(mood)
+  expect(screen.getByRole('status')).toHaveTextContent('しっぽ ふりふり')
+  fireEvent.click(screen.getByRole('button', { name: /えさを あげる/ }))
+  expect(zoo().foods[0].kind).toBe('meat')
+  animal.state = 'sleep'
+  fireEvent.click(screen.getByRole('button', { name: /えさを あげる/ }))
+  expect(screen.getByRole('status')).toHaveTextContent('あさまで まってね')
+  expect(zoo().foods).toHaveLength(1)
+})

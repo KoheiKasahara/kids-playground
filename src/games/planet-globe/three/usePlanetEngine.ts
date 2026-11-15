@@ -29,6 +29,7 @@ import { axialTiltRotationZ, createRingMeshes, createRingSegmentTexture } from '
 import {
   createSunSurfaceMaterial,
   createSunCoronaMaterial,
+  createSunGlow,
   SUN_CORONA_SCALE,
   updateSunSurfaceMaterial,
 } from './sunVisual'
@@ -417,7 +418,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (isSun && maps.map !== null) {
         // 恒星は光源に照らされる/されないの陰影を持たせず、自分で光っている見た目にする。
         // ベースの帯+黒点テクスチャ(maps.map)はそのまま使い、その上へ流れるノイズと
-        // Fresnel状の縁発光だけをシェーダーで重ねる(three/sunVisual.ts参照)。
+        // 周縁減光だけをシェーダーで重ねる(three/sunVisual.ts参照)。
         const sunMat = createSunSurfaceMaterial({
           map: maps.map,
           hotColor: body.material.emissive ?? '#fff3c4',
@@ -465,6 +466,13 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         nextTiltGroup.add(corona)
         visualObjects.push(corona)
         visualMaterials.push(coronaMaterial)
+
+        const glow = createSunGlow(body.radius)
+        if (glow !== null) {
+          nextTiltGroup.add(glow)
+          visualObjects.push(glow)
+          visualMaterials.push(glow.material)
+        }
       }
 
       const visual = body.visual

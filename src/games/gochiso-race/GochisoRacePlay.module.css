@@ -192,24 +192,24 @@
 /* --- ボタン --- */
 .controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   padding: 10px calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
   background: rgba(30, 40, 70, .82);
 }
-.slideButton, .jumpButton {
+.slideButton, .jumpButton, .guardButton {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   min-height: 96px;
-  padding: 0 10px;
+  padding: 0 3px;
   border: 4px solid #fff;
   border-radius: 28px;
   color: #fff;
   font: inherit;
-  font-size: clamp(17px, 5vw, 26px);
+  font-size: clamp(14px, 4vw, 24px);
   font-weight: 900;
   letter-spacing: .04em;
   white-space: nowrap;
@@ -230,7 +230,7 @@
 .jumpButton { background: linear-gradient(#69db7c, #2f9e44); box-shadow: 0 6px 0 #1f6e2f; }
 .slideButton:active { transform: translateY(4px); box-shadow: 0 2px 0 #1864ab; }
 .jumpButton:active { transform: translateY(4px); box-shadow: 0 2px 0 #1f6e2f; }
-.slideButton:focus-visible, .jumpButton:focus-visible { outline: 4px solid #ffd43b; outline-offset: 2px; }
+.slideButton:focus-visible, .jumpButton:focus-visible, .guardButton:focus-visible { outline: 4px solid #ffd43b; outline-offset: 2px; }
 .controlIcon { width: 34px; height: 34px; flex-shrink: 0; }
 
 .status {
@@ -506,7 +506,7 @@
     background: transparent;
     pointer-events: none;
   }
-  .slideButton, .jumpButton { min-height: 80px; width: min(26vw, 190px); pointer-events: auto; opacity: .94; }
+  .slideButton, .jumpButton, .guardButton { min-height: 80px; width: min(26vw, 190px); pointer-events: auto; opacity: .94; }
   .slideButton { font-size: clamp(15px, 2.6vw, 20px); }
   .hud { flex-direction: row; align-items: center; }
   .hudRow { order: 2; }
@@ -536,3 +536,12 @@
   .banner, .bannerGo, .callout, .card, .starOn, .starOff, .overlay, .resultRow { animation: none !important; }
   .confetti { display: none; }
 }
+
+.guardButton { background: linear-gradient(#a78bfa, #6741d9); box-shadow: 0 6px 0 #4c2b99; }
+.guardButton[aria-disabled='true'] { background: #665c83; }
+.guardButton:active { transform: translateY(3px); }
+.guardButton small { font-size: 11px; }
+.traitLabel { color: #354561; font-size: 12px; }
+.traitHelp { text-align: center; color: #354561; font-size: 14px; line-height: 1.6; }
+.courseCard[data-theme='seaside'] { --card: #c5f6fa; --card-edge: #1098ad; }
+.courseCard[data-theme='snow'] { --card: #e7f5ff; --card-edge: #4c6ef5; }

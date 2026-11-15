@@ -308,6 +308,32 @@ describe('カブクワ バトル', () => {
     expect(screen.getByRole('heading', { name: 'ヘラクレスの かち！' })).toBeInTheDocument()
   })
 
+  test.each([
+    ['hercules', 'caucasus', 6, 'throw', 'そりゃああ！'],
+    ['hercules', 'caucasus', 44, 'pincer', 'がっちりぃ！'],
+    ['neptunus', 'elephas', 94, 'rush', 'いっけぇぇぇ！'],
+  ] as const)('きめてに あわせた カットイン: %s vs %s (%s)', (mineId, foeId, seed, variant, shout) => {
+    renderGame()
+    const mine = SPECIES.find(sp => sp.id === mineId)!
+    const foe = SPECIES.find(sp => sp.id === foeId)!
+    fireEvent.click(screen.getByRole('button', { name: `${mine.name}（${mine.home}）` }))
+    fireEvent.click(screen.getByRole('button', { name: `${mine.short}に けってい！` }))
+    fireEvent.click(screen.getByRole('button', { name: `${foe.name}（${foe.home}）` }))
+    fireEvent.click(screen.getByRole('button', { name: `${foe.short}と たたかう！` }))
+    vi.spyOn(Math, 'random').mockReturnValueOnce(seed / 2 ** 31)
+    fireEvent.click(screen.getByRole('button', { name: 'もりの まるた（ななめから みる）' }))
+    for (let i = 0; i < 900 && !screen.queryByTestId('kabukuwa-cut-in'); i++) advance(.1)
+    expect(screen.getByTestId('kabukuwa-cut-in')).toHaveAttribute('data-variant', variant)
+    expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent(shout)
+    expect(screen.getByRole('status')).toHaveTextContent(shout)
+    const time = battle()!.time
+    advance(1)
+    expect(battle()!.time).toBe(time)
+    advance(1)
+    expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
+    expect(playCutIn).toHaveBeenCalledTimes(1)
+  })
+
   test('あいてが ぎゃくてんして かった ときも カットインが はいる', () => {
     renderGame()
     chooseHerculesVsCaucasus()

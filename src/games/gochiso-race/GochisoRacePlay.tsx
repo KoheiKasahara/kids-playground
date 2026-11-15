@@ -7,12 +7,12 @@ import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
 import { totalStageStars, type StageProgress } from '../shared/progress/stageProgress'
-import { ANIMALS, findAnimal, pickRival, type AnimalId } from './animals'
+import { ANIMALS, traitOf, findAnimal, pickRival, type AnimalId } from './animals'
 import { RUN_FRAMES, animalSprite, foodSprite, type AnimalState } from './art'
 import { COURSES, type Course } from './courses'
 import { progressStore, isUnlocked, readAnimal, writeAnimal } from './progress'
 import {
-  GOAL_BONUS, createRace, drainEvents, pressJump, pressSlide, progressOf, stepRace,
+  GOAL_BONUS, createRace, drainEvents, pressJump, pressSlide, pressGuard, progressOf, stepRace,
   type Race, type RaceEvent, type RaceResult, type Score,
 } from './race'
 import { createFx, drawPortrait, drawScene, followCamera, makeView, cameraTarget, spawnFx, updateFx, type Cam, type View } from './render'
@@ -27,6 +27,7 @@ const FRAME_MS = 1000 / 60
 /** おわってから この じかん[s] たったら 絵を とめて 電池を まもる。 */
 const REST_AFTER_DONE = 3
 const JUMP_KEYS = new Set(['ArrowUp', 'w', 'W'])
+const GUARD_KEYS = new Set(['ArrowRight', 'd', 'D'])
 const SLIDE_KEYS = new Set(['ArrowDown', 's', 'S'])
 
 type Banner = 'ready' | 'go' | null
@@ -130,6 +131,7 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
   const raceRef = useRef<Race | null>(null)
   const lastKeyPress = useRef(-1e9)
   const [banner, setBanner] = useState<Banner>('ready')
+  const [guardState, setGuardState] = useState('よーい')
   const [running, setRunning] = useState(false)
   const [scores, setScores] = useState({ player: 0, rival: 0 })
   const [callout, setCallout] = useState<Callout | null>(null)
@@ -192,6 +194,13 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
           break
         case 'slide':
           if (event.who === 'player') playSlide()
+          break
+        case 'guard':
+          if (event.who === 'player') {
+            playBoost()
+            vibrate('tap')
+            setMessage('バリア！ はちを ふせぐよ')
+          }
           break
         case 'spring':
           if (event.who === 'player') {
@@ -278,6 +287,9 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
       time += frames / 60
       if (meMarkerRef.current) meMarkerRef.current.style.left = `${progressOf(race, race.player) * 100}%`
       if (rivalMarkerRef.current) rivalMarkerRef.current.style.left = `${progressOf(race, race.rival) * 100}%`
+      setGuardState(race.phase !== 'run' ? (race.phase === 'ready' ? 'よーい' : 'おわり')
+        : race.player.guard > 0 ? 'まもってる！'
+          : race.player.guardCooldown > 0 ? `あと ${Math.ceil(race.player.guardCooldown)}びょう` : 'つかえる！')
       draw()
       if (race.phase === 'done' && (restTimer -= frames / 60) <= 0) {
         resting = true
@@ -294,13 +306,15 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
       if (race.phase === 'done' || isOtherControl(event.target)) return
       const own = isOwnControl(event.target) ? (event.target as HTMLElement).dataset.raceControl : null
       const activate = event.key === ' ' || event.key === 'Enter'
+      const guard = GUARD_KEYS.has(event.key) || (activate && own === 'guard')
       const slide = SLIDE_KEYS.has(event.key) || (activate && own === 'slide')
-      if (!slide && !JUMP_KEYS.has(event.key) && !activate) return
+      if (!guard && !slide && !JUMP_KEYS.has(event.key) && !activate) return
       event.preventDefault()
       if (event.repeat) return
       primeAudio()
       lastKeyPress.current = performance.now()
-      if (slide) pressSlide(race)
+      if (guard) pressGuard(race)
+      else if (slide) pressSlide(race)
       else pressJump(race)
     }
     const onKeyUp = (event: KeyboardEvent) => {
@@ -395,7 +409,13 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
       <button type="button" className={styles.slideButton} data-race-control="slide" aria-label="スライディング。ひくく すべって トンネルを くぐる"
         onPointerDown={event => pointerPress(event, pressSlide)} onClick={event => clickPress(event, pressSlide)}>
         <SlideIcon />
-        <span>スライディング</span>
+        <span>すべる</span>
+      </button>
+      <button type="button" className={styles.guardButton} data-race-control="guard"
+        aria-label={`バリア。はちを ふせぐ。${guardState}`} aria-disabled={guardState !== 'つかえる！'}
+        onPointerDown={event => pointerPress(event, pressGuard)} onClick={event => clickPress(event, pressGuard)}>
+        <span className={styles.controlIcon} aria-hidden="true">🛡</span>
+        <span>バリア</span><small>{guardState}</small>
       </button>
       <button type="button" className={styles.jumpButton} data-race-control="jump" aria-label="ジャンプ。くうちゅうで もう1かい とべる"
         onPointerDown={jumpDown} onClick={event => clickPress(event, pressJump)}>
@@ -450,16 +470,19 @@ function AnimalSelect({ current, onPick }: { current: AnimalId | null; onPick: (
     <header className={styles.selectHeader}>
       <TitleArt />
       <h1>{TITLE}</h1>
-      <p>ジャンプと スライディングで はしって、ごちそうを たべながら ゴール！</p>
+      <p>ジャンプ・すべる・バリアで ごちそうを あつめよう！</p>
     </header>
     <h2 className={styles.selectTitle}>はしる どうぶつを えらぼう</h2>
+    <p className={styles.traitHelp}>とくいわざが すこし ちがうよ。すきな どうぶつで あそぼう！</p>
     <ul className={styles.animalGrid} aria-label="どうぶつを えらぶ">
       {ANIMALS.map(animal => <li key={animal.id}>
         <button type="button" className={styles.animalCard} data-current={animal.id === current || undefined}
+          aria-label={animal.name} aria-describedby={`trait-${animal.id}`}
           style={{ '--animal': animal.color } as CSSProperties}
           onClick={() => { primeAudio(); playTap(); onPick(animal.id) }}>
           <Portrait animal={animal.id} size={72} />
           <span className={styles.animalName}>{animal.name}</span>
+          <small id={`trait-${animal.id}`} className={styles.traitLabel}>{traitOf(animal.id).label}</small>
         </button>
       </li>)}
     </ul>
@@ -475,7 +498,9 @@ function CourseSelect({ animal, progress, onPick, onBack }: { animal: AnimalId; 
         <Portrait animal={animal} size={96} state="cheer" />
         <p><b>{nameOf(animal)}</b>で はしるよ！</p>
       </div>
+      <p className={styles.traitHelp}>{traitOf(animal).label}：{traitOf(animal).detail}</p>
       <h1>{TITLE}</h1>
+      <p className={styles.traitHelp}>↑ ジャンプ（2かい）・↓ すべる・🛡 バリア（→ / D）<br />バリアは はちを ふせぐよ。5びょうで また つかえる！<br />あなは ジャンプ、トンネルは すべろう。</p>
       <p className={styles.rule}>ごちそうの てんすう ＋ さきに ゴールで <b>+{GOAL_BONUS}てん</b>。ごうけいが おおい ほうの かち！</p>
       <p className={styles.totalStars} aria-label={`あつめた ほし ${total} / ${COURSES.length * 3}`}>★ {total} / {COURSES.length * 3}</p>
     </header>

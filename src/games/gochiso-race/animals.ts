@@ -1,4 +1,4 @@
-// えらべる どうぶつ。みため（いろ・みみ・もよう）だけが ちがい、はやさや ジャンプは みんな おなじ。
+// どうぶつの いろ と、すこしだけ ちがう とくいわざ。
 // 絵は art.ts が この いろを つかって canvas に かく。
 
 export type AnimalId =
@@ -42,4 +42,22 @@ export function findAnimal(id: string): Animal | undefined {
 export function pickRival(player: AnimalId, random: () => number = Math.random): AnimalId {
   const others = ANIMALS.filter(animal => animal.id !== player)
   return others[Math.min(others.length - 1, Math.floor(random() * others.length))].id
+}
+
+type TraitId = 'steady' | 'speed' | 'jump' | 'guard'
+export const TRAITS = {
+  steady: { label: '⭐ ふっかつ はやめ', detail: 'ぶつかった あと すこし はやく うごける', speed: 1, jump: 1, recovery: .8, guard: 1 },
+  speed: { label: '💨 あしが はやい', detail: 'はしる はやさが 5% アップ', speed: 1.05, jump: 1, recovery: 1, guard: 1 },
+  jump: { label: '↑ たかく とべる', detail: 'ジャンプの たかさが やく10% アップ', speed: 1, jump: 1.05, recovery: 1, guard: 1 },
+  guard: { label: '🛡 バリア ながめ', detail: 'バリアが すこし ながい（+0.3びょう）', speed: 1, jump: 1, recovery: 1, guard: 1.25 },
+} as const
+
+const ANIMAL_TRAITS: Record<AnimalId, TraitId> = {
+  dog: 'steady', cat: 'jump', rabbit: 'jump', panda: 'guard',
+  penguin: 'speed', lion: 'speed', koala: 'guard', hamster: 'steady',
+  giraffe: 'jump', elephant: 'guard', bear: 'steady', fox: 'speed',
+}
+
+export function traitOf(id: AnimalId) {
+  return TRAITS[ANIMAL_TRAITS[id]]
 }

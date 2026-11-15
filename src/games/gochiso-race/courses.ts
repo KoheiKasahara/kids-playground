@@ -4,7 +4,7 @@ import { FOODS, type FoodKind } from './foods'
 // トンネル（スライディングで くぐる）・ジャンプだい・かそくそうち・わかれみち・はち・くも・ごちそうの ばしょを つくる。
 // きょりの たんいは がめんの 1ドットくらい。y は じめんから うえへの たかさ。
 
-export type ThemeId = 'meadow' | 'sweets' | 'starry'
+export type ThemeId = 'meadow' | 'sweets' | 'starry' | 'seaside' | 'snow'
 
 /** じめん。x0〜x1 の あいだは top より したが ぜんぶ かたい。あいだが あいていれば あな。 */
 export type Span = { x0: number; x1: number; top: number }
@@ -371,7 +371,7 @@ const SWEETS: CourseDef = {
 const STARRY: CourseDef = {
   id: 'starry',
   name: 'ほしぞら コース',
-  lead: 'さいごの レース！ あいても はやいよ',
+  lead: 'ほしの したを はしろう！ あいても はやいよ',
   rival: { speed: .93, greed: .6, hesitate: .15, appetite: .7 },
   pieces: [
     { t: 'run', len: 520, row: 'banana', n: 4 },
@@ -436,6 +436,58 @@ const STARRY: CourseDef = {
   ],
 }
 
-export const COURSE_DEFS: readonly CourseDef[] = [MEADOW, SWEETS, STARRY]
+
+const SEASIDE: CourseDef = {
+  id: 'seaside', name: 'うみべ コース',
+  lead: 'すなはまを びゅーん！ はちには バリア',
+  rival: { speed: .94, greed: .5, hesitate: .2, appetite: .65 },
+  pieces: [
+    { t: 'run', len: 620, row: 'banana', n: 5 },
+    { t: 'boost' }, { t: 'run', len: 500, row: 'apple', n: 5 },
+    { t: 'bee', y: 46, amp: 25, len: 340, row: 'strawberry', n: 4 },
+    { t: 'gap', w: 100, arc: 'banana' }, { t: 'run', len: 360 },
+    { t: 'tunnel', len: 220, row: 'onigiri', n: 3 }, { t: 'run', len: 360 },
+    { t: 'fork', len: 780, row: 'cake', n: 3 },
+    { t: 'run', len: 120 }, { t: 'boost' }, { t: 'run', len: 380, row: 'banana', n: 4 },
+    { t: 'tunnel', len: 180, row: 'burger', n: 1 }, { t: 'run', len: 340 },
+    { t: 'step', h: 50, len: 300, row: 'apple', n: 3 },
+    { t: 'gap', w: 110, arc: 'strawberry' }, { t: 'run', len: 320 },
+    { t: 'step', h: -50, len: 320 },
+    { t: 'bee', y: 50, amp: 30, len: 360, row: 'donut', n: 3 },
+    { t: 'run', len: 300 }, { t: 'spring' },
+    { t: 'cloud', y: 200, len: 200, at: 140, row: 'parfait', n: 1 },
+    { t: 'run', len: 500, row: 'banana', n: 4 },
+    { t: 'hurdle', h: 60, top: 'cake' }, { t: 'run', len: 420, row: 'apple', n: 4 },
+  ],
+}
+
+const SNOW: CourseDef = {
+  id: 'snow', name: 'ゆきやま コース',
+  lead: 'だんだん のぼって、くもの うえの ごちそうへ！',
+  rival: { speed: .95, greed: .6, hesitate: .15, appetite: .7 },
+  pieces: [
+    { t: 'run', len: 560, row: 'apple', n: 4 },
+    { t: 'step', h: 60, len: 260, row: 'banana', n: 3 },
+    { t: 'step', h: 60, len: 300, row: 'donut', n: 3 },
+    { t: 'gap', w: 100, arc: 'strawberry' }, { t: 'run', len: 300 },
+    { t: 'step', h: -120, len: 340 },
+    { t: 'tunnel', len: 200, row: 'pudding', n: 2 }, { t: 'run', len: 340 },
+    { t: 'bee', y: 54, amp: 30, len: 320, row: 'apple', n: 3 },
+    { t: 'run', len: 240 }, { t: 'boost' }, { t: 'run', len: 420, row: 'banana', n: 4 },
+    { t: 'fork', len: 740, row: 'burger', n: 3 },
+    { t: 'run', len: 100 }, { t: 'tunnel', len: 160, row: 'cake', n: 1 },
+    { t: 'run', len: 400 }, { t: 'gap', w: 120, arc: 'donut' },
+    { t: 'run', len: 340 }, { t: 'spring' },
+    { t: 'cloud', y: 210, len: 200, at: 140, row: 'parfait', n: 1 },
+    { t: 'run', len: 480 },
+    { t: 'step', h: 80, len: 300, row: 'onigiri', n: 3 },
+    { t: 'gap', w: 110, arc: 'banana' }, { t: 'run', len: 300 },
+    { t: 'step', h: -80, len: 320 },
+    { t: 'bee', y: 44, amp: 24, len: 320, row: 'strawberry', n: 3 },
+    { t: 'run', len: 240 }, { t: 'boost' }, { t: 'run', len: 500, row: 'apple', n: 4 },
+  ],
+}
+
+export const COURSE_DEFS: readonly CourseDef[] = [MEADOW, SWEETS, STARRY, SEASIDE, SNOW]
 
 export const COURSES: readonly Course[] = COURSE_DEFS.map(buildCourse)

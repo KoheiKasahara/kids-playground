@@ -521,7 +521,7 @@ export default function FlagRollPuzzlePlay() {
 
         <div className={styles.body} data-testid="puzzle-layout">
           <div className={styles.boardPane} data-testid="puzzle-board-pane">
-            <BoardViewport>
+            <BoardViewport className={styles.boardViewport}>
               <PuzzleBoard
                 parts={state.parts}
                 selectedPartId={state.selectedPartId}

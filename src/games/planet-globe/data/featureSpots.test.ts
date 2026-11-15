@@ -189,6 +189,16 @@ describe('featureSpotsByBodyId', () => {
     expect(spotById('venus-hottest').description).toContain('あつく')
   })
 
+  it('誤解を招きやすい言い方をしない(説明文レビューで直した事実の回帰テスト)', () => {
+    // 太陽はものが燃えているのではない。黒点も「つめたい」わけではなく、まわりより温度が低いだけ。
+    expect(spotById('sun-heat').displayName).not.toContain('もえる')
+    expect(spotById('sun-sunspot').description).not.toContain('つめたい')
+    // 海王星の濃い青は強調された画像の色で、実際は天王星より少し青い程度。
+    expect(spotById('neptune-blue').description).not.toContain('こい')
+    // 天王星も横倒しのため、ぎゃく回転は金星だけではない。
+    expect(spotById('venus-backspin').description).toContain('おおくの')
+  })
+
   describe('Phase 2の描画位置との一致(表示位置とタップ位置がずれたら落ちる回帰テスト)', () => {
     /**
      * 「見えている模様」に紐づくスポットは、その模様と同じ経緯度を使う。

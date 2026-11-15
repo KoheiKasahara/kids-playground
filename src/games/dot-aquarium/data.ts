@@ -1,7 +1,7 @@
 // すいそうに いれられる いきもの・もの・えさ の きまり。
 
 export type SpeciesId = 'clown' | 'neon' | 'angel' | 'tang' | 'puffer' | 'seahorse' | 'jelly' | 'crab' | 'eel' | 'turtle' | 'shark'
-  | 'octopus' | 'squid' | 'moray' | 'ray' | 'sunfish' | 'butterfly' | 'boxfish' | 'lionfish'
+  | 'octopus' | 'squid' | 'moray' | 'ray' | 'sunfish' | 'butterfly' | 'boxfish' | 'lionfish' | 'dolphin' | 'penguin' | 'starfish'
 export type DecorKind = 'kelp' | 'rock' | 'wood' | 'coral' | 'anemone' | 'clam' | 'chest' | 'castle' | 'pot' | 'bubbler'
 export type FoodKind = 'flake' | 'pellet' | 'shrimp'
 
@@ -51,6 +51,9 @@ export const SPECIES: readonly SpeciesDef[] = [
   { id: 'butterfly', name: 'チョウチョウウオ', short: 'チョウチョウ', limit: 4, w: 18, h: 16, zone: 'mid', speed: 15, eats: ['flake', 'shrimp'], likes: ['coral', 'anemone'], small: true, act: 'ちょうちょ みたいに ひらひら' },
   { id: 'boxfish', name: 'ハコフグ', limit: 2, w: 18, h: 12, zone: 'low', speed: 9, eats: ['flake', 'pellet'], likes: ['rock', 'coral'], small: true, act: 'しかくい からだで ぷりぷり' },
   { id: 'lionfish', name: 'ミノカサゴ', limit: 1, w: 26, h: 20, zone: 'mid', speed: 8, eats: ['shrimp'], likes: ['rock', 'castle'], small: false, act: 'ひれが ふわふわ きれいでしょ' },
+  { id: 'dolphin', name: 'イルカ', limit: 2, w: 42, h: 18, zone: 'high', speed: 23, eats: ['shrimp'], likes: ['bubbler', 'castle'], small: false, act: 'しっぽを うごかして すいすい！' },
+  { id: 'penguin', name: 'ペンギン', limit: 3, w: 26, h: 18, zone: 'any', speed: 19, eats: ['shrimp'], likes: ['rock', 'bubbler'], small: false, act: 'みずの なかを とぶみたい！' },
+  { id: 'starfish', name: 'ヒトデ', limit: 4, w: 20, h: 20, zone: 'floor', speed: 2, eats: ['pellet'], likes: ['rock', 'clam'], small: false, act: 'すなの うえを ゆっくり おさんぽ' },
 ]
 
 export type DecorDef = {

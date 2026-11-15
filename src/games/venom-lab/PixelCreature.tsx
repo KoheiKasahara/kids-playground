@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Species } from './data'
 import { context2d, drawFrame, onTick, usePixelCanvas, useReducedMotion } from './canvas'
-import { clipSeconds, profileOf, type Special } from './motion'
+import { clipSeconds, nextSpecial, profileOf, type Special } from './motion'
 import { detailScale, frameOf, readyFrame, SPRITE_H, SPRITE_W } from './sprite'
 import styles from './VenomLabPlay.module.css'
 
@@ -12,7 +12,7 @@ const ACT_EVERY = 6
 export type Cue = { clip: Special; n: number }
 
 /**
- * いきものの ドット絵。live なら いきづかいの ループと、ときどき とくいわざ・くらしの ようす（かわりばんこ）。
+ * いきものの ドット絵。live なら いきづかいの ループと、ときどき 3つの うごき（じゅんばん）。
  * cue が かわると すぐに その うごきを みせる。small は ちいさな カード よう（64×48 ドット）、
  * そうでなければ がめんに あわせた こまかさ。
  */
@@ -38,7 +38,7 @@ export default function PixelCreature({ species, className, live = false, cue, s
       return () => clearTimeout(timer)
     }
     let mode: 'idle' | Special = cueCount > 0 ? cueClip : 'idle'
-    let next: Special = cueClip === 'act' ? 'habit' : 'act'
+    let next: Special = nextSpecial(cueClip)
     let time = 0, calm = 0, shown = ''
     drawFrame(ctx, frameOf(species, mode, 0, p.frames[mode], scale))
     return onTick(dt => {
@@ -46,7 +46,7 @@ export default function PixelCreature({ species, className, live = false, cue, s
       if (mode !== 'idle' && time >= clipSeconds(p, mode)) { mode = 'idle'; time = 0; calm = 0 }
       if (mode === 'idle' && (calm += Math.min(dt, .1)) > ACT_EVERY) {
         mode = next
-        next = next === 'act' ? 'habit' : 'act'
+        next = nextSpecial(next)
         time = 0
       }
       const count = p.frames[mode]

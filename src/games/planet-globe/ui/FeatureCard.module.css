@@ -20,6 +20,20 @@
   cursor: pointer;
   pointer-events: auto;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
+  /* 選んだものが変わるたびに、ふわっと出てきて「えらべた」ことが分かるようにする。 */
+  animation: card-pop 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+@keyframes card-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .card:active {
@@ -76,5 +90,6 @@
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;
+    animation: none;
   }
 }

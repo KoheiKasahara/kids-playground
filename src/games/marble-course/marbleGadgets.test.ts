@@ -118,11 +118,8 @@ describe('physical gadgets', () => {
       const course = courseFor(kind)
       course.startId = 'gadget'
       const result = simulate(course)
-      if (kind === 'seesaw') {
-        // A slow release may roll back before crossing the pivot; it still exits cleanly for retry.
-        expect(result.path.some(point => toLocal(course.parts[1]!, point).x > -1.8)).toBe(true)
-        expect(result.status).toBe('ready')
-      } else expect(result.status, `${kind}: ${JSON.stringify(result.end)}`).toBe('goal')
+      // Contact assistance also carries a gentle seesaw release over its pivot.
+      expect(result.status, `${kind}: ${JSON.stringify(result.end)}`).toBe('goal')
     }
   })
 

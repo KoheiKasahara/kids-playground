@@ -269,7 +269,7 @@ export function useMarbleEngine(options: EngineOptions) {
     rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: course, part, offset: new THREE.Vector3(), moved: false, palette: true, snapped: false }
     rt.scene.update(appended, part.id, false)
     rt.dirty = 90
-    if (course.parts.length && !hasConnectedInput(part, course.parts)) latest.current.onHint?.('ここに おけるよ。みちを つなぎなおそう！')
+    if (course.parts.length && !hasConnectedInput(part, appended.parts)) latest.current.onHint?.('ここに おけるよ。みちを つなぎなおそう！')
   }, [status])
   const nextId = useCallback(() => `part-${sequence.current++}`, [])
   const retry = useCallback(() => { setStatus('loading'); setAttempt(value => value + 1) }, [])

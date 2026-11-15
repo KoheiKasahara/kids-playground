@@ -18,6 +18,9 @@ export type Random = () => number
 export const CAR_COLORS = ['#f76707', '#1c7ed6', '#fcc419', '#2f9e44', '#f1f3f5'] as const
 export const TRAIN_COLORS = ['#2f9e44', '#1971c2', '#e03131', '#f08c00', '#7048e8'] as const
 export const CAR_VARIANTS = 5
+/** ひろい ちずでも うごきが おもく ならない だいすう。 */
+const MAX_CARS = 36
+const MAX_TRAINS = 8
 const KINDS: readonly VehicleKind[] = ['car', 'train']
 
 function carries(kind: VehicleKind, town: Town, index: number): boolean {
@@ -47,8 +50,8 @@ function pick<T>(items: readonly T[], random: Random): T {
 export function vehicleTarget(town: Town, kind: VehicleKind): number {
   let count = 0
   for (let index = 0; index < town.length; index += 1) if (carries(kind, town, index)) count += 1
-  if (kind === 'car') return count < 2 ? 0 : Math.min(10, Math.ceil(count / 4))
-  return count < 3 ? 0 : Math.min(3, 1 + Math.floor(count / 16))
+  if (kind === 'car') return count < 2 ? 0 : Math.min(MAX_CARS, Math.ceil(count / 4))
+  return count < 3 ? 0 : Math.min(MAX_TRAINS, 1 + Math.floor(count / 16))
 }
 
 /** けされた みちの くるまを のぞき、たりない ぶんを つながった みちに だす。 */

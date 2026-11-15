@@ -1,14 +1,16 @@
 /**
  * パターゴルフのカメラの置き場所。Three.js にもブラウザにも依存しない計算だけを置く。
  *
- * - ねらう: ボールのうしろ上から、カップの ほう（ねらいが 大きく それたら ねらいの ほう）を見る。
- *   コの字の みちなど カップが 見とおせないときは、みちすじに そって 先の点を 見る。
- *   おすすめの うつ むきが カップの ほうから 大きく ずれるときは、おすすめの むきを 見る
+ * - ねらう: ボールのうしろ上から、みちなりに すすむ ほう（おすすめの うち方が 向く ほう）を見る。
+ *   ねらいを 大きく そらしたときだけ、矢じるしが 見える所まで ねらいの ほうへ 回す
  * - おいかける: 転がるボールを、進む向きのうしろから追う
+ * - カップイン: カップの まわりを ゆっくり まわる
  * - ぜんたい: ホール全体がちょうど入る高さから見下ろす
+ *
+ * ねらう・おいかけるの きりかえは、ボールの まわりを まわる 角度と、うしろへ さがる ぐあいを なめらかに 変える。
+ * 位置を まっすぐ つなぐと、とちゅうで ボールの 上を よこぎって あさっての ほうを 向いてしまう。
  */
 import type { Vec2 } from './golfCourses'
-import type { WallBox } from './golfGeometry'
 import type { Vec3 } from './golfPhysics'
 
 export type CameraPose = { position: Vec3; target: Vec3 }
@@ -29,8 +31,8 @@ function portraitScale(aspect: number): number {
 export const MAX_VIEW_OFFSET = (55 * Math.PI) / 180
 
 /**
- * ねらうときの カメラの向き。基本は カップの ほうを 見る。
- * ねらいが カップから 大きく それているときだけ、矢じるしが 見える所まで ねらいの ほうへ 回す。
+ * ねらうときの カメラの向き。基本は 見る 点（みちなりに すすむ 先）の ほうを 見る。
+ * ねらいが そこから 大きく それているときだけ、矢じるしが 見える所まで ねらいの ほうへ 回す。
  */
 export function viewHeading(ball: Vec2, cup: Vec2, aim: Vec2, maxOffset = MAX_VIEW_OFFSET): Vec2 {
   const a = normalize(aim)
@@ -41,95 +43,6 @@ export function viewHeading(ball: Vec2, cup: Vec2, aim: Vec2, maxOffset = MAX_VI
   if (Math.abs(offset) <= maxOffset) return c
   const turn = offset - Math.sign(offset) * maxOffset
   return { x: c.x * Math.cos(turn) - c.z * Math.sin(turn), z: c.z * Math.cos(turn) + c.x * Math.sin(turn) }
-}
-
-/** みとおしを しらべる かべと ゆか。 */
-export type SightGeometry = { walls: readonly WallBox[]; heightAt: (x: number, z: number) => number | null }
-
-/** かべに ぶつからず、ゆかの きれめ（たに・がけ）も こえずに まっすぐ 見とおせるか。いけの 上は 見とおせる。 */
-export function canSee(from: Vec3, to: Vec2, geometry: SightGeometry, margin = 0.06): boolean {
-  const dx = to.x - from.x
-  const dz = to.z - from.z
-  const length = Math.hypot(dx, dz)
-  if (length < 0.05) return true
-  for (const wall of geometry.walls) {
-    // ボールより ひくい かべ（下の だんの かべ）は じゃまに ならない。
-    if (wall.y + wall.hy < from.y) continue
-    // かべの 向きに あわせた 座標で、線分が ふくらませた 箱に かかるかを しらべる。
-    const cos = Math.cos(wall.yaw)
-    const sin = Math.sin(wall.yaw)
-    const local = (x: number, z: number) => ({ u: (x - wall.x) * cos - (z - wall.z) * sin, v: (x - wall.x) * sin + (z - wall.z) * cos })
-    const a = local(from.x, from.z)
-    const b = local(to.x, to.z)
-    let enter = 0
-    let exit = 1
-    for (const [start, end, half] of [[a.u, b.u, wall.hx + margin], [a.v, b.v, wall.hz + margin]] as const) {
-      const delta = end - start
-      if (Math.abs(delta) < 1e-9) {
-        if (Math.abs(start) > half) { enter = 2; break }
-        continue
-      }
-      const t0 = (-half - start) / delta
-      const t1 = (half - start) / delta
-      enter = Math.max(enter, Math.min(t0, t1))
-      exit = Math.min(exit, Math.max(t0, t1))
-    }
-    if (enter <= exit) return false
-  }
-  for (let travel = 0.2; travel < length - 0.1; travel += 0.2) {
-    if (geometry.heightAt(from.x + (dx / length) * travel, from.z + (dz / length) * travel) === null) return false
-  }
-  return true
-}
-
-/**
- * ねらうときに カメラが 見る 点。カップが 見とおせれば カップ。
- * コの字の みちなどで 見とおせないときは、みちすじの 先の点のうち 見とおせる いちばん先の点を 見る。
- */
-export function lookTarget(ball: Vec3, cup: Vec2, route: readonly Vec2[], geometry: SightGeometry): Vec2 {
-  if (canSee(ball, cup, geometry)) return cup
-  let segment = 0
-  let nearest = Infinity
-  for (let index = 0; index < route.length - 1; index++) {
-    const distance = segmentDistance(ball, route[index]!, route[index + 1]!)
-    if (distance <= nearest + 1e-6) { nearest = distance; segment = index }
-  }
-  for (let index = route.length - 1; index > segment; index--) {
-    const point = route[index]!
-    if (!canSee(ball, point, geometry)) continue
-    // まがりかどの すぐ そばでは、かどの 点より その先の みちの 向きを 見る。
-    const after = route[index + 1]
-    if (after && Math.hypot(point.x - ball.x, point.z - ball.z) < 1) return { x: ball.x + after.x - point.x, z: ball.z + after.z - point.z }
-    return point
-  }
-  const next = route[segment + 1] ?? cup
-  const from = route[segment] ?? ball
-  // すぐ先の点も 見えなければ、いまの みちの 向きを 見る。
-  return Math.hypot(next.x - from.x, next.z - from.z) > 0.05 ? { x: ball.x + next.x - from.x, z: ball.z + next.z - from.z } : next
-}
-
-/** カップの ほうと おすすめの むきが これより ずれたら、おすすめの むきを 見る。 */
-export const MAX_LOOK_GAP = (30 * Math.PI) / 180
-
-/**
- * ねらうときに カメラが 見る むきの もと。ふだんは lookTarget の 点（カップや みちすじの 先）の ほう。
- * バンパーや ふうしゃを よける・トランポリンの まうしろへ まわる などで、おすすめの うつ むきが
- * そこから 大きく ずれるときは、おすすめの むきを 見る（カップと うつ むきの あいだの なにもない ほうを 見ない）。
- */
-export function lookHeading(ball: Vec2, look: Vec2, suggested: Vec2 | null, maxGap = MAX_LOOK_GAP): Vec2 {
-  const toLook = { x: look.x - ball.x, z: look.z - ball.z }
-  if (!suggested || Math.hypot(suggested.x, suggested.z) < 1e-6) return normalize(toLook)
-  const s = normalize(suggested)
-  if (Math.hypot(toLook.x, toLook.z) < 0.3) return s
-  const l = normalize(toLook)
-  return Math.acos(Math.max(-1, Math.min(1, l.x * s.x + l.z * s.z))) > maxGap ? s : l
-}
-
-function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
-  const dx = b.x - a.x
-  const dz = b.z - a.z
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz || 1)))
-  return Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t))
 }
 
 export function aimPose(ball: Vec3, direction: Vec2, aspect: number): CameraPose {
@@ -148,6 +61,35 @@ export function followPose(ball: Vec3, heading: Vec2, aspect: number): CameraPos
     position: { x: ball.x - d.x * 4.6 * scale, y: ball.y + 3.8 * scale, z: ball.z - d.z * 4.6 * scale },
     target: { x: ball.x + d.x * 1.2, y: ball.y, z: ball.z + d.z * 1.2 },
   }
+}
+
+/** ねらう（follow = 0）と おいかける（follow = 1）の あいだの カメラ。 */
+export function ballPose(ball: Vec3, heading: Vec2, aspect: number, follow: number): CameraPose {
+  return lerpPose(aimPose(ball, heading, aspect), followPose(ball, heading, aspect), follow)
+}
+
+/** カップインの あと、カップの まわりを まわる カメラ。angle は +z を0として 時計回り。 */
+export function cupPose(cup: Vec3, angle: number, aspect: number): CameraPose {
+  const scale = portraitScale(aspect)
+  return {
+    position: { x: cup.x - Math.sin(angle) * 3.0 * scale, y: cup.y + 2.5 * scale, z: cup.z - Math.cos(angle) * 3.0 * scale },
+    target: { x: cup.x, y: cup.y + 0.5, z: cup.z },
+  }
+}
+
+/** 向き → 角度（+z を0として、+x の ほうへ ふえる）。 */
+export function headingAngle(heading: Vec2): number {
+  return Math.atan2(heading.x, heading.z)
+}
+
+export function angleHeading(angle: number): Vec2 {
+  return { x: Math.sin(angle), z: Math.cos(angle) }
+}
+
+/** current から target へ、近い ほうの まわり方で amount（0〜1）だけ よせた 角度。 */
+export function turnToward(current: number, target: number, amount: number): number {
+  const gap = Math.atan2(Math.sin(target - current), Math.cos(target - current))
+  return current + gap * Math.min(1, Math.max(0, amount))
 }
 
 /** カメラから見た点の位置（-1〜1）。奥行きが手前なら null。 */

@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { createRailCourse, railCourseZoom, RAIL_COURSES } from './railCourses'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import {
   appendRailPiece,
@@ -25,6 +26,7 @@ import TrainTypePicker from './TrainTypePicker'
 import RailPartIcon from './RailPartIcon'
 import styles from './RailBuilderPlay.module.css'
 import {
+  BASE_VIEW_SIZE,
   MAX_ZOOM,
   MIN_ZOOM,
   ZOOM_STEP,
@@ -77,7 +79,7 @@ type RailBuilderSelection =
 
 function nextSpawnPosition(pieces: readonly RailPiece[], cameraTarget: RailVec3): RailVec3 {
   for (const offset of SPAWN_OFFSETS) {
-    // 線路全体が100x100の地面からはみ出さない範囲に、現在見ている場所を基準に出す。
+    // 線路全体が200x200の地面からはみ出さない範囲に、現在見ている場所を基準に出す。
     const candidate = {
       x: Math.min(RAIL_APPEND_LIMIT, Math.max(-RAIL_APPEND_LIMIT, cameraTarget.x + offset.x)),
       y: 0,
@@ -127,6 +129,8 @@ export default function RailBuilderPlay() {
   // 最後に選んでいた（または置いた）せんろ。地面や電車をタップして選択が外れても、
   // 次に置くせんろはここへつなぐ。
   const [lastActivePieceId, setLastActivePieceId] = useState<string | null>(null)
+  const [courseId, setCourseId] = useState('circle')
+  const courseLoad = useRef(0)
   const [zoom, setZoom] = useState(1)
   const [fleetSummaries, setFleetSummaries] = useState<RailFleetTrainSummary[]>(INITIAL_FLEET_SUMMARIES)
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
@@ -167,6 +171,20 @@ export default function RailBuilderPlay() {
     onTrainOccupiedIdsChange: setOccupiedRailIds,
     soundEnabled,
   })
+
+  const loadCourse = () => {
+    for (const train of fleetSummaries) pauseTrain(train.id)
+    courseLoad.current += 1
+    const next = createRailCourse(courseId, 'course-' + courseLoad.current)
+    setPieces(next)
+    setSelection(null)
+    setLastActivePieceId(null)
+    setOccupiedRailIds([])
+    setTrainPickerMode(null)
+    setZoom(railCourseZoom(next, BASE_VIEW_SIZE))
+    revealPiece(createRailPiece('straight', 'course-center'))
+    playRailSnapSound(soundEnabled)
+  }
 
   const addPiece = useCallback((kind: RailPieceKind, branchSide?: RailBranchSide) => {
     // 選んでいるせんろ（選んでいなければ最後に選んだ／置いたせんろ）の空き端点へ
@@ -353,6 +371,14 @@ export default function RailBuilderPlay() {
         </header>
 
         <div className={styles.stage}>
+          <div className={styles.courseControls}>
+            <select aria-label="コースを えらぶ" value={courseId} onChange={(event) => setCourseId(event.target.value)}>
+              {RAIL_COURSES.map((course) => <option key={course.id} value={course.id}>{course.label}</option>)}
+              <option value="empty">からっぽ</option>
+            </select>
+            <button type="button" onClick={loadCourse}>コースを ひらく</button>
+            <small>いまの せんろと いれかえるよ</small>
+          </div>
           <div className={styles.zoomControls} aria-label="カメラのズーム">
             <button type="button" className={styles.iconButton} onClick={zoomOut} aria-label="ちいさく みる">−</button>
             <button type="button" className={styles.iconButton} onClick={zoomIn} aria-label="おおきく みる">＋</button>
@@ -426,6 +452,16 @@ export default function RailBuilderPlay() {
 
         <section className={styles.tray} aria-label="せんろを えらぶ">
           <div className={styles.trayTools}>
+            {([
+              ['long-straight', 'ながい ちょくせん'],
+              ['wide-curve', 'おおきい カーブ'],
+              ['gentle-curve', 'はんぶん カーブ'],
+              ['down-slope', 'くだりざか'],
+            ] as const).map(([kind, label]) => (
+              <button key={kind} type="button" className={styles.toolButton} onClick={() => addPiece(kind)} aria-label={label + 'を ついか'}>
+                <RailPreview kind={kind} /><span>{label}</span>
+              </button>
+            ))}
             <button type="button" className={styles.toolButton} onClick={() => addPiece('straight')} aria-label="ちょくせんを ついか">
               <RailPreview kind="straight" />
               <span>ちょくせん</span>

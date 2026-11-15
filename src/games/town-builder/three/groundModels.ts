@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { colOf, COLS, railMask, roadMask, rowOf, ROWS, type Town } from '../town'
+import { colOf, COLS, railMask, roadMask, rowOf, ROWS, type Ground, type Town } from '../town'
 import { directions, segmentsOf } from '../trackGeometry'
 import { Frame, matrixOf, type Mat, type TownKit } from './townKit'
 import { tileCenter, tileNoise, type Point } from './townLayout'
@@ -7,7 +7,11 @@ import { tileCenter, tileNoise, type Point } from './townLayout'
 // じめん・かわ・みち・せんろ。マスの うえの めんが y=0。
 // みちと せんろの かたちは 2D と おなじ trackGeometry の せんから つくる。
 
-const GRASS = ['#9bd66f', '#92ce66'] as const
+const LAND: Record<Exclude<Ground, 'water'>, readonly [string, string]> = {
+  grass: ['#9bd66f', '#92ce66'],
+  sand: ['#f4dfa6', '#eed597'],
+  snow: ['#fbfdff', '#edf3f9'],
+}
 const SOIL = '#b07a4a'
 const WATER = '#5bbde8'
 const BRIDGE = '#8d6e52'
@@ -151,26 +155,27 @@ function rail(f: Frame, mask: number, bridge: boolean, overRoad: boolean): void 
 
 export type Crossing = { index: number; center: Point; lamps: THREE.Mesh[] }
 
-/** ふみきりの けいほうき。でんしゃが ちかい ときに あかい ランプが こうごに ひかる。 */
+/**
+ * ふみきりの けいほうき。でんしゃが ちかい ときに あかい ランプが こうごに ひかる。
+ * はしらや ばってんは うごかないので まちと いっしょに まとめ、ランプは ひだり・みぎ の くみごとに 1つの Mesh に する。
+ */
 function crossingSignals(kit: TownKit, index: number, root: THREE.Group): Crossing {
   const center = tileCenter(index)
-  const lamps: THREE.Mesh[] = []
+  const sides: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[][] = [[], []]
   // かどは みち・せんろが とおらない（カーブも かどから 0.19 より うちがわ）。
   for (const [cx, cz] of [[0.4, -0.4], [-0.4, 0.4]] as const) {
-    const signal = new THREE.Group()
-    signal.position.set(center.x + cx, 0, center.z + cz)
-    signal.rotation.y = Math.atan2(-cx, -cz)
-    signal.add(kit.mesh(kit.cyl(8), '#3d3d3d', [0, 0, 0], [0.018, 0.44, 0.018]))
-    signal.add(kit.mesh(kit.box(), '#ffd43b', [0, 0.38, 0.02], [0.17, 0.035, 0.012], [0, 0, Math.PI / 4]))
-    signal.add(kit.mesh(kit.box(), '#ffd43b', [0, 0.38, 0.02], [0.17, 0.035, 0.012], [0, 0, -Math.PI / 4]))
-    signal.add(kit.mesh(kit.box(), '#3d3d3d', [0, 0.27, 0.01], [0.14, 0.03, 0.02]))
-    for (const side of [-0.05, 0.05]) {
-      const lamp = kit.mesh(kit.ball(1), '#5a1d1d', [side, 0.3, 0.03], [0.03, 0.03, 0.03], [0, 0, 0], false)
-      lamps.push(lamp)
-      signal.add(lamp)
-    }
-    root.add(signal)
+    const base = matrixOf([center.x + cx, 0, center.z + cz], [0, Math.atan2(-cx, -cz), 0])
+    const signal = new Frame(kit, base)
+    signal.cyl('#3d3d3d', 0.018, 0.44, [0, 0, 0], 8)
+    signal.box('#ffd43b', [0.17, 0.035, 0.012], [0, 0.38, 0.02], [0, 0, Math.PI / 4])
+    signal.box('#ffd43b', [0.17, 0.035, 0.012], [0, 0.38, 0.02], [0, 0, -Math.PI / 4])
+    signal.box('#3d3d3d', [0.14, 0.03, 0.02], [0, 0.27, 0.01])
+    ;[-0.05, 0.05].forEach((side, n) => {
+      sides[n].push({ geometry: kit.ball(1), matrix: base.clone().multiply(matrixOf([side, 0.3, 0.03], [0, 0, 0], [0.03, 0.03, 0.03])) })
+    })
   }
+  const lamps = sides.map((parts) => kit.joined(parts, '#5a1d1d'))
+  root.add(...lamps)
   return { index, center, lamps }
 }
 
@@ -214,12 +219,13 @@ export function buildGround(kit: TownKit, town: Town, root: THREE.Group): Ground
     const center = tileCenter(index)
     const base = matrixOf([center.x, 0, center.z])
     const flat = new Frame(kit, base, false)
-    const water = tile.ground === 'water'
-    if (water) {
+    const ground = tile.ground
+    const water = ground === 'water'
+    if (ground === 'water') {
       // かわは くさはらより すこし ひくく して、きしを みせる。
       flat.box(kit.mat(WATER, { rough: 0.18, metal: 0.05 }), [1, 0.06, 1], [0, -0.1, 0])
     } else {
-      flat.box(GRASS[(colOf(index) + rowOf(index)) % 2], [1, 0.1, 1], [0, -0.1, 0])
+      flat.box(LAND[ground][(colOf(index) + rowOf(index)) % 2], [1, 0.1, 1], [0, -0.1, 0])
     }
     const part = tile.part
     if (part === 'road' || part === 'crossing') road(flat, roadMask(town, index), water)
@@ -227,7 +233,7 @@ export function buildGround(kit: TownKit, town: Town, root: THREE.Group): Ground
     if (part === 'crossing') crossings.push(crossingSignals(kit, index, root))
     const standing = new Frame(kit, base)
     if (part === 'road' && !water && (colOf(index) + rowOf(index)) % 2 === 0) lamp(standing, pool)
-    if (!part && !water) tufts(flat, index)
+    if (!part && ground === 'grass') tufts(flat, index)
   })
   return { crossings, pool }
 }

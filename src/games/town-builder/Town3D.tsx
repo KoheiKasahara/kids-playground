@@ -4,7 +4,7 @@ import { primeAudio } from '../../audio/sound'
 import { ToolIcon } from './PartArt'
 import { partLabel } from './parts'
 import { playTownSound } from './sounds'
-import type { Town } from './town'
+import { GROUND_LABELS, type Town } from './town'
 import type { VehicleKind } from './vehicles'
 import { createTownScene, type TownPick, type TownSceneHandle, type VehicleCounts } from './three/townScene'
 import styles from './Town3D.module.css'
@@ -13,6 +13,8 @@ import styles from './Town3D.module.css'
 
 type Props = {
   town: Town
+  /** はじめに ながめる マス（2D で みて いた ばしょ）。 */
+  focus: number
   night: boolean
   onToggleNight: () => void
   sound: boolean
@@ -28,21 +30,22 @@ function prefersReducedMotion(): boolean {
 
 function pickLabel(pick: TownPick): string {
   if (pick.kind === 'vehicle') return pick.vehicle === 'car' ? 'くるま' : 'でんしゃ'
-  if (pick.kind === 'ground') return pick.ground === 'water' ? 'かわ' : 'くさはら'
+  if (pick.kind === 'ground') return GROUND_LABELS[pick.ground]
   const name = partLabel(pick.part)
   return pick.bridge ? `${name}の はし` : name
 }
 
 function PickIcon({ pick }: { pick: TownPick }) {
   if (pick.kind === 'vehicle') return <span className={styles.bubbleEmoji} aria-hidden="true">{pick.vehicle === 'car' ? '🚗' : '🚃'}</span>
-  if (pick.kind === 'ground') return pick.ground === 'water' ? <ToolIcon tool="water" /> : <span className={styles.bubbleEmoji} aria-hidden="true">🌱</span>
+  if (pick.kind === 'ground') return pick.ground === 'grass' ? <span className={styles.bubbleEmoji} aria-hidden="true">🌱</span> : <ToolIcon tool={pick.ground} />
   return <ToolIcon tool={pick.part === 'crossing' ? 'rail' : pick.part} />
 }
 
-export default function Town3D({ town, night, onToggleNight, sound, onToggleSound, onClose }: Props) {
+export default function Town3D({ town, focus, night, onToggleNight, sound, onToggleSound, onClose }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const handle = useRef<TownSceneHandle | null>(null)
   const initialNight = useRef(night)
+  const initialFocus = useRef(focus)
   const [status, setStatus] = useState<Status>('loading')
   const [counts, setCounts] = useState<VehicleCounts>({ car: 0, train: 0 })
   const [tour, setTour] = useState(() => !prefersReducedMotion())
@@ -63,7 +66,7 @@ export default function Town3D({ town, night, onToggleNight, sound, onToggleSoun
         setPicked((previous) => ({ pick, stamp: (previous?.stamp ?? 0) + 1 }))
         playTownSound('select')
       },
-    })
+    }, initialFocus.current)
     handle.current = scene
     element.focus({ preventScroll: true })
     return () => {

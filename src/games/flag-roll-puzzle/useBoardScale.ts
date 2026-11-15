@@ -44,7 +44,9 @@ export function useBoardScale(): BoardScale {
     if (!container) return
 
     const measure = () => {
-      setScale(computeBoardScale(container.clientWidth, container.clientHeight))
+      // Reserve a one-pixel inset on every side to absorb subpixel clipping/IntersectionObserver rounding.
+      const rect = container.getBoundingClientRect()
+      setScale(computeBoardScale(Math.max(0, Math.floor(rect.width) - 2), Math.max(0, Math.floor(rect.height) - 2)))
     }
     measure()
 
@@ -65,7 +67,8 @@ export function useBoardScale(): BoardScale {
   return {
     containerRef,
     scale,
-    width: Math.round(BOARD_WIDTH * scale),
-    height: Math.round(BOARD_HEIGHT * scale),
+    // Round outwards without turning floating-point noise (375.00000000000006) into a pixel.
+    width: Math.ceil(BOARD_WIDTH * scale - 1e-9) + 2,
+    height: Math.ceil(BOARD_HEIGHT * scale - 1e-9) + 2,
   }
 }

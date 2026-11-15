@@ -32,6 +32,24 @@ function roll(world: GolfWorld, onStep?: () => void): GolfEvent[] {
   return events
 }
 
+/** みちすじの はじめから、その点に いちばん 近い ところまでの ながさ（同じ 近さなら 先の ほう）。 */
+function routeProgress(hole: HoleDefinition, point: { x: number; z: number }): number {
+  let travelled = 0
+  let best = 0
+  let nearest = Infinity
+  hole.route.slice(0, -1).forEach((a, index) => {
+    const b = hole.route[index + 1]!
+    const dx = b.x - a.x
+    const dz = b.z - a.z
+    const length = Math.hypot(dx, dz)
+    const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.z - a.z) * dz) / (length * length || 1)))
+    const distance = Math.hypot(point.x - (a.x + dx * t), point.z - (a.z + dz * t))
+    if (distance <= nearest + 1e-6) { nearest = distance; best = travelled + length * t }
+    travelled += length
+  })
+  return best
+}
+
 function withWorld<T>(world: GolfWorld, run: (world: GolfWorld) => T): T {
   try { return run(world) } finally { world.dispose() }
 }
@@ -84,6 +102,47 @@ describe('パターゴルフの物理', () => {
       for (let i = 0; i < 120; i++) world.step()
       const ball = world.ball().position
       expect(Math.hypot(ball.x - hole.cup.x, ball.z - hole.cup.z)).toBeLessThan(0.5)
+    })
+  })
+
+  it.each(GOLF_COURSES.flatMap(course => course.holes.map(hole => [hole.id, course, hole] as const)))('%s: どこに 止まっても、おすすめは カップまでの みちのりを ちぢめる ほうへ うつ', (_, course, hole) => {
+    const geometry = buildHoleGeometry(hole)
+    // トランポリンの まうしろへ まわる・ふうしゃの 柱の かげから トンネルの 入口へ もどる ときは、いったん 遠ざかってよい。
+    const mayBackUp = (hole.gadgets ?? []).some(gadget => gadget.kind === 'trampoline' || gadget.kind === 'windmill')
+    withWorld(createGolfWorld(course, hole, geometry), world => {
+      let samples = 0
+      let backward = 0
+      for (let x = geometry.bounds.minX + 0.45; x < geometry.bounds.maxX; x += 0.9) for (let z = geometry.bounds.minZ + 0.45; z < geometry.bounds.maxZ; z += 0.9) {
+        // ボールが 止まれる 場所だけ（ゆかの 上で、かべ・しかけ・みず・カップから はなれた 所）。
+        if ([0, 1, 2, 3, 4, 5, 6, 7].some(k => geometry.heightAt(x + Math.cos((k * Math.PI) / 4) * 0.22, z + Math.sin((k * Math.PI) / 4) * 0.22) === null)) continue
+        if (geometry.waterAt(x, z, 0.2) || Math.hypot(x - hole.cup.x, z - hole.cup.z) < 0.8) continue
+        if ((hole.gadgets ?? []).some(gadget => Math.hypot(gadget.x - x, gadget.z - z) < 0.9)) continue
+        world.placeBall({ x, z })
+        const here = world.distanceToCup()
+        if (!Number.isFinite(here)) continue
+        const shot = world.suggestShot()
+        samples++
+        // ねらう先は いまより カップに 近い。うしろや かべの むこうの みちを ねらわない。
+        if (!(world.distanceToCup(shot.target) < here)) backward++
+        // カメラは、うつ むきか、みちなりに すすむ ほうを 向く（長さ 1 の 向き）。
+        expect(Math.hypot(shot.view.x, shot.view.z)).toBeCloseTo(1, 5)
+      }
+      expect(samples).toBeGreaterThan(5)
+      if (mayBackUp) expect(backward / samples).toBeLessThan(0.2)
+      else expect(backward, `${backward}/${samples}`).toBe(0)
+    })
+  })
+
+  it('Uの字の みちで じゃま物の かげに 止まっても、うしろへ もどらず 先へ ねらう', () => {
+    // candy-3 は 下で おりかえす Uの字。おりかえしの まん中に グミが ある。
+    const hole = holeById('candy-3')
+    withWorld(open(courseById('candy'), hole), world => {
+      world.placeBall({ x: -1.0, z: -3.0 })
+      const shot = world.suggestShot()
+      // グミの むこうの かど（+x）へ むかう。左の みち（-x）へは もどらない。
+      expect(shot.direction.x).toBeGreaterThan(0.5)
+      expect(shot.view).toEqual(shot.direction)
+      expect(world.distanceToCup(shot.target)).toBeLessThan(world.distanceToCup() - 0.4)
     })
   })
 
@@ -244,8 +303,8 @@ describe('パターゴルフの物理', () => {
       hole.route.slice(0, -1).forEach((point, index) => {
         world.placeBall(point)
         const { target } = world.suggestShot()
-        const targetIndex = hole.route.findIndex(item => item.x === target.x && item.z === target.z)
-        expect(targetIndex, `${index}ばんめの点から`).toBeGreaterThan(index)
+        // ねらう先は、みちすじの 先の点か、（どうぶつが みちを ふさいでいるときは）みちすじに そって 先へ すすんだ 場所。
+        expect(routeProgress(hole, target), `${index}ばんめの点から`).toBeGreaterThan(routeProgress(hole, point) + 0.3)
       })
     })
   })

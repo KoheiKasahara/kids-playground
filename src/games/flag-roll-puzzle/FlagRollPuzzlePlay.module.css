@@ -6,8 +6,8 @@
  * 操作ボタンは操作の段へ集め、パーツ置き場には画面の横幅をまるごと使わせる。
  */
 .page {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -27,6 +27,7 @@
 }
 
 .header {
+  flex: 0 0 auto;
   width: 100%;
   max-width: var(--content-max-width);
   display: flex;
@@ -53,10 +54,9 @@
   min-width: 0;
   overflow: hidden;
   text-align: center;
-  font-size: 18px;
-  text-overflow: ellipsis;
-  /* 折り返して2行になるとヘッダが盤面の高さを削るため、1行に収める */
-  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 /* 現在の国旗を常に見せ、編集時だけそのまま選び直しの入口にする。 */
@@ -157,7 +157,14 @@
   width: 100%;
 }
 
+/* 残りの高さと幅を共通ビューポートに渡す。 */
+.boardViewport {
+  flex: 1;
+  width: 100%;
+}
+
 .side {
+  flex: 0 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;

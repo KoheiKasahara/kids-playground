@@ -3,6 +3,12 @@ import { restore, serialize, starterTank } from './save'
 import { addCreature, addDecor, createWorld, floorY } from './sim'
 
 describe('save', () => {
+  test('新しい生き物も既存の保存形式で復元できる', () => {
+    const world = createWorld()
+    for (const id of ['dolphin', 'penguin', 'starfish'] as const) addCreature(world, id, 150, 90)
+    expect(restore(serialize(world)).creatures.map(c => c.species)).toEqual(['dolphin', 'penguin', 'starfish'])
+  })
+
   test('ほぞんして もどすと おなじ ならび（はばが かわっても わりあいで もどる）', () => {
     const world = createWorld(1, 400, 225)
     addDecor(world, 'castle', 200, floorY(world, .5))

@@ -71,7 +71,7 @@ test('コースを選ぶと景色が切り替わり、描画量が上限に収�
   await page.goto('/games/putter-golf')
   await expect(page.getByRole('button', { name: 'スタート！', exact: true })).toBeEnabled({ timeout: 20_000 })
   const scene = page.getByTestId('golf-scene')
-  for (const [name, hole] of [['うみべ', 'beach-1'], ['おつきさま', 'moon-1'], ['もり', 'forest-1'], ['くだりざか', 'downhill-1'], ['かわべ', 'river-1'], ['たにま', 'canyon-1'], ['こうじょう', 'factory-1'], ['そらのしま', 'sky-1'], ['はらっぱ', 'meadow-1']]) {
+  for (const [name, hole] of [['うみべ', 'beach-1'], ['おつきさま', 'moon-1'], ['もり', 'forest-1'], ['くだりざか', 'downhill-1'], ['かわべ', 'river-1'], ['たにま', 'canyon-1'], ['こうじょう', 'factory-1'], ['そらのしま', 'sky-1'], ['だいぼうけん', 'journey-1'], ['はらっぱ', 'meadow-1']]) {
     await test.step(`${name}コースの景色を読み込む`, async () => {
       const choice = page.getByRole('button', { name: `${name}コースを えらぶ`, exact: true })
       await choice.click()

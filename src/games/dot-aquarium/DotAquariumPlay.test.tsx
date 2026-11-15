@@ -84,6 +84,33 @@ describe('dot-aquarium play', () => {
     expect(store.get('dot-aquarium-v1')).toContain('shark')
   })
 
+  test('さがそうは空の水槽を案内し、正解を一度だけ数えて次へ進める', () => {
+    render(<MemoryRouter><DotAquariumPlay /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /からっぽから/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'さがそう' }))
+    expect(screen.getByText('いきものを いれてから あそぼう')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'いきもの' }))
+    fireEvent.click(screen.getByRole('button', { name: /^イルカ/ }))
+    tap(240, 100)
+    fireEvent.click(screen.getByRole('button', { name: /^ペンギン/ }))
+    tap(480, 200)
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    fireEvent.click(screen.getByRole('button', { name: 'さがそう' }))
+    expect(screen.getByText('イルカは どこ？')).toBeInTheDocument()
+    const [dolphin, penguin] = tank().creatures
+    tap(penguin.x * 2, penguin.y * 2)
+    expect(screen.getByText('⭐ 0 みつけた')).toBeInTheDocument()
+    tap(dolphin.x * 2, dolphin.y * 2)
+    tap(dolphin.x * 2, dolphin.y * 2)
+    expect(screen.getByText('⭐ 1 みつけた')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'つぎへ' }))
+    expect(screen.getByText('ペンギンは どこ？')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'かたづけ' }))
+    tap(penguin.x * 2, penguin.y * 2)
+    fireEvent.click(screen.getByRole('button', { name: 'さがそう' }))
+    expect(screen.getByText('イルカは どこ？')).toBeInTheDocument()
+  })
+
   test('かたづけで いきものを もどせる', () => {
     render(<MemoryRouter><DotAquariumPlay /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: /からっぽから/ }))

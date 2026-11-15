@@ -65,7 +65,12 @@ export default function SingleBodyStage({
     <>
       <div ref={registerContainer} className={`${styles.scene} ${styles.singleScene}`} aria-hidden="true" />
 
-      <FeatureCard spot={selectedItem} onClose={() => { onSpotSelect(null); onSatelliteSelect(null) }} />
+      {/* 選択が変わるたびに作り直し、カードの出現アニメーションをやり直す。 */}
+      <FeatureCard
+        key={`${selectedSatelliteId ?? ''}:${selectedSpotId ?? ''}:${selectionFeedbackKey}`}
+        spot={selectedItem}
+        onClose={() => { onSpotSelect(null); onSatelliteSelect(null) }}
+      />
 
       <ZoomControls
         canZoomIn={zoomLevel < MAX_ZOOM_LEVEL}

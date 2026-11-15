@@ -4,12 +4,14 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 // 3D の まちを くみたてる どうぐ。
 // うごかない ものは ざいりょうごとに 1つの かたちへ まとめ（えがく かいすうを へらす）、
 // うごく ものだけ べつの Mesh に する。つくった かたち・ざいりょうは さいごに まとめて すてる。
+// いろ だけが ちがう ふつうの ざいりょう（mat(いろ)）は、ちょうてんに いろを もたせた 1つの ざいりょう（paint）に まとめる。
+// これで まちが にぎやかに なっても、えがく かいすうは いろの かずに よらず ほとんど ふえない。
 
 export type V3 = readonly [number, number, number]
 export type Mat = string | THREE.Material
 
 /** よるに ひかる ざいりょう。 */
-export type GlowKind = 'window' | 'windowOff' | 'bulb' | 'red' | 'headlight' | 'tail'
+export type GlowKind = 'window' | 'windowOff' | 'bulb' | 'red' | 'headlight' | 'tail' | 'fire'
 
 type GlowSpec = { day: string; night: string; emissive: string; dayGlow: number; nightGlow: number }
 
@@ -20,6 +22,7 @@ const GLOWS: Record<GlowKind, GlowSpec> = {
   red: { day: '#ff6b6b', night: '#ff6b6b', emissive: '#ff2d2d', dayGlow: 0.35, nightGlow: 2.2 },
   headlight: { day: '#fffbe6', night: '#fffbe6', emissive: '#fff4c2', dayGlow: 0, nightGlow: 2.6 },
   tail: { day: '#e03131', night: '#e03131', emissive: '#ff3b3b', dayGlow: 0, nightGlow: 1.6 },
+  fire: { day: '#ff922b', night: '#ff922b', emissive: '#ff7b00', dayGlow: 0.7, nightGlow: 2.4 },
 }
 
 const ZERO: V3 = [0, 0, 0]
@@ -94,12 +97,92 @@ function arcGeometry(cx: number, cz: number, inner: number, outer: number, a0: n
   return geometry
 }
 
-type Batch = { material: THREE.Material; cast: boolean; parts: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] }
+type Part = { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4; color?: THREE.Color }
+type Batch = { material: THREE.Material; cast: boolean; parts: Part[] }
 
-export class TownKit {
+/** かたちを おく さき（まちの うごかない もの・いっしょに うごく もの）。 */
+export type Sink = { place(geometry: THREE.BufferGeometry, material: Mat, matrix: THREE.Matrix4, cast?: boolean): void }
+
+/** おいた かたちを ざいりょうごとに あつめ、merge で 1つの Mesh ずつに する。 */
+class Batcher implements Sink {
+  private readonly batches = new Map<string, Batch>()
+  constructor(private readonly kit: TownKit) {}
+
+  place(geometry: THREE.BufferGeometry, material: Mat, matrix: THREE.Matrix4, cast = true): void {
+    const resolved = this.kit.resolve(material)
+    const color = this.kit.paintColor(resolved)
+    const target = color ? this.kit.paint() : resolved
+    const key = `${target.uuid}|${cast}`
+    let batch = this.batches.get(key)
+    if (!batch) {
+      batch = { material: target, cast, parts: [] }
+      this.batches.set(key, batch)
+    }
+    batch.parts.push({ geometry, matrix, color })
+  }
+
+  merge(): THREE.Mesh[] {
+    const meshes: THREE.Mesh[] = []
+    for (const batch of this.batches.values()) {
+      const parts = batch.parts.map(({ geometry, matrix, color }) => {
+        const part = geometry.clone().applyMatrix4(matrix)
+        if (color) {
+          const colors = new Float32Array(part.attributes.position.count * 3)
+          for (let n = 0; n < colors.length; n += 3) {
+            colors[n] = color.r
+            colors[n + 1] = color.g
+            colors[n + 2] = color.b
+          }
+          part.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+        }
+        return part
+      })
+      const merged = mergeGeometries(parts, false)
+      parts.forEach((part) => part.dispose())
+      if (!merged) continue
+      merged.computeBoundingSphere()
+      this.kit.own(merged)
+      const mesh = new THREE.Mesh(merged, batch.material)
+      mesh.castShadow = batch.cast
+      mesh.receiveShadow = true
+      mesh.matrixAutoUpdate = false
+      meshes.push(mesh)
+    }
+    this.batches.clear()
+    return meshes
+  }
+
+  clear(): void {
+    this.batches.clear()
+  }
+}
+
+/** いっしょに うごく もの（まわる わ・はしる くるま）を ざいりょうごとに まとめて 1つの Group に する。 */
+export class Cluster implements Sink {
+  private readonly batcher: Batcher
+  constructor(kit: TownKit) {
+    this.batcher = new Batcher(kit)
+  }
+
+  place(geometry: THREE.BufferGeometry, material: Mat, matrix: THREE.Matrix4, cast = true): void {
+    this.batcher.place(geometry, material, matrix, cast)
+  }
+
+  /** まとめた Mesh を group に いれて かえす。 */
+  build(group: THREE.Group = new THREE.Group()): THREE.Group {
+    for (const mesh of this.batcher.merge()) {
+      mesh.updateMatrix()
+      group.add(mesh)
+    }
+    return group
+  }
+}
+
+export class TownKit implements Sink {
   private readonly geos = new Map<string, THREE.BufferGeometry>()
   private readonly mats = new Map<string, THREE.Material>()
-  private readonly batches = new Map<string, Batch>()
+  private readonly plain = new Map<THREE.Material, THREE.Color>()
+  private readonly statics: Batcher = new Batcher(this)
   private readonly glows: { material: THREE.MeshStandardMaterial; spec: GlowSpec }[] = []
   private readonly owned: { dispose(): void }[] = []
 
@@ -119,8 +202,24 @@ export class TownKit {
         depthWrite: !transparent,
       })
       this.mats.set(key, material)
+      if (options.rough === undefined && options.metal === undefined && options.opacity === undefined) this.plain.set(material, new THREE.Color(color))
     }
     return material
+  }
+
+  /** ちょうてんの いろで ぬる ざいりょう。mat(いろ) で つくった ふつうの ものは まとめる ときに これに なる。 */
+  paint(): THREE.Material {
+    let material = this.mats.get('paint')
+    if (!material) {
+      material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.82, metalness: 0, vertexColors: true })
+      this.mats.set('paint', material)
+    }
+    return material
+  }
+
+  /** paint に まとめられる ざいりょうなら その いろ。 */
+  paintColor(material: THREE.Material): THREE.Color | undefined {
+    return this.plain.get(material)
   }
 
   glow(kind: GlowKind): THREE.Material {
@@ -208,14 +307,40 @@ export class TownKit {
 
   /** うごかない ものとして おく（あとで まとめる）。 */
   place(geometry: THREE.BufferGeometry, material: Mat, matrix: THREE.Matrix4, cast = true): void {
-    const resolved = this.resolve(material)
-    const key = `${resolved.uuid}|${cast}`
-    let batch = this.batches.get(key)
-    if (!batch) {
-      batch = { material: resolved, cast, parts: [] }
-      this.batches.set(key, batch)
-    }
-    batch.parts.push({ geometry, matrix })
+    this.statics.place(geometry, material, matrix, cast)
+  }
+
+  /** いっしょに うごく ものを まとめる はこ。 */
+  cluster(): Cluster {
+    return new Cluster(this)
+  }
+
+  /** いっしょに うごく ものを おく わく。frame は かげを おとし、flat は おとさない。さいごに cluster.build() する。 */
+  moving(): { frame: Frame; flat: Frame; cluster: Cluster } {
+    const cluster = this.cluster()
+    const origin = new THREE.Matrix4()
+    return { frame: new Frame(this, origin, true, cluster), flat: new Frame(this, origin, false, cluster), cluster }
+  }
+
+  /** いくつかの かたちを 1つの Mesh に する（あとで ざいりょうを とりかえる もの。ふみきりの ランプ など）。 */
+  joined(parts: readonly { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[], material: Mat, cast = false): THREE.Mesh {
+    const clones = parts.map(({ geometry, matrix }) => geometry.clone().applyMatrix4(matrix))
+    const merged = this.own(mergeGeometries(clones, false) ?? new THREE.BufferGeometry())
+    clones.forEach((clone) => clone.dispose())
+    merged.computeBoundingSphere()
+    const mesh = new THREE.Mesh(merged, this.resolve(material))
+    mesh.castShadow = cast
+    mesh.receiveShadow = true
+    return mesh
+  }
+
+  /** おなじ かたちを たくさん ならべて うごかす もの（ゴンドラ・しずく など）。1かいで えがく。 */
+  instanced(geometry: THREE.BufferGeometry, material: Mat, count: number, cast = true): THREE.InstancedMesh {
+    const mesh = this.own(new THREE.InstancedMesh(geometry, this.resolve(material), count))
+    mesh.castShadow = cast
+    mesh.receiveShadow = true
+    mesh.frustumCulled = false
+    return mesh
   }
 
   /** うごく もの。かたちと ざいりょうは つかいまわす。 */
@@ -231,22 +356,7 @@ export class TownKit {
 
   /** おいた ものを ざいりょうごとに 1つの Mesh に まとめる。 */
   merge(): THREE.Mesh[] {
-    const meshes: THREE.Mesh[] = []
-    for (const batch of this.batches.values()) {
-      const parts = batch.parts.map(({ geometry, matrix }) => geometry.clone().applyMatrix4(matrix))
-      const merged = mergeGeometries(parts, false)
-      parts.forEach((part) => part.dispose())
-      if (!merged) continue
-      merged.computeBoundingSphere()
-      this.owned.push(merged)
-      const mesh = new THREE.Mesh(merged, batch.material)
-      mesh.castShadow = batch.cast
-      mesh.receiveShadow = true
-      mesh.matrixAutoUpdate = false
-      meshes.push(mesh)
-    }
-    this.batches.clear()
-    return meshes
+    return this.statics.merge()
   }
 
   dispose(): void {
@@ -255,9 +365,10 @@ export class TownKit {
     this.owned.forEach((item) => item.dispose())
     this.geos.clear()
     this.mats.clear()
+    this.plain.clear()
     this.owned.length = 0
     this.glows.length = 0
-    this.batches.clear()
+    this.statics.clear()
   }
 }
 
@@ -266,10 +377,10 @@ export class TownKit {
  * at の y は そこの たかさ。しょうめんは ローカルの +z。
  */
 export class Frame {
-  constructor(readonly kit: TownKit, readonly base: THREE.Matrix4, private readonly cast = true) {}
+  constructor(readonly kit: TownKit, readonly base: THREE.Matrix4, private readonly cast = true, private readonly sink: Sink = kit) {}
 
   put(geometry: THREE.BufferGeometry, material: Mat, at: V3, scale: V3, rot: V3 = ZERO): void {
-    this.kit.place(geometry, material, this.base.clone().multiply(matrixOf(at, rot, scale)), this.cast)
+    this.sink.place(geometry, material, this.base.clone().multiply(matrixOf(at, rot, scale)), this.cast)
   }
 
   box(material: Mat, size: V3, at: V3, rot?: V3): void {

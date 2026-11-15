@@ -1,10 +1,11 @@
 /**
- * パターゴルフのコースとホールの定義（データだけ）。
+ * パターゴルフのコースとホールの定義（データだけ）。まがりくねった ながい ホールは golfLongHoles.ts に 置く。
  *
  * ホールは「床の形（角の丸めつき多角形）」「高さのしかけ（こぶ・なみ・ジャンプ台）」
  * 「動くしかけ」「すなば」で表す。見た目の床と物理の床は、どちらもこのデータから
  * golfGeometry.ts が同じ三角形として作るので、見えている形と転がり方が必ず一致する。
  */
+import { FINALE_HOLES, JOURNEY_HOLES } from './golfLongHoles'
 import { EARTH_GRAVITY } from './golfPhysics'
 
 export type Vec2 = { x: number; z: number }
@@ -123,7 +124,7 @@ export type HoleDefinition = {
 }
 
 /** コースの並び順。★の保存やコース選びは、この一覧を正とする。 */
-export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill', 'river', 'canyon', 'factory', 'sky'] as const
+export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill', 'river', 'canyon', 'factory', 'sky', 'journey'] as const
 export type CourseId = (typeof COURSE_IDS)[number]
 
 export type CourseLook = {
@@ -356,6 +357,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: 0, z: 5.2 }, { x: 0, z: 2.2, minPower: 0.6 }, { x: 2.7, z: -1.4 }, { x: 2.7, z: -4.6 }],
         tip: 'どかんに いれると むこうがわへ！',
       },
+      FINALE_HOLES.beach,
     ],
   },
   {
@@ -437,6 +439,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: 0, z: 5.8 }, { x: 0, z: 0.6 }, { x: 0, z: -5.6 }],
         tip: 'とびらの あいた ほうを ねらおう',
       },
+      FINALE_HOLES.moon,
     ],
   },
   {
@@ -511,6 +514,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: -1.6, z: 4.8 }, { x: -1.6, z: -1.0 }, { x: -1.6, z: -4.2, minPower: 0.45 }, { x: 1.6, z: -4.2 }, { x: 1.6, z: 4.2 }],
         tip: 'トンネルで むこうの みちへ',
       },
+      FINALE_HOLES.snow,
     ],
   },
   {
@@ -607,6 +611,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: -0.9, z: 4.0 }, { x: 0, z: 1.8 }, { x: 0, z: -1.8 }, { x: 0.9, z: -4.0 }],
         tip: 'とびらの あいた ほうを ぬけよう',
       },
+      FINALE_HOLES.candy,
     ],
   },
   {
@@ -706,6 +711,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: 0, z: 3.8 }, { x: 3.2, z: -0.2 }, { x: 0, z: -3.6 }],
         tip: 'おやまの そとがわを まわろう',
       },
+      FINALE_HOLES.dino,
     ],
   },
   {
@@ -1407,6 +1413,17 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         tip: 'トランポリンを ぽよん ぽよん！',
       },
     ],
+  },
+  {
+    id: 'journey',
+    label: 'だいぼうけん',
+    icon: '🧭',
+    description: 'ながーい みちを たび',
+    color: '#d9722b',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#7cc05a', wall: '#b8733f', wallCap: '#ffe2a8', skirt: '#8a5a34', sand: '#f0d79c', ice: '#d6effa', rough: '#4f9148', ground: '#c9c070', sky: '#9fd4f2', horizon: '#fbefd2', bumper: '#e8892b', bumperCap: '#8a5a34', rock: '#a89c8e' },
+    holes: JOURNEY_HOLES,
   },
 ]
 

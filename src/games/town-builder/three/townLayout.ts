@@ -1,4 +1,5 @@
-import { carriesRoad, colOf, COLS, neighborIndex, rowOf, ROWS, type Dir, type Town } from '../town'
+import { sizeOf } from '../parts'
+import { buildingCells, carriesRoad, colOf, COLS, neighborIndex, rowOf, ROWS, type Dir, type Town } from '../town'
 
 // 3D の まちの ならべかた。three.js を つかわない じゅんすいな かんすう だけを おく。
 // 1マスを 1 とし、ちずの まんなかが 0、きた（ちずの うえ）が -z、ひがし（みぎ）が +x。
@@ -20,11 +21,31 @@ export function tileAt(x: number, z: number): number | null {
 /** みなみ（はじめの カメラの がわ）→ ひがし → にし → きた の じゅんに みちを さがす。 */
 const FACING_ORDER: readonly Dir[] = [2, 1, 3, 0]
 
-/** たてものの しょうめんを むける ほう。となりの みちに むけ、なければ みなみ。 */
+/** たてものの まんなか。おおきな たてものは のって いる マス ぜんぶの まんなか。 */
+export function buildingCenter(town: Town, index: number): Point {
+  const cells = buildingCells(town, index)
+  const points = cells.map(tileCenter)
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    z: points.reduce((sum, point) => sum + point.z, 0) / points.length,
+  }
+}
+
+/**
+ * たてものの しょうめんを むける ほう。となりの みちに むけ、なければ みなみ。
+ * よこながの おおきな たてものは まわすと マスから はみでるので、みなみか きたに だけ むける。
+ */
 export function facingOf(town: Town, index: number): Dir {
-  for (const dir of FACING_ORDER) {
-    const next = neighborIndex(index, dir)
-    if (next !== null && carriesRoad(town[next].part)) return dir
+  const cells = buildingCells(town, index)
+  const part = town[index]?.part ?? null
+  const [cols, rows] = part ? sizeOf(part) : [1, 1]
+  const order = cols === rows ? FACING_ORDER : FACING_ORDER.filter((dir) => dir === 0 || dir === 2)
+  for (const dir of order) {
+    const facesRoad = cells.some((cell) => {
+      const next = neighborIndex(cell, dir)
+      return next !== null && !cells.includes(next) && carriesRoad(town[next].part)
+    })
+    if (facesRoad) return dir
   }
   return 2
 }
@@ -42,13 +63,23 @@ export function tileNoise(index: number, salt = 0): number {
   return (h >>> 0) / 4294967296
 }
 
-/** ちずの はんぶんの はば（すこし よゆうを もたせる）。 */
-const HALF_SPAN = Math.max(COLS, ROWS) / 2 + 0.6
+/** ちず ぜんたいの はんぶんの はば（すこし よゆうを もたせる）。 */
+const MAP_HALF_SPAN = Math.max(COLS, ROWS) / 2 + 0.6
+/** はじめに みえる まちの はんぶんの はば。ひろい ちずの うち、みて いた あたりを ながめる。 */
+const VIEW_HALF_SPAN = Math.min(MAP_HALF_SPAN, 7.6)
 
-/** カメラの きょり。たて・よこ どちらの がめんでも ちずの はばが だいたい おさまる。 */
-export function fitDistance(aspect: number, fovDegrees: number): number {
+function distanceFor(halfSpan: number, aspect: number, fovDegrees: number): number {
   const vertical = (fovDegrees * Math.PI) / 180
   const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * Math.max(0.2, aspect))
-  const distance = HALF_SPAN / Math.tan(Math.min(vertical, horizontal) / 2)
-  return Math.min(46, Math.max(14, distance))
+  return halfSpan / Math.tan(Math.min(vertical, horizontal) / 2)
+}
+
+/** はじめの カメラの きょり。たて・よこ どちらの がめんでも、みて いた あたりの まちが おさまる。 */
+export function fitDistance(aspect: number, fovDegrees: number): number {
+  return Math.min(46, Math.max(14, distanceFor(VIEW_HALF_SPAN, aspect, fovDegrees)))
+}
+
+/** いちばん はなれた ときの カメラの きょり。ちず ぜんたいが だいたい おさまる。 */
+export function farDistance(aspect: number, fovDegrees: number): number {
+  return Math.min(150, Math.max(fitDistance(aspect, fovDegrees) * 1.4, distanceFor(MAP_HALF_SPAN, aspect, fovDegrees)))
 }

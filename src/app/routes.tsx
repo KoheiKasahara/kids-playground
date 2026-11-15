@@ -292,5 +292,6 @@ export const routes: RouteObject[] = [
     element: <Navigate to="/games/flag-quiz" replace />,
   },
   { path: '/games/mini-4wd', element: lazyRoute(() => import('../games/mini-4wd/Mini4wdPlay')) },
+  { path: '/games/hanabi-don', element: lazyRoute(() => import('../games/hanabi-don/HanabiDonPlay')) },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

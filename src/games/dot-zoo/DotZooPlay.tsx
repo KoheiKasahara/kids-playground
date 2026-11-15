@@ -9,7 +9,7 @@ import {
 } from './data'
 import {
   addAnimal, addObject, animalAt, checkAnimal, checkFood, checkObject, cleanPoop, countKind, countSpecies, counter, dayPhase,
-  drainEvents, dropFood, pokeAnimal, poopAt, removeAt, removeObject, stepWorld, zooRating, createWorld, DAY_SECONDS, type World,
+  drainEvents, dropFood, offerFood, pokeAnimal, poopAt, removeAt, removeObject, stepWorld, zooRating, createWorld, DAY_SECONDS, type World,
 } from './sim'
 import { ZooRenderer, type Ghost, type Hover, type View } from './render'
 import { clearZoo, readMusic, readZoo, starterZoo, writeMusic, writeZoo } from './save'
@@ -399,6 +399,27 @@ function Zoo({ initial, music, onMusic, onExit }: { initial: World; music: boole
     }
   }
 
+  function care(feed: boolean) {
+    primeAudio()
+    const world = worldRef.current
+    const animal = world.animals.find(a => a.id === infoIdRef.current)
+    if (!animal) { infoIdRef.current = null; setInfo(null); return }
+    const def = speciesDef(animal.species)
+    if (feed) {
+      const result = offerFood(world, animal.id)
+      if (!result.ok) { playNoSound(); say(result.reason, true); return }
+      playDropSound()
+      say(`${def.name}の そばに ${foodName(def.eats[0])}を おいたよ`)
+    } else {
+      pokeAnimal(world, animal)
+      playTapSound()
+      if (animal.state !== 'sleep') renderer.burst('heart', animal.x, 1 + animal.alt, animal.z, 3)
+      say(animal.state === 'sleep' ? `${def.name}は ねているよ。しーっ` : `${def.name}「${def.act}」`)
+    }
+    setInfo(current => current ? { ...current, mood: animal.mood, hunger: animal.hunger, sleeping: animal.state === 'sleep' } : null)
+    writeZoo(world)
+  }
+
   function down(event: PointerEvent<HTMLCanvasElement>) {
     if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return
     event.preventDefault()
@@ -587,6 +608,10 @@ function Zoo({ initial, music, onMusic, onExit }: { initial: World; music: boole
         <dt>ごきげん</dt>
         <dd className={styles.hearts} aria-label={`ごきげん ${Math.round(info.mood * 5)} / 5`}>{Array.from({ length: 5 }, (_, i) => <span key={i} data-on={i < Math.round(info.mood * 5) || undefined} aria-hidden="true">♥</span>)}</dd>
       </dl>
+      <div className={styles.care}>
+        <button type="button" onClick={() => care(false)}>♡ なでる</button>
+        <button type="button" onClick={() => care(true)}>🌿 えさを あげる</button>
+      </div>
     </aside>}
   </main></GamePlaySurface>
 }

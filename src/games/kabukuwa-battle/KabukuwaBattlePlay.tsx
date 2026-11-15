@@ -304,11 +304,24 @@ type Pop = { id: number; text: string; x: number; y: number; big: boolean; tone:
 
 /** カットインを みせる じかん（たたかいは とまる）。 */
 const CUT_IN_SECONDS = 1.8
-const SHOUT = 'ウオリャアアアアア！'
+const CUT_IN_STYLES = {
+  classic: { shout: 'ウオリャアアアアア！' },
+  rush: { shout: 'いっけぇぇぇ！' },
+  pincer: { shout: 'がっちりぃ！' },
+  throw: { shout: 'そりゃああ！' },
+} as const
+type CutInStyle = keyof typeof CUT_IN_STYLES
 
-/** ぎゃくてん・せっせんの カットイン。ななめの おびが ひだりから スワイプで はいり、ゆれながら むしが さけぶ。 */
-function ComebackCutIn({ sp, side, kind }: { sp: Species; side: 0 | 1; kind: CutInKind }) {
-  return <div className={styles.cutIn} style={{ '--team': TEAM_COLORS[side] } as CSSProperties} aria-hidden="true" data-testid="kabukuwa-cut-in">
+function cutInStyle(move: Technique | null): CutInStyle {
+  if (move === null) return 'classic'
+  if (move === 'charge' || move === 'rush') return 'rush'
+  if (move === 'pinch' || move === 'lift') return 'pincer'
+  return 'throw'
+}
+
+/** きめての わざに あわせて おび・はいけい・むしの うごきを かえる。 */
+function BattleCutIn({ sp, side, kind, variant }: { sp: Species; side: 0 | 1; kind: CutInKind; variant: CutInStyle }) {
+  return <div className={styles.cutIn} style={{ '--team': TEAM_COLORS[side] } as CSSProperties} aria-hidden="true" data-testid="kabukuwa-cut-in" data-variant={variant}>
     <span className={styles.cutInFlash} />
     <span className={styles.cutInSwipe} />
     <div className={styles.cutInRumble}>
@@ -316,7 +329,7 @@ function ComebackCutIn({ sp, side, kind }: { sp: Species; side: 0 | 1; kind: Cut
         <span className={styles.cutInLines} />
         <BeetlePicture sp={sp} className={styles.cutInBeetle} />
         <p className={styles.cutInShout}>
-          {[...SHOUT].map((ch, i) => <span key={i} style={{ '--i': i } as CSSProperties}>{ch}</span>)}
+          {[...CUT_IN_STYLES[variant].shout].map((ch, i) => <span key={i} style={{ '--i': i } as CSSProperties}>{ch}</span>)}
         </p>
       </div>
       <p className={styles.cutInLabel}>{kind === 'comeback' ? 'ぎゃくてん！' : 'せっせん！'}</p>
@@ -352,7 +365,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
   const [result, setResult] = useState<Result | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [pops, setPops] = useState<Pop[]>([])
-  const [cutIn, setCutIn] = useState<{ side: 0 | 1; kind: CutInKind } | null>(null)
+  const [cutIn, setCutIn] = useState<{ side: 0 | 1; kind: CutInKind; variant: CutInStyle } | null>(null)
   const [activeMoves, setActiveMoves] = useState<[Technique | null, Technique | null]>([null, null])
   const mirror = mine.id === foe.id
 
@@ -403,15 +416,16 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
     const at = (side: 0 | 1, up = 30) => [battle.f[side].u, battle.f[side].v, battle.f[side].z + up] as const
     // ぎゃくてん・せっせんの ときは（じぶんでも あいてでも）とめて カットインを いれる。あっしょうは いれない。
     let cutInShown = false
-    const showCutIn = (winner: 0 | 1, kind: CutInKind) => {
+    const showCutIn = (winner: 0 | 1, kind: CutInKind, move: Technique | null = null) => {
+      const variant = cutInStyle(move)
       cutInShown = true
       stop = CUT_IN_SECONDS
       // スローは カットインの あいだ（とまって いる あいだ）も へるので、そのぶん ながく する。
       if (!still) slow = CUT_IN_SECONDS + 1.2
       sound.playCutIn()
       vibrate('impact')
-      setCutIn({ side: winner, kind })
-      setMessage(kind === 'comeback' ? `${name(winner)}の ぎゃくてん！ ウオリャアアアア！` : `${name(winner)}が せっせんを せいした！ ウオリャアアアア！`)
+      setCutIn({ side: winner, kind, variant })
+      setMessage(kind === 'comeback' ? `${name(winner)}の ぎゃくてん！ ${CUT_IN_STYLES[variant].shout}` : `${name(winner)}が せっせんを せいした！ ${CUT_IN_STYLES[variant].shout}`)
       timers.push(setTimeout(() => setCutIn(null), CUT_IN_SECONDS * 1000))
     }
 
@@ -497,7 +511,8 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       for (const e of events) onEvent(e)
       if (plan && count === plan.step && !cutInShown && events.some(e =>
         (e.type === 'hit' && e.side === plan.winner) || (e.type === 'fall' && e.side !== plan.winner) || e.type === 'end')) {
-        showCutIn(plan.winner, plan.kind)
+        const hit = events.find(e => e.type === 'hit' && e.side === plan.winner)
+        showCutIn(plan.winner, plan.kind, hit?.type === 'hit' ? hit.move : null)
       }
       if (!still) ambient(fx, stage.id, dt, scene.camU)
       updateFx(fx, dt)
@@ -545,7 +560,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       <div className={styles.pops} aria-hidden="true">
         {pops.map(p => <span key={p.id} className={styles.pop} data-tone={p.tone} data-big={p.big} style={{ left: `${p.x}%`, top: `${p.y}%` }}>{p.text}</span>)}
       </div>
-      {cutIn !== null && <ComebackCutIn sp={cutIn.side === 0 ? mine : foe} side={cutIn.side} kind={cutIn.kind} />}
+      {cutIn !== null && <BattleCutIn sp={cutIn.side === 0 ? mine : foe} side={cutIn.side} kind={cutIn.kind} variant={cutIn.variant} />}
       {banner === 'ready' && <p className={styles.banner} aria-hidden="true">はっけよい…<small>{stage.view}・{stage.name}</small></p>}
       {banner === 'go' && <p className={`${styles.banner} ${styles.bannerGo}`} aria-hidden="true">のこった！</p>}
       {banner === 'end' && result && !showResult && <p className={`${styles.banner} ${styles.bannerEnd}`} style={{ '--team': TEAM_COLORS[result.winner] } as CSSProperties} aria-hidden="true">

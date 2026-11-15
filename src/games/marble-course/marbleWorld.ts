@@ -1,16 +1,16 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import { configureGameContacts } from '../../physics/rapierWorld'
 import type { BufferGeometry } from 'three'
-import { BALL_RADIUS, launchPose, rotate, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_BAR_HALF, SPINNER_BAR_RADIUS, SPINNER_BAR_Y, toLocal, toWorld, type Course, type MarblePart, type PartKind, type Vec3 } from './marbleModel'
+import { BALL_RADIUS, BOARD_LIMIT, launchPose, rotate, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_BAR_HALF, SPINNER_BAR_RADIUS, SPINNER_BAR_Y, toLocal, toWorld, type Course, type MarblePart, type PartKind, type Vec3 } from './marbleModel'
 
 export type RunStatus = 'rolling' | 'goal' | 'ready'
 export type MechanismPose = { id: string; position: Vec3; rotation: { x: number; y: number; z: number; w: number } }
 export type MarbleEvent = { id: string; kind: 'takeoff' | 'land' | 'boost' | 'hit'; position: Vec3 }
 const yaw = (angle: number) => ({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) })
 /** How quickly a bowl bleeds a swirling ball's energy: a few laps, not a minute of orbiting. */
-const FUNNEL_DRAG = 1.2
+const FUNNEL_DRAG = 2.4
 
-/** All paths remain physical surfaces. Only the motor and a bounded, contact-triggered boost supply energy. */
+/** Physical contacts keep the marble on the track; bounded assistance keeps level tracks playful. */
 export function createMarbleWorld(course: Course, geometries: Record<PartKind, BufferGeometry>, offset = 0) {
   const pose = launchPose(course, offset)
   if (!pose) return null
@@ -24,9 +24,13 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
   // Only the motor and the tipping board legitimately hold a nearly still ball; a funnel has
   // nothing left to move it, so a ball resting there is stuck and must end the run like any track.
   const gadgets = course.parts.filter(part => ['spinner', 'seesaw'].includes(part.kind))
+  const colliderData = new Map<PartKind, { vertices: Float32Array; indices: Uint32Array }>()
+  for (const kind of new Set(course.parts.map(part => part.kind))) {
+    const vertices = new Float32Array(geometries[kind].getAttribute('position').array)
+    colliderData.set(kind, { vertices, indices: Uint32Array.from({ length: vertices.length / 3 }, (_, i) => i) })
+  }
   for (const part of course.parts) {
-    const vertices = new Float32Array(geometries[part.kind].getAttribute('position').array)
-    const indices = Uint32Array.from({ length: vertices.length / 3 }, (_, i) => i)
+    const { vertices, indices } = colliderData.get(part.kind)!
     const angle = -part.rotation * Math.PI / 2
     // The funnel swallows the drop from its raised mouth instead of turning it into more
     // orbiting: a lively bounce there keeps a ball circling the bowl long after it should
@@ -61,7 +65,7 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
       mechanisms.set(part.id, body)
     }
   }
-  world.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.2, 60).setTranslation(0, -0.3, 0).setFriction(0.45).setRestitution(0.25))
+  world.createCollider(RAPIER.ColliderDesc.cuboid(BOARD_LIMIT + 10, 0.2, BOARD_LIMIT + 10).setTranslation(0, -0.3, 0).setFriction(0.45).setRestitution(0.25))
   const ball = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
     .setTranslation(pose.position.x, pose.position.y, pose.position.z)
     .setLinvel(pose.velocity.x, pose.velocity.y, pose.velocity.z)
@@ -103,7 +107,7 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
     step(): RunStatus {
       if (status !== 'rolling') return status
       for (const part of spinners) {
-        const speed = (part.settings.speed === 'fast' ? 2.2 : 1.05) * (part.settings.reverse ? -1 : 1)
+        const speed = (part.settings.speed === 'fast' ? 3.2 : 1.8) * (part.settings.reverse ? -1 : 1)
         mechanisms.get(part.id)!.setNextKinematicRotation(yaw(-part.rotation * Math.PI / 2 + SPINNER_ANGLE + (elapsed + world.timestep) * speed))
       }
       world.step()
@@ -117,6 +121,34 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
         return Math.hypot(local.x, local.z) < 2.5 && local.y > -0.72 && local.y < 0.7
       })
       ball.setAngularDamping(swirling ? FUNNEL_DRAG : 0.035)
+      // Accelerate only in contact with a track; leave the takeoff ramp and free flight physical.
+      for (const part of course.parts) {
+        if (part.kind === 'goal' || part.kind === 'booster') continue
+        const local = toLocal(part, p)
+        if (Math.abs(local.x) > 3.5 || Math.abs(local.z) > 3 || local.y < -2 || local.y > 2) continue
+        if (part.kind === 'jump' && local.x > -1.55 && local.x < 0.2) continue
+        if (part.kind === 'funnel' && local.y > -0.85 && local.y < 0.8) continue
+        const surface = surfaces.get(part.id)!
+        const board = part.kind === 'seesaw' ? mechanisms.get(part.id)?.collider(0) : undefined
+        if (!touching(surface) && !(board && touching(board))) continue
+        if (local.y < -0.05 && !['spinner', 'funnel', 'seesaw'].includes(part.kind)) continue
+        let direction = { x: 1, y: 0, z: 0 }
+        if (part.kind === 'curve' || part.kind === 'curveRight') {
+          const sign = part.kind === 'curveRight' ? -1 : 1
+          const x = Math.max(0, 2 - sign * local.z), z = Math.max(0, local.x + 2)
+          const length = Math.hypot(x, z) || 1
+          direction = { x: x / length, y: 0, z: sign * z / length }
+        }
+        const velocity = rotate(ball.linvel(), -part.rotation)
+        const forward = velocity.x * direction.x + velocity.z * direction.z
+        const desired = part.kind === 'jump' ? 4 : 3.6
+        const acceleration = Math.max(0, Math.min(4 * world.timestep, desired - forward))
+        if (acceleration) {
+          const next = rotate({ ...velocity, x: velocity.x + direction.x * acceleration, z: velocity.z + direction.z * acceleration }, part.rotation)
+          ball.setLinvel(next, true)
+        }
+        break
+      }
       for (const part of boosters) {
         const local = toLocal(part, p)
         if (Math.abs(local.x) > 2.5 || Math.abs(local.z) > 1.2 || local.y > 1.2 || local.y < -0.5) boosted.delete(part.id)
@@ -145,7 +177,7 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
       const waitingForGadget = gadgets.some(part => { const local = toLocal(part, p); return Math.abs(local.x) < 3.3 && Math.abs(local.z) < 2.6 && local.y > -1.9 && local.y < 1.5 })
       still = !waitingForGadget && Math.hypot(velocity.x, velocity.y, velocity.z) < 0.10 ? still + world.timestep : 0
       grounded = p.y < BALL_RADIUS + 0.04 ? grounded + world.timestep : 0
-      if (elapsed > 40 || still > 1.5 || grounded > 1.2 || p.y < -2 || Math.abs(p.x) > 50 || Math.abs(p.z) > 50) status = 'ready'
+      if (elapsed > 120 || still > 1.5 || grounded > 1.2 || p.y < -2 || Math.abs(p.x) > BOARD_LIMIT + 10 || Math.abs(p.z) > BOARD_LIMIT + 10) status = 'ready'
       return status
     },
     dispose() { world.free() },

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { applyTool, COLS, createEmptyTown, DIRS, ROWS, type Dir } from '../town'
-import { facingAngle, facingOf, fitDistance, tileAt, tileCenter, tileNoise } from './townLayout'
+import { facingAngle, facingOf, farDistance, fitDistance, tileAt, tileCenter, tileNoise } from './townLayout'
 
 it('maps every tile center back to its tile and ignores points off the map', () => {
   for (let index = 0; index < COLS * ROWS; index += 1) {
@@ -52,4 +52,9 @@ it('backs the camera further away on a tall phone than on a wide screen, within 
   expect(fitDistance(0.5, 42)).toBeGreaterThan(fitDistance(1.6, 42))
   expect(fitDistance(0.01, 42)).toBeLessThanOrEqual(46)
   expect(fitDistance(10, 42)).toBeGreaterThanOrEqual(14)
+  // ひろい ちず ぜんたいを みる ときは、もっと はなれられる。
+  for (const aspect of [0.5, 1, 1.6]) {
+    expect(farDistance(aspect, 42)).toBeGreaterThan(fitDistance(aspect, 42))
+    expect(farDistance(aspect, 42)).toBeLessThanOrEqual(150)
+  }
 })

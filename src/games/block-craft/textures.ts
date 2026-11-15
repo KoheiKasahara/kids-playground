@@ -62,6 +62,15 @@ function pattern(material: Material, x: number, y: number, noise: number): numbe
     case 'wheat':
     case 'sprout':
     case 'seed': return x % 3 === 0 ? -0.25 : noise > 0.85 ? 0.2 : n
+    case 'cloud': return noise > 0.82 ? -0.07 : noise < 0.2 ? 0.5 : 0
+    case 'crystal': return (x + y) % 5 === 0 ? 0.6 : (x * 2 + y) % 7 === 0 ? -0.25 : noise > 0.88 ? 0.75 : n
+    case 'stonebrick': {
+      const row = Math.floor(y / 4)
+      return y % 4 === 3 || (x + (row % 2) * 4) % 8 === 7 ? -0.35 : noise > 0.9 ? 0.12 : n
+    }
+    case 'mushcap': return ((x + 2) % 6 < 2 && (y + (Math.floor(x / 6) % 2) * 3) % 6 < 2) ? 0.85 : n
+    case 'melon': return x % 4 === 0 ? -0.4 : x % 4 === 2 && noise > 0.5 ? 0.25 : n
+    case 'honey': return (x + y * 2) % 8 === 0 ? 0.5 : noise > 0.9 ? 0.4 : 0
     case 'mushroom': return noise > 0.8 && y < 10 ? 0.75 : y >= 10 ? 0.6 : n
     default: return n
   }

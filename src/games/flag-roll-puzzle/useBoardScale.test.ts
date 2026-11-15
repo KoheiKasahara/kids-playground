@@ -15,15 +15,27 @@ describe('computeBoardScale', () => {
   })
 })
 
-/** clientWidth/clientHeight を固定値で返すjsdom要素を作る（jsdomは常に0を返すため） */
+/** 計測サイズを固定したjsdom要素を作る（jsdomはレイアウトを持たないため） */
 function fakeContainer(width: number, height: number): HTMLDivElement {
   const node = document.createElement('div')
   Object.defineProperty(node, 'clientWidth', { value: width, configurable: true })
   Object.defineProperty(node, 'clientHeight', { value: height, configurable: true })
+  node.getBoundingClientRect = () => ({ width, height } as DOMRect)
   return node
 }
 
 describe('useBoardScale', () => {
+  it('keeps fractional containers and the clipping stage large enough for the scaled board', () => {
+    const { result } = renderHook(() => useBoardScale())
+    for (const [width, height] of [[400.8, 313.6], [500.2, 328.4], [203.4, 700.8], [500, 375], [500, 383], [500, 391]]) {
+      act(() => result.current.containerRef(fakeContainer(width, height)))
+      expect(result.current.width).toBeGreaterThanOrEqual(BOARD_WIDTH * result.current.scale + 2 - 1e-9)
+      expect(result.current.height).toBeGreaterThanOrEqual(BOARD_HEIGHT * result.current.scale + 2 - 1e-9)
+      expect(result.current.width).toBeLessThanOrEqual(width)
+      expect(result.current.height).toBeLessThanOrEqual(height)
+    }
+  })
+
   it('ステージ選択画面などでrefが最初nullでも、後からDOMへ付いたときのサイズで縮尺を計算する', () => {
     // こっきコロコロパズルはステージ選択→盤面の順で同じコンポーネントインスタンス内を
     // 遷移するため、containerRefのDOMノードはマウント直後にはまだ無い。
@@ -36,7 +48,8 @@ describe('useBoardScale', () => {
     })
 
     expect(result.current.scale).toBeCloseTo(0.5, 1)
-    expect(result.current.width).toBeCloseTo(BOARD_WIDTH / 2, 0)
-    expect(result.current.height).toBeCloseTo(BOARD_HEIGHT / 2, 0)
+    expect(Math.abs(result.current.width - BOARD_WIDTH / 2)).toBeLessThanOrEqual(2)
+    expect(result.current.height).toBeLessThanOrEqual(BOARD_HEIGHT / 2)
+    expect(result.current.height).toBeGreaterThanOrEqual(BOARD_HEIGHT / 2 - 2)
   })
 })

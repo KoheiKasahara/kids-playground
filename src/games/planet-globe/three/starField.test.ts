@@ -39,4 +39,13 @@ describe('createStarPositions', () => {
     expect(positions).toHaveLength(STAR_COUNT * 3)
     expect(colors).toHaveLength(STAR_COUNT * 3)
   })
+
+  it('星ごとの大きさを持ち、小さい星が多く大きい星は少ない', () => {
+    const { sizes } = createStarPositions(4)
+    expect(sizes).toHaveLength(STAR_COUNT)
+    for (const size of sizes) expect(size).toBeGreaterThan(0)
+    const large = Array.from(sizes).filter((size) => size > 3)
+    expect(large.length).toBeGreaterThan(0)
+    expect(large.length).toBeLessThan(STAR_COUNT * 0.15)
+  })
 })

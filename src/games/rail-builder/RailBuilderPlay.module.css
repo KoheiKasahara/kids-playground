@@ -632,3 +632,39 @@
     transition: none;
   }
 }
+
+.courseControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: min(310px, calc(100% - 68px));
+  pointer-events: auto;
+}
+.courseControls select, .courseControls button {
+  min-height: 48px;
+  min-width: 0;
+  max-width: 100%;
+  border: 2px solid #b6d9cd;
+  border-radius: 12px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  background: #fff;
+  color: #245b72;
+}
+.courseControls select { flex: 1 1 120px; }
+.courseControls small {
+  width: 100%;
+  color: #254d3d;
+  font-size: 11px;
+  text-shadow: 0 1px 2px white;
+}
+.courseControls :focus-visible { outline: 3px solid var(--color-accent); }
+@media (max-width: 360px) {
+  .title { font-size: 16px; }
+  .trayHint { font-size: 10px; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .courseControls { width: min(360px, calc(100% - 64px)); }
+}

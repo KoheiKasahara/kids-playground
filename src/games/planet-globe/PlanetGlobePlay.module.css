@@ -21,9 +21,15 @@
   /*
    * 宇宙らしい濃紺のグラデーション。星はここに点描せず、WebGL側の`three/starField.ts`に置く
    * (カメラの向きに応じて動く星と、CSSの静止した星が混ざると不自然なため)。
+   * 奥行きを出すため、ごく淡い星雲のにじみ(青紫・青緑)を遠景として重ねる。
+   * 白い文字やボタンの読みやすさを落とさないよう、上部は暗いまま・彩度も低く抑える。
    */
   background-color: #0b1130;
-  background-image: linear-gradient(160deg, #171f4d 0%, #0b1130 55%, #05071a 100%);
+  background-image:
+    radial-gradient(ellipse 70% 45% at 82% 72%, rgba(122, 82, 196, 0.22) 0%, rgba(122, 82, 196, 0) 70%),
+    radial-gradient(ellipse 60% 40% at 12% 88%, rgba(40, 128, 168, 0.18) 0%, rgba(40, 128, 168, 0) 70%),
+    radial-gradient(ellipse 55% 35% at 20% 42%, rgba(86, 70, 168, 0.14) 0%, rgba(86, 70, 168, 0) 70%),
+    linear-gradient(160deg, #171f4d 0%, #0b1130 55%, #05071a 100%);
   background-repeat: no-repeat;
   background-size: cover;
 }

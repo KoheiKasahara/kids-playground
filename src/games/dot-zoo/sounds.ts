@@ -199,9 +199,11 @@ export function playCry(id: SpeciesId) {
     case 'monkey':
       for (let i = 0; i < 3; i++) tone(ctx, d, 900 + i * 120, t + i * .09, .07, .05, 'square', .02, 1.4)
       break
+    case 'tortoise': // しぐさに あわせた ちいさな おと。
     case 'rabbit':
       tone(ctx, d, 1400, t, .06, .03, 'sine', .02, 1.3)
       break
+    case 'sheep':
     case 'penguin':
       tone(ctx, d, 440, t, .12, .05, 'sawtooth', .04, 1.4)
       tone(ctx, d, 480, t + .14, .16, .05, 'sawtooth', .04, .8)
@@ -233,6 +235,7 @@ export function playCry(id: SpeciesId) {
       noise(ctx, t, .25, .14, 220)
       tone(ctx, d, 75, t, .3, .1, 'square', .1, .7)
       break
+    case 'fox':
     case 'capybara':
       for (let i = 0; i < 2; i++) tone(ctx, d, 820, t + i * .15, .08, .035, 'sine', .03, 1.2)
       break

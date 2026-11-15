@@ -35,7 +35,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     },
     {
       id: 'sun-heat',
-      displayName: 'もえる ひょうめん',
+      displayName: 'あつい ひょうめん',
       description: 'ひょうめんは やく 6000ど。とても あついよ。',
       target: { kind: 'surface', lonDeg: -140, latDeg: -8 },
       hitRadiusPx: 34,
@@ -45,7 +45,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
       // 黒点は周りより2000度ほど温度が低く、その差で暗く見える。「暗い場所」ではなく理由を言う。
       id: 'sun-sunspot',
       displayName: 'くろてん',
-      description: 'まわりより つめたいので、くろく みえる ところだよ。',
+      description: 'まわりより おんどが ひくいので、くろく みえる ところだよ。',
       target: { kind: 'surface', lonDeg: 20, latDeg: 12 },
       hitRadiusPx: 34,
       accentColor: '#ffe3a0',
@@ -53,7 +53,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'sun-sunspot-b',
       displayName: 'くろてんは かわる',
-      description: 'くろてんは ふえたり へったり するんだよ。',
+      description: 'くろてんの かずは、やく 11ねんごとに ふえたり へったり するよ。',
       target: { kind: 'surface', lonDeg: -55, latDeg: -18 },
       hitRadiusPx: 34,
       accentColor: '#ffe3a0',
@@ -132,7 +132,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'venus-hottest',
       displayName: 'いちばん あつい わくせい',
-      description: 'くもが ねつを とじこめて、450どより あつく なるよ。',
+      description: 'ぶあつい くうきが ねつを とじこめて、460どくらいまで あつく なるよ。',
       target: { kind: 'surface', lonDeg: -60, latDeg: -20 },
       hitRadiusPx: 34,
       accentColor: '#f3dfae',
@@ -141,7 +141,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
       // 金星だけ`spinSpeed`が負(逆回転)。押した子が画面の回り方で確かめられる事実にする。
       id: 'venus-backspin',
       displayName: 'ぎゃくむきに まわる',
-      description: 'ほかの わくせいと ぎゃくむきに、ゆっくり まわって いるよ。',
+      description: 'ほかの おおくの わくせいと ぎゃくむきに、ゆっくり まわって いるよ。',
       target: { kind: 'surface', lonDeg: 140, latDeg: -5 },
       hitRadiusPx: 34,
       accentColor: '#f3dfae',
@@ -157,7 +157,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'venus-evening-star',
       displayName: 'よいの みょうじょう',
-      description: 'ゆうがたの そらで いちばん あかるく ひかる ほしだよ。',
+      description: 'ゆうがたの そらで、つきの つぎに あかるく みえる ほしだよ。',
       target: { kind: 'surface', lonDeg: 90, latDeg: 0 },
       hitRadiusPx: 34,
       accentColor: '#f3dfae',
@@ -175,7 +175,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'continent-africa',
       displayName: 'アフリカ',
-      description: 'あつい くにが おおい、おおきな たいりくだよ。',
+      description: 'せかいで 2ばんめに おおきい、あつい くにが おおい たいりくだよ。',
       target: { kind: 'surface', lonDeg: 20, latDeg: 5 },
       hitRadiusPx: 50,
       accentColor: '#e6c98a',
@@ -191,7 +191,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'continent-north-america',
       displayName: 'きたアメリカ',
-      description: 'アメリカが ある、きたがわの たいりくだよ。',
+      description: 'アメリカや カナダが ある、きたの たいりくだよ。',
       target: { kind: 'surface', lonDeg: -100, latDeg: 45 },
       hitRadiusPx: 50,
       accentColor: '#bfe0a0',
@@ -207,7 +207,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'continent-oceania',
       displayName: 'オーストラリア',
-      description: 'みなみはんきゅうに ある、しまの たいりくだよ。',
+      description: 'うみに かこまれた、いちばん ちいさい たいりくだよ。',
       target: { kind: 'surface', lonDeg: 135, latDeg: -25 },
       hitRadiusPx: 44,
       accentColor: '#e6c98a',
@@ -225,7 +225,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'ocean-pacific',
       displayName: 'たいへいよう',
-      description: 'ちきゅうの ほとんどは うみ。いちばん おおきいのが ここだよ。',
+      description: 'いちばん ひろい うみ。ぜんぶの りくを あわせたより ひろいよ。',
       target: { kind: 'surface', lonDeg: -170, latDeg: 0 },
       hitRadiusPx: 52,
       accentColor: '#bfe0f0',
@@ -235,7 +235,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
       // 同じ大西洋の中で南へ寄せる。南アメリカ・アフリカ・雲のどれとも30°以上あく。
       id: 'ocean-atlantic',
       displayName: 'たいせいよう',
-      description: 'アメリカと ヨーロッパの あいだに ある うみだよ。',
+      description: 'アメリカと、ヨーロッパや アフリカの あいだに ある うみだよ。',
       target: { kind: 'surface', lonDeg: -28, latDeg: -25 },
       hitRadiusPx: 48,
       accentColor: '#bfe0f0',
@@ -243,7 +243,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'ocean-indian',
       displayName: 'インドよう',
-      description: 'アジアと アフリカの みなみに ひろがる うみだよ。',
+      description: 'アジアの みなみ、アフリカと オーストラリアの あいだの うみだよ。',
       target: { kind: 'surface', lonDeg: 75, latDeg: -10 },
       hitRadiusPx: 46,
       accentColor: '#bfe0f0',
@@ -279,7 +279,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'moon-procellarum',
       displayName: 'あらしの おおよう',
-      description: 'いちばん ひろい くろい ところ。みずは ないんだよ。',
+      description: 'ようがんが かたまった くろい ところ。うみでも みずは ないよ。',
       target: { kind: 'surface', lonDeg: -57, latDeg: 19 },
       hitRadiusPx: 38,
       accentColor: '#ffe9b8',
@@ -296,7 +296,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'moon-far-side',
       displayName: 'つきの うらがわ',
-      description: 'つきは いつも おなじ めんを ちきゅうに むけて いるよ。',
+      description: 'ちきゅうからは みえない がわ。つきは いつも おなじ めんを むけるよ。',
       target: { kind: 'surface', lonDeg: 165, latDeg: 5 },
       hitRadiusPx: 36,
       accentColor: '#ffe9b8',
@@ -332,7 +332,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'mars-olympus-mons',
       displayName: 'オリンポスさん',
-      description: 'たいようけいで いちばん たかい やま。ふじさんの 6ばい だよ。',
+      description: 'たいようけいで いちばん おおきな かざん。ふじさんの やく 6ばい たかいよ。',
       target: { kind: 'surface', lonDeg: -134, latDeg: 18 },
       hitRadiusPx: 34,
       accentColor: '#ffd9a8',
@@ -479,7 +479,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'saturn-float',
       displayName: 'みずに うかぶ ほし',
-      description: 'とても かるいので、おおきな みずに うかぶほどだよ。',
+      description: 'おなじ おおきさの みずより かるいので、みずに うかぶ はずだよ。',
       target: { kind: 'surface', lonDeg: -120, latDeg: -10 },
       hitRadiusPx: 34,
       accentColor: '#fff2d0',
@@ -555,15 +555,15 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'neptune-winds',
       displayName: 'つよい かぜ',
-      description: 'しんかんせんの 7ばい はやい かぜが ふいて いるよ。',
+      description: 'しんかんせんの やく 7ばいも はやい かぜが ふいて いるよ。',
       target: { kind: 'surface', lonDeg: 60, latDeg: 10 },
       hitRadiusPx: 34,
       accentColor: '#aec4f2',
     },
     {
       id: 'neptune-blue',
-      displayName: 'こい あお',
-      description: 'メタンの ガスが、てんのうせいより こい あおに みせて いるよ。',
+      displayName: 'あおい いろ',
+      description: 'メタンの ガスで あおく みえるよ。てんのうせいより すこし あおいよ。',
       target: { kind: 'surface', lonDeg: -110, latDeg: 15 },
       hitRadiusPx: 34,
       accentColor: '#aec4f2',
@@ -584,7 +584,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
       // マーカーが完全に重なって押し分けられなかったので1つに統合する。
       id: 'pluto-tombaugh',
       displayName: 'ハートの もよう',
-      description: 'ハートに みえる、ちっそが こおった あかるい だいちだよ。',
+      description: 'ハートに みえる、ちっそなどが こおった あかるい だいちだよ。',
       target: { kind: 'surface', lonDeg: 20, latDeg: -5 },
       hitRadiusPx: 38,
       accentColor: '#f3e7d0',
@@ -592,7 +592,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'pluto-dark',
       displayName: 'くろい もよう',
-      description: 'ハートの となりに ある、くろっぽい ちいきだよ。',
+      description: 'ハートの となりの くらい ところ。こげちゃいろの ちりが つもって いるよ。',
       target: { kind: 'surface', lonDeg: -120, latDeg: 0 },
       hitRadiusPx: 36,
       accentColor: '#f3e7d0',
@@ -600,7 +600,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'pluto-dwarf',
       displayName: 'むかしは わくせいだった',
-      description: 'いまは じゅんわくせいと よばれて いるよ。',
+      description: 'にた ほしが たくさん みつかって、いまは じゅんわくせいと よばれて いるよ。',
       target: { kind: 'surface', lonDeg: -60, latDeg: 30 },
       hitRadiusPx: 34,
       accentColor: '#f3e7d0',
@@ -608,7 +608,7 @@ export const featureSpotsByBodyId: Record<CelestialBodyId, readonly FeatureSpot[
     {
       id: 'pluto-cold',
       displayName: 'とても さむい',
-      description: 'とおくて さむく、たいようも ちいさく みえるよ。',
+      description: 'マイナス 230どくらい。たいようも ちいさな ほしに みえるよ。',
       target: { kind: 'surface', lonDeg: 140, latDeg: 20 },
       hitRadiusPx: 34,
       accentColor: '#f3e7d0',

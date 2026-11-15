@@ -1031,6 +1031,75 @@ button.window:focus-visible,
   animation: cutInStamp 1.8s steps(36) forwards;
 }
 
+/* たいあたり: いなずまの おびを まっすぐ つきぬける。 */
+.cutIn[data-variant='rush'] .cutInBand {
+  background: linear-gradient(110deg, #192547, var(--team) 65%, #fff19b);
+  animation-name: cutInRushBand;
+}
+.cutIn[data-variant='rush'] .cutInLines {
+  background: repeating-linear-gradient(165deg, transparent 0 22px, #fff9 23px 27px, transparent 28px 44px);
+}
+.cutIn[data-variant='rush'] .cutInBeetle { animation-name: cutInRushBeetle; }
+
+/* はさみ: りょうがわから とじる あごと、がっちり とまる むし。 */
+.cutIn[data-variant='pincer'] .cutInBand {
+  background: radial-gradient(ellipse at 30% 50%, #ddfff1, #126454 55%, #082d38);
+  border-color: #a6ffe3;
+}
+.cutIn[data-variant='pincer'] .cutInLines {
+  background: linear-gradient(135deg, #b8fff5 0 22%, transparent 22% 78%, #b8fff5 78%);
+  mask-image: none;
+  animation: cutInPincer .55s ease-out both;
+}
+.cutIn[data-variant='pincer'] .cutInBeetle { animation-name: cutInGrip; }
+.cutIn[data-variant='pincer'] .cutInShout { color: #dcfff4; }
+
+/* なげ: ほしの うずと ともに したから はねあがる。 */
+.cutIn[data-variant='throw'] .cutInBand {
+  background: radial-gradient(ellipse at 25% 70%, #f8bbff, #7238b1 55%, #241548);
+  border-color: #ffe394;
+  animation-name: cutInThrowBand;
+}
+.cutIn[data-variant='throw'] .cutInLines {
+  background: repeating-conic-gradient(from 15deg at 25% 65%, transparent 0deg 20deg, #fff5 21deg 25deg, transparent 26deg 40deg);
+  animation: cutInArc 1.8s ease-out both;
+}
+.cutIn[data-variant='throw'] .cutInBeetle { animation-name: cutInToss; }
+
+@keyframes cutInRushBand {
+  0% { transform: translate(-130%, -50%) skewX(-18deg); }
+  17%, 86% { transform: translate(0, -50%) skewX(-5deg); }
+  100% { transform: translate(130%, -50%) skewX(-18deg); }
+}
+@keyframes cutInRushBeetle {
+  0%, 6% { transform: translateX(-100%) scale(.7); }
+  22% { transform: translateX(12%) scale(1.1); }
+  32%, 100% { transform: translateX(0) scale(1); }
+}
+@keyframes cutInPincer {
+  from { transform: scaleX(2.4); opacity: 0; }
+  to { transform: scaleX(1); opacity: .8; }
+}
+@keyframes cutInGrip {
+  0%, 6% { transform: scale(1.8); opacity: 0; }
+  20% { transform: scale(.85); opacity: 1; }
+  30%, 100% { transform: scale(1); opacity: 1; }
+}
+@keyframes cutInThrowBand {
+  0% { transform: translateY(100%) rotate(12deg); opacity: 0; }
+  18%, 86% { transform: translateY(-50%) rotate(-7deg); opacity: 1; }
+  100% { transform: translateY(-200%) rotate(-12deg); opacity: 0; }
+}
+@keyframes cutInToss {
+  0%, 6% { transform: translateY(100%) rotate(-40deg); }
+  24% { transform: translateY(-10%) rotate(8deg); }
+  36%, 100% { transform: translateY(0) rotate(0); }
+}
+@keyframes cutInArc {
+  from { transform: rotate(-20deg) scale(1.4); }
+  to { transform: rotate(15deg) scale(1.4); }
+}
+
 @keyframes cutInDim {
   0%, 85% { opacity: 1; }
   100% { opacity: 0; }
@@ -1253,7 +1322,10 @@ button.window:focus-visible,
   .cutInBeetle,
   .cutInShout,
   .cutInShout span,
-  .cutInLabel {
+  .cutInLabel,
+  .cutIn[data-variant] .cutInBand,
+  .cutIn[data-variant] .cutInLines,
+  .cutIn[data-variant] .cutInBeetle {
     animation: none;
   }
 

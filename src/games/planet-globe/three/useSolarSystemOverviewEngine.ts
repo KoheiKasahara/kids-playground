@@ -9,7 +9,7 @@ import type {
 } from '../types'
 import { CAMERA_FAR, CAMERA_NEAR, fitDistance } from './planetCamera'
 import { axialTiltRotationZ, createRingMeshes } from './planetRing'
-import { createSunCoronaMaterial, createSunSurfaceMaterial, SUN_CORONA_SCALE, updateSunSurfaceMaterial } from './sunVisual'
+import { createSunCoronaMaterial, createSunGlow, createSunSurfaceMaterial, SUN_CORONA_SCALE, updateSunSurfaceMaterial } from './sunVisual'
 import { createStarField, disposeStarField } from './starField'
 import { renderPixelRatioForDevice } from './renderQuality'
 import {
@@ -128,7 +128,8 @@ export function useSolarSystemOverviewEngine(
     let controls: OrbitControls | null = null
     let starField: THREE.Points | null = null
 
-    const sphereGeometry = new THREE.SphereGeometry(1, 20, 14)
+    // 小さな球でも輪郭がカクつかない程度の分割数(1つの共有ジオメトリなので負荷はほぼ変わらない)。
+    const sphereGeometry = new THREE.SphereGeometry(1, 32, 20)
     const orbitLineGeometry = new THREE.BufferGeometry()
     {
       const positions = new Float32Array((ORBIT_LINE_SEGMENTS + 1) * 3)
@@ -271,6 +272,11 @@ export function useSolarSystemOverviewEngine(
       const corona = new THREE.Mesh(sphereGeometry, coronaMaterial)
       corona.scale.setScalar(overviewRadius * SUN_CORONA_SCALE)
       sunRoot.add(corona)
+      const glow = createSunGlow(overviewRadius)
+      if (glow !== null) {
+        disposableMaterials.push(glow.material)
+        sunRoot.add(glow)
+      }
 
       const label = buildLabel(body.displayName, overviewRadius)
       if (label !== null) sunRoot.add(label)

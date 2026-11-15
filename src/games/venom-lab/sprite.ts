@@ -1,6 +1,7 @@
 // いきもの ごとの もけいを えらんで、ポーズごとの ドット絵（コマ）を つくる。
 // おなじ コマは 1かいだけ つくって しまっておく。
 
+import { EXTRA_MOVES } from './extra'
 import type { Species, SpriteKind } from './data'
 import { frog, newt, toad } from './amphibians'
 import { centipede, hornet, lizard, scorpion, spider } from './bugs'
@@ -21,7 +22,8 @@ const BUILDERS: Record<SpriteKind, Builder> = {
 /** いきものの ポーズを 1コマ ドット絵に する。scale は こまかさ（ちいさな カードは 1）。 */
 export function renderFrame(sp: Species, pose: Pose, scale = DETAIL): Frame {
   const model = new Model()
-  const look = BUILDERS[sp.sprite](model, pose, sp)
+  const look = BUILDERS[sp.sprite](model, pose.clip === 'extra' ? { clip: 'idle', t: 0 } : pose, sp)
+  if (pose.clip === 'extra') EXTRA_MOVES[sp.id].animate(model, pose.t)
   return rasterize(model, sp.colors, look?.tint ?? undefined, scale)
 }
 
@@ -54,7 +56,7 @@ export function detailScale() {
   return typeof window !== 'undefined' && (window.devicePixelRatio || 1) < 1.5 ? 3 : DETAIL
 }
 
-const poseAt = (clip: ClipName, index: number, count: number) => ({ clip, t: count <= 1 ? 0 : clip === 'act' || clip === 'habit' ? index / (count - 1) : index / count })
+const poseAt = (clip: ClipName, index: number, count: number) => ({ clip, t: count <= 1 ? 0 : clip === 'act' || clip === 'habit' || clip === 'extra' ? index / (count - 1) : index / count })
 
 /** clip の count コマの うち index ばんめ。 */
 export function frameOf(sp: Species, clip: ClipName, index: number, count: number, scale = DETAIL): Frame {
@@ -117,7 +119,7 @@ function schedule() {
 export function prewarm(sp: Species, counts: Record<ClipName, number>, scale = DETAIL) {
   if (queued.has(sp.id)) return
   queued.add(sp.id)
-  for (const clip of ['idle', 'move', 'act', 'habit'] as const) {
+  for (const clip of ['idle', 'move', 'act', 'habit', 'extra'] as const) {
     for (let i = 0; i < counts[clip]; i++) queue.push(() => { if (queued.has(sp.id)) frameOf(sp, clip, i, counts[clip], scale) })
   }
   schedule()
