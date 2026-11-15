@@ -24,15 +24,15 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 function setup() {
   let engine!: ReturnType<typeof useMarbleEngine>
-  const onCommit = vi.fn(), onPhase = vi.fn(), onSelect = vi.fn()
+  const onCommit = vi.fn(), onPhase = vi.fn(), onSelect = vi.fn(), onHint = vi.fn()
   const course = initialCourse()
   function Harness() {
-    engine = useMarbleEngine({ course, selectedId: 'part-0', onCommit, onPhase, onSelect, onSnap: vi.fn() })
+    engine = useMarbleEngine({ course, selectedId: 'part-0', onCommit, onPhase, onSelect, onSnap: vi.fn(), onHint })
     const { registerContainer } = engine
     return <div ref={registerContainer} />
   }
   const result = render(<Harness />)
-  return { ...result, current: () => engine, onCommit, onPhase, onSelect }
+  return { ...result, current: () => engine, onCommit, onPhase, onSelect, onHint }
 }
 
 it('owns one world per run and disposes worlds, scene and RAF on stop/exit', async () => {
@@ -86,6 +86,20 @@ it('rolls back interrupted palette drags and removes its window listeners', asyn
   expect(app.onCommit).not.toHaveBeenCalled()
   app.unmount()
   act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { pointerId: 1 })))
+  expect(app.onCommit).not.toHaveBeenCalled()
+})
+
+it('shows no preview or hint for a palette press the browser turns into a palette swipe', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.current().status).toBe('ready'))
+  const scene = mocks.createScene.mock.results[0]!.value
+  const pointer = (type: string, x: number) => Object.assign(new Event(type), { pointerId: 5, clientX: x, clientY: 500, button: 0 }) as PointerEvent
+  scene.update.mockClear()
+  act(() => app.current().palette('curveRight', pointer('pointerdown', 300)))
+  act(() => window.dispatchEvent(pointer('pointermove', 290)))
+  act(() => window.dispatchEvent(pointer('pointercancel', 280)))
+  expect(scene.update.mock.calls.every(([course]: [{ parts: unknown[] }]) => course.parts.length === 1)).toBe(true)
+  expect(app.onHint).not.toHaveBeenCalled()
   expect(app.onCommit).not.toHaveBeenCalled()
 })
 
