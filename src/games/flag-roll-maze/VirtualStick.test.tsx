@@ -58,24 +58,29 @@ describe('VirtualStick', () => {
   test('デッドゾーン内のわずかな移動ではNEUTRAL_TILTのまま、ノブだけ見た目が動く', () => {
     const { onTiltChange, base, knob } = renderStick()
 
+    const centeredTransform = knob.style.transform
+
     // 半径60に対して5pxはデッドゾーン(0.18)の内側。
     fireEvent.pointerDown(base, { pointerId: 1, clientX: 65, clientY: 60 })
 
     const tilt = onTiltChange.mock.calls.at(-1)?.[0]
     expect(tilt).toEqual(NEUTRAL_TILT)
-    expect(knob.style.transform).not.toBe('translate(0px, 0px)')
+    expect(knob.style.transform).not.toBe(centeredTransform)
   })
 
   test('指を離すとNEUTRAL_TILTを1回通知し、ノブは中央へ戻る', () => {
     const { onTiltChange, base, knob } = renderStick()
+    const centeredTransform = knob.style.transform
+    expect(centeredTransform).toMatch(/^translate\(0px(?:,\s*0px)?\)$/)
 
     fireEvent.pointerDown(base, { pointerId: 1, clientX: 100, clientY: 100 })
+    expect(knob.style.transform).not.toBe(centeredTransform)
     onTiltChange.mockClear()
     fireEvent.pointerUp(base, { pointerId: 1, clientX: 100, clientY: 100 })
 
     expect(onTiltChange).toHaveBeenCalledTimes(1)
     expect(onTiltChange).toHaveBeenCalledWith(NEUTRAL_TILT)
-    expect(knob.style.transform).toBe('translate(0px, 0px)')
+    expect(knob.style.transform).toBe(centeredTransform)
   })
 
   test('disabledのときはpointerdownを押しても何も通知しない', () => {

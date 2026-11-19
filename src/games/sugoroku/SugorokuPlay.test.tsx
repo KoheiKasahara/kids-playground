@@ -174,7 +174,8 @@ describe('SugorokuPlay', () => {
     expect(screen.getByRole('button', { name: 'はじめる！' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ふたり' })).toHaveAttribute('aria-pressed', 'true')
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
-    advance(1)
+    // Allow two browser frames for jsdom's asynchronous focus cleanup.
+    advance(34)
     expect(vi.getTimerCount()).toBe(0)
   })
 

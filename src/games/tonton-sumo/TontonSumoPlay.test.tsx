@@ -78,7 +78,8 @@ describe('TontonSumoPlay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'えらびなおす' }))
     expect(screen.getByRole('button', { name: /ひとりで/ })).toBeInTheDocument()
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
-    advance(1) // jsdom queues a selectionchange after focus moves
+    // Allow two browser frames for jsdom's asynchronous focus cleanup.
+    advance(34)
     expect(vi.getTimerCount()).toBe(0)
   })
 
