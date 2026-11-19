@@ -1,9 +1,9 @@
-import type { BuildingId, NetworkId, TilePart } from './parts'
-import { COLS, ROWS, type Ground, type Tile, type Town } from './town'
+import { isLarge, scalesOf, type BuildingId, type NetworkId, type Scale, type TilePart } from './parts'
+import { COLS, footprintOf, ROWS, type Ground, type Tile, type Town } from './town'
 
 // はじめの せかいを つくる。たね（seed）が おなじなら おなじ せかい、ちがえば ちがう かたちに なる。
 // どの せかいも ちずの まんなかに ちいさな むらと、でんしゃが まわる せんろの わと えきが あり、
-// とおくに みつけて うれしい ものを かくして おく。まっさらな ちずは maps.ts が もつ。
+// とおくに みつけて うれしい もの（おおきな おしろ・ピラミッド・やま など）を かくして おく。まっさらな ちずは maps.ts が もつ。
 
 export type WorldId = 'river' | 'island' | 'forest' | 'city' | 'rail' | 'castle' | 'snow' | 'desert'
 
@@ -58,10 +58,21 @@ function noiseOf(random: Random): (x: number, y: number) => number {
   }
 }
 
+/** おおきな たてものの おきかた。 */
+type BigOptions = {
+  /** ほかの たてものも どけて おく（みち・せんろ・みずの うえには おかない）。 */
+  readonly force?: boolean
+  /** あしもとを この じめんに する（みずも うめたてる）。 */
+  readonly ground?: Exclude<Ground, 'water'>
+}
+
 /** つくりかけの ちず。 */
 class Land {
   private readonly ground: Ground[]
   private readonly part: (TilePart | null)[] = new Array<TilePart | null>(COLS * ROWS).fill(null)
+  /** 2マス いじょうの たてものの ひだりうえの マス（ない ときは undefined）と おおきさ。 */
+  private readonly anchor: (number | undefined)[] = new Array<number | undefined>(COLS * ROWS).fill(undefined)
+  private readonly scale: Scale[] = new Array<Scale>(COLS * ROWS).fill(1)
 
   constructor(ground: Ground) {
     this.ground = new Array<Ground>(COLS * ROWS).fill(ground)
@@ -87,6 +98,7 @@ class Land {
   paint(c: number, r: number, ground: Ground): void {
     if (!this.inside(c, r)) return
     const index = r * COLS + c
+    if (ground === 'water') this.unplace(index)
     this.ground[index] = ground
     const part = this.part[index]
     if (ground === 'water' && part !== 'road' && part !== 'rail' && part !== 'crossing') this.part[index] = null
@@ -108,20 +120,61 @@ class Land {
     if (!this.inside(c, r)) return false
     const index = r * COLS + c
     const current = this.part[index]
-    if (this.ground[index] === 'water' || (current !== null && !NATURE.has(current))) return false
+    if (this.ground[index] === 'water' || this.anchor[index] !== undefined || (current !== null && !NATURE.has(current))) return false
     this.part[index] = part
     return true
   }
 
   /** だいじな たてものを、みちや ほかの たてものの うえでも おく（みずの うえ いがい）。 */
   replace(c: number, r: number, part: BuildingId): void {
-    if (this.inside(c, r) && this.ground[r * COLS + c] !== 'water') this.part[r * COLS + c] = part
+    if (!this.inside(c, r) || this.ground[r * COLS + c] === 'water') return
+    this.unplace(r * COLS + c)
+    this.part[r * COLS + c] = part
+  }
+
+  /**
+   * 2マス いじょうを つかう おおきな たてもの・しぜんを、ひだりうえを c, r に して おく。
+   * き・はなは どけて おく。みち・せんろの うえと、ちずから はみでる ときは おかない（false）。
+   */
+  big(c: number, r: number, part: BuildingId, scale: Scale, options: BigOptions = {}): boolean {
+    const anchor = r * COLS + c
+    const cells = this.inside(c, r) && scalesOf(part).includes(scale) ? footprintOf(anchor, part, scale) : null
+    if (!cells) return false
+    const blocked = cells.some((index) => {
+      const current = this.part[index]
+      if (current === 'road' || current === 'rail' || current === 'crossing') return true
+      if (this.ground[index] === 'water' && !options.ground) return true
+      return !options.force && current !== null && (this.anchor[index] !== undefined || !NATURE.has(current))
+    })
+    if (blocked) return false
+    for (const index of cells) this.unplace(index)
+    const large = isLarge(part, scale)
+    for (const index of cells) {
+      if (options.ground) this.ground[index] = options.ground
+      this.part[index] = part
+      this.anchor[index] = large ? anchor : undefined
+      this.scale[index] = scale
+    }
+    return true
+  }
+
+  /** その マスに のって いる おおきな たてものを まるごと どける。 */
+  private unplace(index: number): void {
+    const anchor = this.anchor[index]
+    const part = this.part[index]
+    if (anchor === undefined || part === null || part === 'road' || part === 'rail' || part === 'crossing') return
+    for (const cell of footprintOf(anchor, part, this.scale[index]) ?? [index]) {
+      this.part[cell] = null
+      this.anchor[cell] = undefined
+      this.scale[cell] = 1
+    }
   }
 
   /** みち・せんろを ひく。かさなると ふみきり、みずの うえは はしに なる。 */
   way(kind: NetworkId, c: number, r: number): void {
     if (!this.inside(c, r)) return
     const index = r * COLS + c
+    this.unplace(index)
     const current = this.part[index]
     if (current === kind || current === 'crossing') return
     this.part[index] = current === 'road' || current === 'rail' ? 'crossing' : kind
@@ -136,8 +189,9 @@ class Land {
   /** まるの なかの き・はなを かたづけて ひろばに する。 */
   clear(c: number, r: number, radius: number): void {
     this.each((x, y) => {
-      const part = this.part[y * COLS + x]
-      if (part !== null && NATURE.has(part) && Math.hypot(x - c, y - r) <= radius) this.part[y * COLS + x] = null
+      const index = y * COLS + x
+      const part = this.part[index]
+      if (part !== null && NATURE.has(part) && this.anchor[index] === undefined && Math.hypot(x - c, y - r) <= radius) this.part[index] = null
     })
   }
 
@@ -149,6 +203,11 @@ class Land {
     const cache = new Map<string, Tile>()
     return this.ground.map((ground, index) => {
       const part = this.part[index]
+      const anchor = this.anchor[index]
+      if (anchor !== undefined && part !== null) {
+        const scale = this.scale[index]
+        return scale > 1 ? { ground, part, anchor, scale } : { ground, part, anchor }
+      }
       const key = `${ground}:${part}`
       let tile = cache.get(key)
       if (!tile) {
@@ -230,11 +289,15 @@ function riverWorld(random: Random): Land {
   railLoop(land, C - 8, R - 6, C + 6, R + 6)
   putAll(land, [
     [C - 4, R - 1, 'house'], [C - 2, R - 1, 'house-blue'], [C - 2, R + 1, 'shop'], [C - 5, R + 1, 'tree'], [C + 3, R + 2, 'flowers'],
-    // きたの はたけと ふうしゃ、にしの ふんすい、はしの むこうの おしろ。
-    [C + 1, 11, 'farm'], [C + 2, 11, 'farm'], [C + 1, 12, 'farm'], [C + 2, 12, 'farm'], [C + 3, 11, 'windmill'], [C - 1, 12, 'park'],
-    [7, R, 'fountain'], [7, R - 1, 'sakura'], [7, R + 1, 'sakura'],
-    [45, R, 'castle'], [45, R - 1, 'flowers'], [45, R + 1, 'flowers'],
+    // きたの はたけ、にしの ふんすい。
+    [C + 1, 11, 'farm'], [C + 2, 11, 'farm'], [C + 1, 12, 'farm'], [C + 2, 12, 'farm'], [C - 1, 12, 'park'], [7, R, 'fountain'],
   ])
+  // はたけの おおきな ふうしゃ、ふんすいを はさむ おおきな さくら、はしの むこうの おおきな おしろ。
+  if (!land.big(C + 3, 11, 'windmill', 2, { force: true })) land.put(C + 3, 11, 'windmill')
+  land.big(5, R - 2, 'sakura', 2, { force: true })
+  land.big(5, R + 1, 'sakura', 2, { force: true })
+  if (!land.big(45, R - 1, 'castle', 2, { force: true })) land.put(45, R, 'castle')
+  putAll(land, [[45, R - 2, 'flowers'], [46, R - 2, 'flowers'], [45, R + 1, 'flowers'], [46, R + 1, 'flowers']])
   return land
 }
 
@@ -263,12 +326,13 @@ function islandWorld(random: Random): Land {
   for (let c = C + 12; c > C; c -= 1) {
     if (land.groundAt(c, R - 2) === 'sand' && land.put(c, R - 2, 'lighthouse')) break
   }
-  // ほかの しまには たからもの。いちばん とおい しまに おしろ。
+  // ほかの しまには おおきな たからもの。いちばん とおい しまに おしろ。
   const others = isles.slice(1).sort((a, b) => Math.hypot(b.c - C, b.r - R) - Math.hypot(a.c - C, a.r - R))
   others.forEach((isle, index) => {
     land.paint(isle.c, isle.r, 'grass')
     land.clear(isle.c, isle.r, 1.5)
-    land.put(isle.c, isle.r, index === 0 ? 'castle' : pick(random, ['windmill', 'tent', 'fountain', 'lighthouse', 'pyramid'] as const))
+    const part = index === 0 ? 'castle' : pick(random, ['windmill', 'tent', 'fountain', 'lighthouse', 'pyramid'] as const)
+    if (!land.big(isle.c, isle.r, part, 2, { ground: 'grass' })) land.put(isle.c, isle.r, part)
   })
   return land
 }
@@ -292,11 +356,14 @@ function forestWorld(random: Random): Land {
     [C - 3, R - 1, 'house'], [C + 1, R - 1, 'house-blue'], [C - 1, R + 1, 'cake'], [C + 3, R + 1, 'tent'], [C + 4, R - 1, 'tent'],
     [C + 5, R - 2, 'windmill'], [C - 5, R + 2, 'farm'], [C - 4, R + 2, 'farm'], [C - 5, R + 3, 'farm'], [C - 4, R + 3, 'farm'], [C + 1, R + 2, 'fountain'],
   ])
-  // もりの おくの ひみつの おしろ。
+  // もりの おくの ひみつの とくだいの おしろ。まえに はなと ふんすい。
   const hidden = { c: pick(random, [int(random, 6, 12), int(random, COLS - 13, COLS - 7)]), r: int(random, 6, 14) }
   land.blob(random, hidden.c, hidden.r, 2.2, 'grass')
   land.clear(hidden.c, hidden.r, 2.4)
-  putAll(land, [[hidden.c, hidden.r, 'castle'], [hidden.c - 1, hidden.r + 1, 'flowers'], [hidden.c + 1, hidden.r + 1, 'flowers'], [hidden.c, hidden.r + 2, 'fountain']])
+  land.big(hidden.c - 1, hidden.r - 2, 'castle', 3, { force: true, ground: 'grass' })
+  putAll(land, [[hidden.c - 1, hidden.r + 1, 'flowers'], [hidden.c + 1, hidden.r + 1, 'flowers'], [hidden.c, hidden.r + 2, 'fountain']])
+  // むらの ひがしの もりに そびえる とくだいの き。
+  land.big(C + 9, R - 4, 'tree', 3, { force: true, ground: 'grass' })
   return land
 }
 
@@ -337,12 +404,20 @@ function cityWorld(random: Random): Land {
       }
     }
   }
-  const landmarks: readonly (readonly [number, number, BuildingId])[] = [
-    [C - 1, R - 1, 'tv-tower'], [C + 1, R + 1, 'depart'], [first + 1, first + 3, 'school'], [first + 6, last - 3, 'hospital'],
+  // おおきな たてものは ひだりうえの マス。まんなかの まわりに とくだいの タワーと タワーマンション、
+  // まわりの ブロック まるごとに スタジアム・どうぶつえん・くうこう。
+  const landmarks: readonly (readonly [number, number, BuildingId, Scale?])[] = [
+    [C - 3, R - 3, 'tv-tower', 3], [C + 1, R + 1, 'depart', 2], [C + 1, R - 2, 'tower', 2], [C - 2, R + 1, 'tower', 2],
+    [first + 1, first + 3, 'school', 2], [first + 6, last - 3, 'hospital', 2],
+    [C + 1, first + 1, 'stadium', 2], [first + 1, C + 1, 'zoo', 2], [last - 4, last - 4, 'airport', 2],
     [last - 4, first + 2, 'fire'], [first + 3, last - 1, 'police'], [last - 1, first + 6, 'factory'], [last - 1, first + 7, 'factory'],
     [C + 1, last - 1, 'ferris'], [C - 1, 36, 'station'],
   ]
-  for (const [c, r, part] of landmarks) {
+  for (const [c, r, part, scale = 1] of landmarks) {
+    if (scale > 1) {
+      land.big(c, r, part, scale, { force: true })
+      continue
+    }
     land.clear(c, r, 0)
     if (!land.put(c, r, part)) land.replace(c, r, part)
   }
@@ -368,9 +443,12 @@ function railWorld(random: Random): Land {
   land.line('road', 3, R, 44, R)
   land.line('road', C, 4, C, 43)
   for (const [c, r] of [[C, R], [C, 5], [C, 42], [4, R], [43, R]] as const) land.clear(c, r, 3)
+  // おおきな えきが 4つ。どれも せんろと みちの りょうほうに となる。
+  for (const [c, r] of [[C - 2, loop.r0 + 1], [C + 1, loop.r1 - 2], [loop.c0 + 1, R - 2], [loop.c1 - 2, R + 1]] as const) {
+    land.big(c, r, 'station', 2, { force: true, ground: 'grass' })
+  }
   const homes = ['house', 'house-blue', 'house', 'shop', 'cake'] as const
   putAll(land, [
-    [C - 1, loop.r0 + 1, 'station'], [C + 1, loop.r1 - 1, 'station'], [loop.c0 + 1, R - 1, 'station'], [loop.c1 - 1, R + 1, 'station'],
     [C - 2, R - 1, 'house'], [C + 2, R - 1, 'house-blue'], [C - 2, R + 1, 'shop'], [C + 2, R + 1, 'cake'], [C - 1, R - 3, 'park'],
     [C - 1, 5, pick(random, homes)], [C + 1, 5, pick(random, homes)], [C - 1, 7, 'house'],
     [C - 1, 42, 'apartment'], [C + 1, 42, pick(random, homes)], [C + 1, 40, 'house-blue'],
@@ -395,10 +473,13 @@ function castleWorld(random: Random): Land {
     const distance = Math.max(Math.abs(c - C), Math.abs(r - R))
     if (distance === 4) land.paint(c, r, 'water')
   })
-  land.line('road', C - 9, R, C + 10, R)
-  land.line('road', C, R - 8, C, R + 9)
+  // まんなかの とくだいの おしろへ、4ほうから みちが のびる（おほりは はしで わたる）。
+  land.line('road', C - 9, R, C - 2, R)
+  land.line('road', C + 2, R, C + 10, R)
+  land.line('road', C, R - 8, C, R - 2)
+  land.line('road', C, R + 2, C, R + 9)
   railLoop(land, C - 6, R - 6, C + 6, R + 6)
-  land.replace(C, R, 'castle')
+  land.big(C - 1, R - 1, 'castle', 3, { force: true })
   for (let r = R - 3; r <= R + 3; r += 1) {
     for (let c = C - 3; c <= C + 3; c += 1) {
       const dc = Math.abs(c - C)
@@ -436,9 +517,13 @@ function snowWorld(random: Random): Land {
   railLoop(land, C - 7, R - 5, C + 7, R + 6)
   putAll(land, [
     [C - 5, R - 1, 'igloo'], [C - 3, R - 1, 'igloo'], [C + 2, R - 1, 'igloo'], [C + 4, R - 1, 'house'], [C - 3, R + 1, 'shop'],
-    [C - 1, R + 1, 'snowman'], [C + 2, R + 1, 'snowman'], [C + 5, R + 1, 'pine'], [C - 1, R + 9, 'windmill'], [C + 1, R + 8, 'igloo'],
-    [C - 9, R, 'tent'], [C + 9, R, 'ferris'],
+    [C - 1, R + 1, 'snowman'], [C + 5, R + 1, 'pine'], [C - 1, R + 9, 'windmill'], [C + 1, R + 8, 'igloo'], [C - 9, R, 'tent'],
   ])
+  // おおきな ゆきだるまと、みちの はしの おおきな かんらんしゃ。
+  land.big(C + 2, R + 1, 'snowman', 2, { force: true })
+  if (!land.big(C + 9, R - 1, 'ferris', 2, { force: true })) land.put(C + 9, R, 'ferris')
+  // きたに ならぶ おおきな やま（かわに かかる ときは おかない）。
+  for (const c of [3, 13, 27, 38]) land.big(c, int(random, 1, 3), 'mountain', 2, { force: true })
   return land
 }
 
@@ -468,12 +553,12 @@ function desertWorld(random: Random): Land {
   land.line('road', C, R, C, R - 3)
   railLoop(land, C - 7, R - 2, C + 7, R + 7)
   putAll(land, [[C - 4, R - 1, 'house'], [C - 2, R - 1, 'house-blue'], [C + 2, R - 1, 'shop'], [C + 4, R + 1, 'tent'], [C - 3, R + 1, 'house']])
+  // とくだい・おおきい・ちいさい の じゅんに ならぶ ピラミッドと、みなみの おおきな ピラミッド。
   const site = { c: int(random, 34, 40), r: int(random, 8, 14) }
-  for (const [dc, dr] of [[0, 0], [2, 1], [-1, 3]] as const) {
-    land.clear(site.c + dc, site.r + dr, 1.5)
-    land.put(site.c + dc, site.r + dr, 'pyramid')
+  for (const [dc, dr, scale] of [[-2, 0, 3], [2, 1, 2], [5, 2, 1]] as const) {
+    land.big(site.c + dc, site.r + dr, 'pyramid', scale, { force: true, ground: 'sand' })
   }
-  land.put(int(random, 30, 42), int(random, 34, 42), 'pyramid')
+  land.big(int(random, 30, 41), int(random, 34, 41), 'pyramid', 2, { force: true, ground: 'sand' })
   return land
 }
 

@@ -270,15 +270,15 @@ it('switches between day and night and limits zooming in and out', async () => {
   // いちばん ちいさく みても、えがくのは ちずの いちぶ だけ。
   expect(mapTiles(container).length).toBeGreaterThan(before)
   expect(mapTiles(container).length).toBeLessThan(COLS * COLS / 2)
-  expect(tile('25-25 みち')).toBeInTheDocument()
+  expect(tile('23-25 みち')).toBeInTheDocument()
 })
 
 it('restarts only this map after confirming, and the restart can be undone', async () => {
   const user = userEvent.setup()
   mount()
   await open(user, 'starter')
-  await user.click(tile('21-21 き'))
-  expect(readSlot('starter')?.[at(21, 21)].part).toBe('house')
+  await user.click(tile('25-27 き'))
+  expect(readSlot('starter')?.[at(25, 27)].part).toBe('house')
 
   await user.click(screen.getByRole('button', { name: 'この まちを さいしょから' }))
   expect(screen.getByRole('dialog', { name: 'はじめの まちを さいしょから つくる？' })).toBeInTheDocument()
@@ -289,15 +289,15 @@ it('restarts only this map after confirming, and the restart can be undone', asy
   await user.click(screen.getByRole('button', { name: 'この まちを さいしょから' }))
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(tile('21-21 あかい おうち・みちが ほしい')).toBeInTheDocument()
+  expect(tile('25-27 あかい おうち・みちが ほしい')).toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'この まちを さいしょから' }))
   await user.click(screen.getByRole('button', { name: 'さいしょから' }))
-  expect(tile('21-21 き')).toBeInTheDocument()
+  expect(tile('25-27 き')).toBeInTheDocument()
   expect(readSlot('starter')).toBeNull()
   await user.click(screen.getByRole('button', { name: 'ひとつ もどす' }))
-  expect(tile('21-21 あかい おうち・みちが ほしい')).toBeInTheDocument()
-  expect(readSlot('starter')?.[at(21, 21)].part).toBe('house')
+  expect(tile('25-27 あかい おうち・みちが ほしい')).toBeInTheDocument()
+  expect(readSlot('starter')?.[at(25, 27)].part).toBe('house')
 })
 
 it('makes a differently shaped world each time a world starts over, and keeps it', async () => {
@@ -332,7 +332,7 @@ it('goes back to the map choice, shows which maps can be continued, and keeps ea
   const user = userEvent.setup()
   mount()
   await open(user, 'lake')
-  await user.click(tile('20-21 くさはら'))
+  await user.click(tile('22-20 くさはら'))
   await user.click(screen.getByRole('button', { name: 'ちずを えらぶ' }))
   expect(playTownSound).toHaveBeenLastCalledWith('select')
   expect(screen.queryByRole('group', { name: /まちの ちず/ })).not.toBeInTheDocument()
@@ -345,7 +345,7 @@ it('goes back to the map choice, shows which maps can be continued, and keeps ea
   expect(screen.queryByRole('button', { name: /あかい おうち・みちが ほしい/ })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'ちずを えらぶ' }))
   await user.click(screen.getByRole('button', { name: 'やまと みずうみ・つづきから' }))
-  expect(tile('20-21 あかい おうち・みちが ほしい')).toBeInTheDocument()
+  expect(tile('22-20 あかい おうち・みちが ほしい')).toBeInTheDocument()
 })
 
 it('continues an old 14×14 single save as the starter town and ignores broken saves', async () => {

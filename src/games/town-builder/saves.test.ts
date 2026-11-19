@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMapTown, MAPS, STAMP_LEFT, STAMP_TOP } from './maps'
+import { createMapTown, MAPS } from './maps'
 import { clearSlot, LEGACY_SAVE_KEY, legacySlotOf, migrateLegacySave, readAllSlots, readSlot, slotKey, writeSlot, type SaveStore } from './saves'
 import { applyTool, COLS, encodeTown } from './town'
 import { createWorld } from './worlds'
@@ -14,8 +14,9 @@ function memoryStore(initial: Record<string, string> = {}): SaveStore & { data: 
   }
 }
 
-/** 14×14 の なかの ばしょを、ひろい ちずの ばんごうに する。 */
-const inStamp = (col: number, row: number) => (STAMP_TOP + row) * COLS + STAMP_LEFT + col
+/** まえの 14×14 の ほぞんの なかの ばしょを、ひろい ちずの ばんごうに する（まんなかに おかれる）。 */
+const LEGACY_EDGE = (COLS - 14) / 2
+const inStamp = (col: number, row: number) => (LEGACY_EDGE + row) * COLS + LEGACY_EDGE + col
 
 /** ちずを えらべなかった ころの ほぞん（14×14 で おおきさの ない version 1）。 */
 function legacySave(): string {
