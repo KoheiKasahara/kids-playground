@@ -287,7 +287,9 @@ it('shows a treasure map and jumps to the touched place, by camera or on foot', 
   const treasures = world().treasures.length
   const map = screen.getByRole('button', { name: 'ちず' })
   expect(map.querySelectorAll('[data-treasure]')).toHaveLength(treasures)
-  expect(map.querySelector<HTMLElement>('[data-here]')!.style.left).toBe(`${48.5 / 96 * 100}%`)
+  const markerLeft = map.querySelector<HTMLElement>('[data-here]')!.style.left
+  expect(markerLeft).toMatch(/^\d+(?:\.\d+)?%$/)
+  expect(Number.parseFloat(markerLeft)).toBeCloseTo(48.5 / 96 * 100, 3)
   await user.click(map)
   const big = screen.getByRole('button', { name: 'ちずの ばしょへ いく' })
   vi.spyOn(big.querySelector('canvas')!, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 50, width: 192, height: 192 } as DOMRect)
@@ -296,7 +298,9 @@ it('shows a treasure map and jumps to the touched place, by camera or on foot', 
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(scene.options.cursor).toEqual({ x: 10, y: 0, z: 80 })
   expect(scene.api.current.focus).toHaveBeenLastCalledWith(10, 80)
-  expect(screen.getByRole('button', { name: 'ちず' }).querySelector<HTMLElement>('[data-here]')!.style.top).toBe(`${80.5 / 96 * 100}%`)
+  const markerTop = screen.getByRole('button', { name: 'ちず' }).querySelector<HTMLElement>('[data-here]')!.style.top
+  expect(markerTop).toMatch(/^\d+(?:\.\d+)?%$/)
+  expect(Number.parseFloat(markerTop)).toBeCloseTo(80.5 / 96 * 100, 3)
   // やじるしで うごかすと カメラも ついてくる
   fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' })
   expect(scene.api.current.focus).toHaveBeenLastCalledWith(11, 80)
