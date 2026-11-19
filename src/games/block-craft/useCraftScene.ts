@@ -18,6 +18,8 @@ export type SceneApi = {
   actAtCenter: (kind: 'pick' | 'hold') => void
   /** そらから ながめる カメラを、その ばしょの うえへ はこぶ（むきと きょりは そのまま）。 */
   focus: (x: number, z: number) => void
+  /** ばくだんが はじけた ばしょに かけらを とばす。 */
+  burst: (at: readonly Position[]) => void
 }
 export type CraftSceneOptions = {
   world: World
@@ -33,6 +35,8 @@ export type CraftSceneOptions = {
   onHold?: (position: Position) => void
   /** どうぶつを タッチした。cell は いま いる ばしょ。 */
   onAnimal?: (animal: Animal, cell: Cell) => void
+  /** ひが ついて、もうすぐ はじける ばくだん（ちかちか ひかる）。 */
+  lit?: readonly Position[]
 }
 
 const DAY = { sky: '#c6eafa', hemisphere: 2.4, sun: 2.5, sunColor: '#fff5db', glow: 0.35 }
@@ -44,6 +48,14 @@ const REACH = 7
 /** ながおしで ブロックを えらぶまでの じかん [ms]。 */
 export const HOLD_MS = 450
 const DRAG_PX = 7
+/** ちかちか ひからせる ばくだんの かずの じょうげん。 */
+export const MAX_LIT = 16
+/** ばくだんの かけら：かずの じょうげん・1つの ばくだんから とぶ かず・きえるまでの じかん [s]。 */
+export const MAX_DEBRIS = 120
+export const DEBRIS_PER_BLAST = 18
+const DEBRIS_LIFE = 0.9
+const DEBRIS_COLORS = ['#ffb13b', '#ffe066', '#ff6a3d', '#f4f1ea', '#8a8f98'].map(color => new THREE.Color(color))
+type Debris = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; size: number; color: THREE.Color }
 
 /** Keeps the two-finger panned view over the world: moves camera and target together so the angle never changes. */
 export function clampTarget(target: THREE.Vector3, camera: THREE.Vector3, { size, height }: Dimensions) {
@@ -170,6 +182,9 @@ export function useCraftScene(options: CraftSceneOptions) {
       transparent: m.opacity !== undefined,
       opacity: m.opacity ?? 1,
       depthWrite: m.opacity === undefined,
+      // さくの すきまからは うらがわの めんも みえる
+      alphaTest: m.cutout ? 0.5 : 0,
+      side: m.cutout ? THREE.DoubleSide : THREE.FrontSide,
       emissive: m.glow ? m.color : '#000000',
       emissiveIntensity: m.glow ? DAY.glow : 0,
     }))
@@ -234,6 +249,51 @@ export function useCraftScene(options: CraftSceneOptions) {
         animals.set(data.id, animal)
       }
       return true
+    }
+
+    // ひの ついた ばくだんと、はじけた かけら
+    const flashMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7, depthWrite: false })
+    const flashMesh = new THREE.InstancedMesh(unit, flashMaterial, MAX_LIT)
+    flashMesh.count = 0
+    flashMesh.frustumCulled = false
+    flashMesh.renderOrder = 2
+    flashMesh.name = 'fuses'
+    const debrisMaterial = new THREE.MeshLambertMaterial({ emissive: '#ff8a3d', emissiveIntensity: 0.35 })
+    const debrisMesh = new THREE.InstancedMesh(unit, debrisMaterial, MAX_DEBRIS)
+    debrisMesh.count = 0
+    debrisMesh.frustumCulled = false
+    debrisMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    debrisMesh.name = 'debris'
+    const effects = new THREE.Group()
+    effects.add(flashMesh, debrisMesh)
+    scene.add(effects)
+    const debris: Debris[] = []
+    const effectPose = new THREE.Matrix4()
+    const noLit: readonly Position[] = []
+    let shownLit: readonly Position[] | undefined
+    const syncLit = (lit: readonly Position[]) => {
+      if (lit === shownLit) return false
+      shownLit = lit
+      flashMesh.count = 0
+      for (const p of lit.slice(0, MAX_LIT)) {
+        effectPose.makeScale(1.04, 1.04, 1.04).setPosition(p.x, p.y, p.z)
+        flashMesh.setMatrixAt(flashMesh.count++, effectPose)
+      }
+      flashMesh.instanceMatrix.needsUpdate = true
+      return true
+    }
+    const batchDebris = () => {
+      debrisMesh.count = 0
+      for (const piece of debris) {
+        const scale = piece.size * Math.min(1, piece.life / DEBRIS_LIFE * 1.6)
+        effectPose.makeScale(scale, scale, scale).setPosition(piece.x, piece.y, piece.z)
+        debrisMesh.setMatrixAt(debrisMesh.count, effectPose)
+        debrisMesh.setColorAt(debrisMesh.count++, piece.color)
+      }
+      if (debrisMesh.count) {
+        debrisMesh.instanceMatrix.needsUpdate = true
+        debrisMesh.instanceColor!.needsUpdate = true
+      }
     }
 
     const root = new THREE.Object3D()
@@ -362,6 +422,9 @@ export function useCraftScene(options: CraftSceneOptions) {
       fog.color.copy(sky)
       animatedTerrain = terrain.setVisibility(camera, frustum, !!walking, isNight)
       batchAnimals(time, !!walking)
+      batchDebris()
+      // ひの ついた ばくだんは ちかちか ひかる
+      flashMaterial.opacity = Math.floor(time / 140) % 2 ? 0.75 : 0.1
       waterTexture.offset.y = (time / 5000) % 1
       lavaTexture.offset.x = (time / 9000) % 1
       const pulse = isNight ? NIGHT.glow * (0.8 + 0.2 * Math.sin(time / 380)) : DAY.glow
@@ -372,7 +435,7 @@ export function useCraftScene(options: CraftSceneOptions) {
 
     let frame = 0
     const update = () => {
-      const { world, cursor, night = false, walker = null, herd = noAnimals, sky: daySky = DAY.sky } = latest.current
+      const { world, cursor, night = false, walker = null, herd = noAnimals, sky: daySky = DAY.sky, lit = noLit } = latest.current
       const theme = night ? NIGHT : DAY
       const skyColor = night ? NIGHT.sky : daySky
       const nightChanged = night !== isNight || shownSky !== skyColor
@@ -381,6 +444,7 @@ export function useCraftScene(options: CraftSceneOptions) {
       sky.set(skyColor)
       watchGround(world)
       const herdChanged = syncHerd(herd)
+      const litChanged = syncLit(lit)
       hemisphere.intensity = theme.hemisphere
       sun.intensity = theme.sun
       sun.color.set(theme.sunColor)
@@ -391,7 +455,7 @@ export function useCraftScene(options: CraftSceneOptions) {
       const walkChanged = walker !== walking
       setWalking(walker)
       if (!frame) aimCamera(1)
-      if (terrainChanged || herdChanged || nightChanged || walkChanged || cursorChanged) render()
+      if (terrainChanged || herdChanged || nightChanged || walkChanged || cursorChanged || litChanged) render()
     }
     let shownSky: string | undefined
 
@@ -419,6 +483,19 @@ export function useCraftScene(options: CraftSceneOptions) {
           moving = true
         }
         if (animal.data.love) moving = true
+      }
+      if (flashMesh.count) moving = true
+      if (debris.length) {
+        moving = true
+        for (let i = debris.length - 1; i >= 0; i--) {
+          const piece = debris[i]
+          piece.life -= dt
+          if (piece.life <= 0) { debris.splice(i, 1); continue }
+          piece.vy -= 16 * dt
+          piece.x += piece.vx * dt
+          piece.y += piece.vy * dt
+          piece.z += piece.vz * dt
+        }
       }
       if (walking) {
         eye.set(walking.x, walking.y + EYE, walking.z)
@@ -574,6 +651,19 @@ export function useCraftScene(options: CraftSceneOptions) {
         controls.update()
         render()
       },
+      burst: at => {
+        for (const p of at) for (let i = 0; i < DEBRIS_PER_BLAST; i++) {
+          if (debris.length >= MAX_DEBRIS) debris.shift()
+          const angle = Math.random() * Math.PI * 2
+          const speed = 2 + Math.random() * 5
+          debris.push({
+            x: p.x, y: p.y, z: p.z, vx: Math.cos(angle) * speed, vy: 3 + Math.random() * 6, vz: Math.sin(angle) * speed,
+            life: DEBRIS_LIFE * (0.6 + Math.random() * 0.4), size: 0.18 + Math.random() * 0.3,
+            color: DEBRIS_COLORS[Math.floor(Math.random() * DEBRIS_COLORS.length)],
+          })
+        }
+        if (!frame) render()
+      },
     }
     sync.current = update
     resize()
@@ -599,6 +689,10 @@ export function useCraftScene(options: CraftSceneOptions) {
       materials.forEach(material => material.dispose())
       animalMesh.dispose()
       animalMaterial.dispose()
+      flashMesh.dispose()
+      flashMaterial.dispose()
+      debrisMesh.dispose()
+      debrisMaterial.dispose()
       terrain.dispose()
       unwatchGround?.()
       outlineGeometry.dispose()

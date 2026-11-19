@@ -114,6 +114,22 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       await name('あるく').tap()
       await expect(name('まえへ すすむ')).toHaveCount(0)
 
+      // クラフトだいを おいて タッチすると、スクロールなしで ブロックを つくれる
+      const table = page.getByRole('button', { name: 'クラフト', exact: true })
+      await table.scrollIntoViewIfNeeded()
+      await table.tap()
+      await scene.press('Enter')
+      await scene.press('Enter')
+      const craft = page.getByRole('dialog', { name: 'クラフトだい' })
+      await craft.getByRole('button', { name: /^ドアの レシピ/ }).tap()
+      const make = craft.getByRole('button', { name: 'ドアを つくる' })
+      for (const control of [make, craft.getByRole('button', { name: 'とじる' }), craft.getByRole('button', { name: /^ランタンの レシピ/ })]) {
+        await expect(control).toBeInViewport({ ratio: 1 })
+      }
+      await make.tap()
+      await expect(craft).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'ドア', exact: true })).toHaveAttribute('aria-pressed', 'true')
+
       await name(/ほぞん/).tap()
       const saved = decodeGame(await page.evaluate(key => localStorage.getItem(key), SAVE_KEY))!
       expect(saved.world.size).toBe(96)

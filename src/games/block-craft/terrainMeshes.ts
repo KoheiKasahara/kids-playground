@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { PLANT_WIDTH_SCALE, plantCenterY } from './raycast'
+import { blockShape, plantCenterY } from './raycast'
 import { definitionAt, materialCode, MATERIAL_DEFS, type Changes, type World } from './world'
 
 export const CHUNK_SIZE = 16
@@ -11,10 +11,13 @@ export function viewDepth(camera: THREE.Camera, x: number, y: number, z: number)
 }
 const water = materialCode('water') - 1
 const lava = materialCode('lava') - 1
-const lamp = materialCode('lamp') - 1
+/** よるに ゆらめく あかり。 */
+const lights = (['lamp', 'torch', 'jack'] as const).map(id => materialCode(id) - 1)
 
-/** まわりを すきまなく かくす ブロック（くさばな・すける ブロックは かくさない）。 */
-const SOLID = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!m.plant && m.opacity === undefined))])
+/** まわりを すきまなく かくす ブロック（くさばな・すける ブロック・すきまの ある ブロック・ちいさな ブロックは かくさない）。 */
+const SOLID = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!m.plant && !m.passable && !m.cutout
+  && m.opacity === undefined && m.width === undefined && m.height === undefined))])
+const SHAPES = MATERIAL_DEFS.map(blockShape)
 const SIDES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]] as const
 /** 6めんとも ブロックに かこまれて、どこからも みえない。せかいの そこは みえない ものと する。 */
 export function isBuried(world: World, x: number, y: number, z: number) {
@@ -103,8 +106,8 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
     }
     visit((x, y, z, code) => {
       const mesh = meshes[code - 1]!
-      const { plant, height = 0.6 } = definitionAt(code)
-      if (plant) matrix.makeScale(PLANT_WIDTH_SCALE, height, PLANT_WIDTH_SCALE).setPosition(x, plantCenterY(y, height), z)
+      const { width, height } = SHAPES[code - 1]
+      if (width !== 1 || height !== 1) matrix.makeScale(width, height, width).setPosition(x, plantCenterY(y, height), z)
       else matrix.makeTranslation(x, y, z)
       mesh.setMatrixAt(mesh.count++, matrix)
     })
@@ -140,7 +143,7 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
         // Cull only when even the nearest corner is fully fogged.
         const near = viewDepth(camera, m[2] > 0 ? max.x : min.x, m[6] > 0 ? max.y : min.y, m[10] > 0 ? max.z : min.z)
         group.visible = (!walking || near <= WALK_DRAW_DISTANCE) && frustum.intersectsBox(bounds)
-        if (group.visible && (meshes[water] || meshes[lava] || (night && meshes[lamp]))) animated = true
+        if (group.visible && (meshes[water] || meshes[lava] || (night && lights.some(i => meshes[i])))) animated = true
       }
       return animated
     },

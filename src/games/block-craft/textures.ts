@@ -72,11 +72,46 @@ function pattern(material: Material, x: number, y: number, noise: number): numbe
     case 'melon': return x % 4 === 0 ? -0.4 : x % 4 === 2 && noise > 0.5 ? 0.25 : n
     case 'honey': return (x + y * 2) % 8 === 0 ? 0.5 : noise > 0.9 ? 0.4 : 0
     case 'mushroom': return noise > 0.8 && y < 10 ? 0.75 : y >= 10 ? 0.6 : n
+    case 'workbench': return x % 5 === 0 || y % 5 === 0 ? -0.38 : (x + y) % 9 === 0 ? 0.2 : n
+    case 'sakura': return noise < 0.2 ? -0.18 : noise > 0.8 ? 0.45 : n
+    case 'sponge': return noise < 0.22 ? -0.35 : noise > 0.9 ? 0.2 : n
+    case 'emerald': return noise > 0.88 ? 0.6 : (x * 2 + y) % 7 === 0 ? -0.25 : n
+    // した（y が ちいさい）は えだ、うえは ほのお
+    case 'torch': return y >= 11 ? 0.35 + n : -0.55 + n
+    case 'fence': return n - (x % 6 === 2 ? 0.15 : 0)
+    case 'door': {
+      if (x === 0 || x === TEXTURE_SIZE - 1 || y === 0 || y === TEXTURE_SIZE - 1) return -0.35
+      if (x >= 4 && x <= 11 && y >= 9 && y <= 13) return 0.55 + n
+      if (x === 12 && y === 6) return -0.65
+      return x % 4 === 0 ? -0.15 : n
+    }
+    case 'door_open': return -0.2 + n
+    case 'bed': return y >= 11 ? 0.8 + n * 0.3 : y % 4 === 1 ? -0.2 : n
+    case 'note': return x === 0 || y === 0 || x === TEXTURE_SIZE - 1 || y === TEXTURE_SIZE - 1 ? -0.4 : x % 4 === 2 && y % 4 === 2 ? 0.5 : n
+    case 'bomb': return y >= 6 && y <= 9 ? (x % 3 === 1 ? -0.45 : 0.8) : x % 5 === 0 ? -0.2 : n
+    case 'cake':
+    case 'cake_half': return y >= 11 ? (noise > 0.92 ? -0.5 : 0.6) : y === 10 ? -0.2 : y % 3 === 0 ? -0.35 : n
+    case 'jack': {
+      // ひかる かお（め・くち）
+      const face = ((x === 4 || x === 5 || x === 10 || x === 11) && y >= 9 && y <= 11) || (y >= 3 && y <= 5 && x >= 3 && x <= 12 && (y !== 5 || x % 3))
+      return face ? 0.75 : x % 5 === 0 ? -0.3 : n
+    }
     default: return n
   }
 }
 
-/** ざいりょうの いろに もようを つけた RGBA のドット（テクスチャ用）。 */
+/** すきまの ある ブロックで、むこうが みえる ドット。 */
+function hole(material: Material, x: number, y: number) {
+  switch (material) {
+    // たての くいが 2ほん、よこの いたが 2まい
+    case 'fence': return !(x >= 2 && x <= 4) && !(x >= 11 && x <= 13) && !(y >= 4 && y <= 6) && !(y >= 10 && y <= 12)
+    // わくだけ のこる
+    case 'door_open': return x > 1 && x < TEXTURE_SIZE - 2 && y < TEXTURE_SIZE - 2
+    default: return false
+  }
+}
+
+/** ざいりょうの いろに もようを つけた RGBA のドット（テクスチャ用）。すきまの ある ブロックは すきまを すきとおらせる。 */
 export function blockPixels(material: Material): Uint8Array {
   const index = MATERIAL_DEFS.findIndex(m => m.id === material)
   const base = hex(MATERIAL_DEFS[index].color)
@@ -88,7 +123,7 @@ export function blockPixels(material: Material): Uint8Array {
     data[i] = r
     data[i + 1] = g
     data[i + 2] = b
-    data[i + 3] = 255
+    data[i + 3] = hole(material, x, y) ? 0 : 255
   }
   return data
 }

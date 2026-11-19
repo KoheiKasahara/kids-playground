@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
-import { clampTarget, headingFromYaw, useCraftScene, type CraftSceneOptions } from './useCraftScene'
+import { clampTarget, DEBRIS_PER_BLAST, headingFromYaw, MAX_DEBRIS, MAX_LIT, useCraftScene, type CraftSceneOptions } from './useCraftScene'
 import { ANIMAL_SPAWNS, herdFrom } from './animals'
 import { createWorld, DEFAULT_WORLD, editWorld, MATERIALS, startWalker } from './world'
 
@@ -72,9 +72,10 @@ it('disposes GPU resources, observer, timers and input handlers on exit and can 
     expect(resources.disconnect).toHaveBeenCalledTimes(entry)
     expect(removeListener.mock.calls.map(call => call[0])).toEqual(expect.arrayContaining(['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'webglcontextlost']))
   }
-  // ブロック・どうぶつ・わく（わくの もとの はこは つくる ときに すてる）
+  // ブロック・どうぶつ・わく（わくの もとの はこは つくる ときに すてる）。ばくだんの ひかりと かけらは どうぶつの はこを つかう
   expect(geometryDispose).toHaveBeenCalledTimes(4 * 2)
-  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + 2) * 2)
+  // ブロック・どうぶつ・わく・ばくだんの ひかり・かけら
+  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + 4) * 2)
   expect(textureDispose).toHaveBeenCalledTimes(MATERIALS.length * 2)
   expect(meshesCreated).toBeGreaterThan(2)
   expect(meshDispose).toHaveBeenCalledTimes(meshesCreated)
@@ -284,4 +285,33 @@ it('keeps two-finger panning over the world without changing the viewing angle',
   expect(target.y).toBeLessThan(SIZE)
   expect(camera.clone().sub(target)).toEqual(offset)
   expect(clampTarget(new THREE.Vector3(SIZE / 2, 2, SIZE / 2), new THREE.Vector3(), DEFAULT_WORLD)).toBe(false)
+})
+
+it('flashes lit bombs and throws pieces from a blast until they fall away', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  const container = document.createElement('div')
+  const props = options()
+  const view = renderHook(next => useCraftScene(next), { initialProps: props })
+  act(() => view.result.current.setContainer(container))
+  const [scene] = resources.render.mock.lastCall as [THREE.Scene]
+  const fuses = scene.getObjectByName('fuses') as THREE.InstancedMesh
+  const debris = scene.getObjectByName('debris') as THREE.InstancedMesh
+  expect(fuses.count).toBe(0)
+  const bomb = { x: 5, y: 3, z: 5 }
+  view.rerender({ ...props, lit: [bomb] })
+  expect(fuses.count).toBe(1)
+  view.rerender({ ...props, lit: Array.from({ length: MAX_LIT + 4 }, (_, x) => ({ ...bomb, x })) })
+  expect(fuses.count).toBe(MAX_LIT)
+  act(() => view.result.current.api.current!.burst([bomb]))
+  act(() => { frames.run(16) })
+  expect(debris.count).toBe(DEBRIS_PER_BLAST)
+  act(() => { for (let time = 32; time <= 2000; time += 16) frames.run(time) })
+  expect(debris.count).toBe(0)
+  view.rerender({ ...props, lit: [] })
+  expect(fuses.count).toBe(0)
+  act(() => view.result.current.api.current!.burst(Array.from({ length: 20 }, (_, x) => ({ ...bomb, x }))))
+  act(() => { frames.run(2016) })
+  expect(debris.count).toBe(MAX_DEBRIS)
+  view.unmount()
 })

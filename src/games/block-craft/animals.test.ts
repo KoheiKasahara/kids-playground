@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ANIMAL_SPAWNS, decodeHerd, feedAnimal, herdFrom, MAX_HERD, chooseAnimalStep, shearSheep } from './animals'
-import { createWorld, DEFAULT_WORLD, editWorld, surfaceOf } from './world'
+import { createWorld, DEFAULT_WORLD, editWorld, surfaceOf, toggleDoor } from './world'
 
 const SIZE = DEFAULT_WORLD.size
 
@@ -38,6 +38,20 @@ describe('animals', () => {
     }
     const at = { x: 5, z: 5 }
     expect(chooseAnimalStep(world, at, { ...at }, new Int8Array(4), () => 0.5)).toBe(false)
+  })
+})
+
+describe('fences and doors', () => {
+  it('keep animals in a pen until the door opens', () => {
+    const world = createWorld()
+    for (const [x, z] of [[4, 5], [6, 5], [5, 4]]) editWorld(world, { x, y: 3, z }, 'fence', 'place')
+    editWorld(world, { x: 5, y: 3, z: 6 }, 'door', 'place')
+    const at = { x: 5, z: 5 }
+    const to = { ...at }
+    expect(chooseAnimalStep(world, at, to, new Int8Array(4), () => 0)).toBe(false)
+    toggleDoor(world, { x: 5, y: 3, z: 6 })
+    expect(chooseAnimalStep(world, at, to, new Int8Array(4), () => 0)).toBe(true)
+    expect(to).toEqual({ x: 5, z: 6 })
   })
 })
 

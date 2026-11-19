@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { expect, it, vi } from 'vitest'
 import { BLOCK_WIDTH } from './raycast'
 import { createTerrainMeshes, isBuried } from './terrainMeshes'
-import { createWorld, editWorld, MATERIALS, undoChanges } from './world'
+import { createWorld, editWorld, MATERIALS, undoChanges, World, type Material } from './world'
 
 it('keeps one instance per visible cell, allocates for the used meshes and updates only dirty chunks', () => {
   const grid = createWorld({ size: 64, height: 12 })
@@ -62,4 +62,17 @@ it('keeps one instance per visible cell, allocates for the used meshes and updat
   geo.dispose()
   for (const material of materials) material.dispose()
   setMatrixAt.mockRestore()
+})
+
+it('keeps a block visible next to see-through, passable or small blocks', () => {
+  const center = { x: 8, y: 5, z: 8 }
+  const around = (material: Material) => {
+    const blocks = [{ ...center, material: 'gold' as Material }]
+    for (const axis of ['x', 'y', 'z'] as const) for (const side of [-1, 1]) blocks.push({ ...center, [axis]: center[axis] + side, material: 'stone' })
+    blocks[1] = { ...blocks[1], material }
+    return new World({ size: 16, height: 12 }, blocks)
+  }
+  expect(isBuried(around('stone'), center.x, center.y, center.z)).toBe(true)
+  for (const material of ['fence', 'door_open', 'bed', 'cake', 'torch'] as const) expect(isBuried(around(material), center.x, center.y, center.z)).toBe(false)
+  expect(isBuried(around('door'), center.x, center.y, center.z)).toBe(true)
 })

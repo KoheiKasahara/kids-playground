@@ -1,7 +1,8 @@
 import { decodeHerd, spawnHerd, WOOL_COLORS, type Herd } from './animals'
+import { CRAFTED } from './recipes'
 import { biome, isBiomeId, type BiomeId } from './biomes'
 import { NEW_WORLD } from './terrain'
-import { MAX_WORLD, type Dimensions, type WoolColor, type World } from './world'
+import { MAX_WORLD, type Dimensions, type Material, type WoolColor, type World } from './world'
 import { decodeGrid, decodeLegacyWorld, encodeGrid, LEGACY_SAVE_KEY } from './saveCodec'
 
 export const SAVE_KEY = 'kids-playground:block-craft:v2'
@@ -12,6 +13,8 @@ const MAX_RECORD_LENGTH = 4 * Math.ceil(MAX_WORLD.size ** 2 * MAX_WORLD.height /
 export const EXTRA_KEY = 'kids-playground:block-craft:extra:v1'
 /** あつめた けいとの いろ（せかいを かえても のこる）。 */
 export const WOOL_KEY = 'kids-playground:block-craft:wool:v1'
+/** クラフトだいで つくった ブロック（せかいを かえても のこる）。 */
+export const CRAFTED_KEY = 'kids-playground:block-craft:crafted:v1'
 export const MAX_WHEAT = 999
 
 /** seed は せかいの かたちを きめる かず。「はじめの せかい」で おなじ せかいに もどせる。 */
@@ -82,4 +85,15 @@ export function readWool(): WoolColor[] {
 
 export function writeWool(colors: readonly WoolColor[]) {
   try { localStorage.setItem(WOOL_KEY, JSON.stringify(colors)) } catch { /* ほぞんできなくても このまま つかえる */ }
+}
+
+export function readCrafted(): Material[] {
+  try {
+    const data: unknown = JSON.parse(localStorage.getItem(CRAFTED_KEY) ?? '[]')
+    return Array.isArray(data) ? CRAFTED.filter(material => data.includes(material)) : []
+  } catch { return [] }
+}
+
+export function writeCrafted(materials: readonly Material[]) {
+  try { localStorage.setItem(CRAFTED_KEY, JSON.stringify(materials)) } catch { /* ほぞんできなくても このまま つかえる */ }
 }

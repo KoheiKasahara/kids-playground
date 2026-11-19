@@ -10,7 +10,7 @@ import { playBeeSound } from '../../games/bee-garden/sounds'
  * ステージや場面で曲が変わるゲームは、1曲だけ大きいのを見逃さないよう、すべての曲を登録する。
  */
 import type { SoundSample } from './soundMeter'
-import { playCraftSound } from '../../games/block-craft/sounds'
+import { playCraftSound, playNote } from '../../games/block-craft/sounds'
 import { playTownSound } from '../../games/town-builder/sounds'
 import { playIroSound } from '../../games/iro-no-yuka/sounds'
 import { playParadeSound } from '../../games/kazoete-parade/sounds'
@@ -111,6 +111,9 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('どうぶつ', () => playCraftSound('pet')), sample('あるく', () => playCraftSound('step')),
     sample('ようがんが かたまる', () => playCraftSound('cool')), sample('こむぎ', () => playCraftSound('harvest')), sample('えさ', () => playCraftSound('feed')),
     sample('あかちゃん', () => playCraftSound('baby')), sample('けいと', () => playCraftSound('shear')),
+    sample('クラフト', () => playCraftSound('craft')), sample('ドア', () => playCraftSound('door')), sample('ばくだんの ひ', () => playCraftSound('fuse')),
+    sample('ドカーン', () => playCraftSound('boom')), sample('おやすみ', () => playCraftSound('sleep')), sample('おはよう', () => playCraftSound('morning')),
+    sample('たべる', () => playCraftSound('eat')), sample('おんぷ ド', () => playNote(0)), sample('おんぷ たかい ド', () => playNote(7)),
   ],
   'town-builder': [sample('おく', () => playTownSound('build')), sample('みち', () => playTownSound('road')), sample('けす', () => playTownSound('erase')), sample('そだつ', () => playTownSound('grow')), sample('3Dで みる', () => playTownSound('view')), sample('のる', () => playTownSound('ride'))],
   'iro-no-yuka': [

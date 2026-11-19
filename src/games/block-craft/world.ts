@@ -6,10 +6,18 @@ export type WoolColor = 'white' | 'pink' | 'yellow' | 'blue'
 export type MaterialDef = {
   id: string; label: string; color: string; emoji: string
   opacity?: number; glow?: boolean; falls?: boolean
-  /** くさばなのように ちいさく、とおりぬけられる。 */
+  /** くさばなのように ちいさく、とおりぬけられる。じめんが なくなると いっしょに きえる。 */
   plant?: boolean
-  /** くさばなの たかさ（ブロック 1つぶんが 1）。 */
+  /** ひらいた ドアのように、おおきさは そのままで とおりぬけられる。 */
+  passable?: boolean
+  /** みえる はこの たかさ（ブロック 1つぶんが 1）。くさばなは 0.6、ほかは 1。 */
   height?: number
+  /** みえる はこの よこはば（ブロック 1つぶんが 1）。くさばなは 0.45、ほかは 1。 */
+  width?: number
+  /** さくのように すきまから むこうが みえる（もようの すきまは えがかない）。 */
+  cutout?: boolean
+  /** さく・ドアのように のりこえられない（うえに のれない）。 */
+  tall?: boolean
   /** パレットには ださない（はたけや そだつ とちゅうの さくもつ）。ながおしでは pickAs を えらぶ。 */
   hidden?: boolean
   pickAs?: string
@@ -56,6 +64,20 @@ export const MATERIALS = [
   { id: 'sprout', label: 'め', color: '#79c94c', emoji: '🌱', plant: true, height: 0.5, hidden: true, pickAs: 'seed' },
   { id: 'wheat', label: 'こむぎ', color: '#e8c25a', emoji: '🌾', plant: true, height: 0.85, hidden: true, pickAs: 'seed' },
   { id: 'farmland', label: 'はたけ', color: '#7b5233', emoji: '🟫', hidden: true, pickAs: 'dirt' },
+  { id: 'workbench', label: 'クラフト', color: '#b07a43', emoji: '🛠️' },
+  { id: 'sakura', label: 'さくら', color: '#f6b6d2', emoji: '🌸' },
+  { id: 'sponge', label: 'スポンジ', color: '#e3d14f', emoji: '🧽' },
+  { id: 'emerald', label: 'エメラルド', color: '#38c172', emoji: '💚' },
+  { id: 'torch', label: 'たいまつ', color: '#ffb347', emoji: '🔥', plant: true, glow: true, width: 0.18, height: 0.62 },
+  { id: 'fence', label: 'さく', color: '#a9773f', emoji: '🚧', cutout: true, tall: true },
+  { id: 'door', label: 'ドア', color: '#9a6534', emoji: '🚪', tall: true },
+  { id: 'bed', label: 'ベッド', color: '#d9463e', emoji: '🛏️', height: 0.56 },
+  { id: 'note', label: 'おんぷ', color: '#7a5233', emoji: '🎵' },
+  { id: 'bomb', label: 'ばくだん', color: '#d8322c', emoji: '💣' },
+  { id: 'cake', label: 'ケーキ', color: '#f6e3cf', emoji: '🎂', width: 0.86, height: 0.5 },
+  { id: 'jack', label: 'ランタン', color: '#f39a2b', emoji: '🏮', glow: true },
+  { id: 'door_open', label: 'ひらいた ドア', color: '#9a6534', emoji: '🚪', cutout: true, passable: true, hidden: true, pickAs: 'door' },
+  { id: 'cake_half', label: 'たべかけの ケーキ', color: '#f6e3cf', emoji: '🍰', width: 0.6, height: 0.5, hidden: true, pickAs: 'cake' },
 ] as const satisfies readonly MaterialDef[]
 export const MATERIAL_DEFS: readonly MaterialDef[] = MATERIALS
 export type Material = typeof MATERIALS[number]['id']
@@ -68,6 +90,12 @@ export const materialCode = (id: unknown) => typeof id === 'string' ? codes.get(
 export const materialId = (code: number) => ids[code]
 export const materialDef = (id: Material): MaterialDef => MATERIAL_DEFS[materialCode(id) - 1]
 export const definitionAt = (code: number) => MATERIAL_DEFS[code - 1]
+/** あるく ひとや どうぶつが とおりぬけられる（くさばな・ひらいた ドア）。 */
+const PASSABLE = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!!(m.plant || m.passable)))])
+export const isPassable = (code: number) => PASSABLE[code] === 1
+/** さく・しまった ドア：うえに のれない。 */
+const TALL = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!!m.tall))])
+export const isTall = (code: number) => TALL[code] === 1
 
 export function validDimensions({ size, height }: Dimensions) {
   return Number.isInteger(size) && size >= DEFAULT_WORLD.size && size <= MAX_WORLD.size
@@ -79,8 +107,8 @@ export function inside({ size, height }: Dimensions, { x, y, z }: Position) {
     && Number.isInteger(y) && y >= 0 && y < height
 }
 
-/** パレットに ならぶ ブロック（けいとは ひつじの けを とるまで「？」）。 */
-export const PALETTE = MATERIALS.filter(m => !('hidden' in m))
+/** パレットに ならぶ ブロック（けいとは ひつじの けを とるまで、クラフトで つくる ものは つくるまで「？」）。クラフトだいを さいしょに おく。 */
+export const PALETTE = MATERIALS.filter(m => !('hidden' in m)).sort((a, b) => Number(b.id === 'workbench') - Number(a.id === 'workbench'))
 /** ながおしで えらぶ ざいりょう（そだつ とちゅうの さくもつは たね、はたけは つち）。 */
 export const pickAs = (id: Material): Material => (materialDef(id).pickAs ?? id) as Material
 export const woolMaterial = (color: WoolColor): Material => MATERIALS.find(m => 'wool' in m && m.wool === color)!.id
@@ -257,7 +285,7 @@ export class World implements Dimensions {
     this.#tops[column] = y
     while (y >= 0) {
       const code = this.codeAtIndex(column + y * this.area)
-      if (code && !definitionAt(code).plant) break
+      if (code && !isPassable(code)) break
       y--
     }
     this.#surfaces[column] = y
@@ -448,7 +476,89 @@ export function editWorld(world: World, target: Position | readonly Position[], 
       placed.push(p)
     }
     if (code === water) flow(world, write, placed)
+    if (material === 'sponge') for (const p of placed) absorb(world, write, p)
   }, true)
+}
+
+/** スポンジが すいとる みずの かずと、とどく きょり。 */
+export const SPONGE_LIMIT = 65
+export const SPONGE_REACH = 5
+
+/** スポンジに つながっている みずを すいとる。 */
+function absorb(world: World, write: WriteCell, sponge: Position) {
+  const queue: Position[] = [sponge]
+  const seen = new Set([world.index(sponge)])
+  let absorbed = 0
+  for (let i = 0; i < queue.length && absorbed < SPONGE_LIMIT; i++) {
+    for (const d of AROUND) {
+      const p = { x: queue[i].x + d.x, y: queue[i].y + d.y, z: queue[i].z + d.z }
+      const index = world.index(p)
+      if (index < 0 || seen.has(index) || world.codeAtIndex(index) !== water) continue
+      seen.add(index)
+      if (Math.abs(p.x - sponge.x) + Math.abs(p.y - sponge.y) + Math.abs(p.z - sponge.z) > SPONGE_REACH) continue
+      write(p, 0)
+      queue.push(p)
+      if (++absorbed >= SPONGE_LIMIT) break
+    }
+  }
+}
+
+const DOORS: readonly number[] = [materialCode('door'), materialCode('door_open')]
+/** ドアを ひらく・しめる。かさねた ドアは いっしょに うごく。 */
+export function toggleDoor(world: World, p: Position): Changes {
+  const code = world.codeAt(p.x, p.y, p.z)
+  if (!DOORS.includes(code)) return []
+  const next = code === DOORS[0] ? DOORS[1] : DOORS[0]
+  return world.change(write => {
+    let bottom = p.y
+    while (DOORS.includes(world.codeAt(p.x, bottom - 1, p.z))) bottom--
+    for (let y = bottom; DOORS.includes(world.codeAt(p.x, y, p.z)); y++) write({ ...p, y }, next)
+  })
+}
+
+/** ケーキを ひとくち たべる。2かい たべると なくなる。 */
+export function eatCake(world: World, p: Position): Changes {
+  const material = world.materialAt(p)
+  if (material !== 'cake' && material !== 'cake_half') return []
+  return world.change(write => write(p, material === 'cake' ? materialCode('cake_half') : 0), true)
+}
+
+/** ばくだんが こわす はんい（ブロックの まんなかからの きょり）。 */
+export const BLAST_RADIUS = 2.5
+/** いっしょに ばくはつする ばくだんの かずの じょうげん。 */
+export const MAX_BLAST_CHAIN = 8
+const bomb = materialCode('bomb')
+
+/** ばくだんの まわりの こわれる ブロック。はんいの なかの ばくだんも いっしょに ばくはつする（くろいしは こわれない）。 */
+export function blastArea(world: World, center: Position): { cells: Position[]; bombs: Position[] } {
+  const bombs: Position[] = []
+  if (world.codeAt(center.x, center.y, center.z) !== bomb) return { cells: [], bombs }
+  bombs.push(center)
+  const lit = new Set([world.index(center)])
+  const cells = new Map<number, Position>()
+  const r = Math.ceil(BLAST_RADIUS)
+  for (let i = 0; i < bombs.length; i++) {
+    const c = bombs[i]
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) {
+      if (dx * dx + dy * dy + dz * dz > BLAST_RADIUS ** 2) continue
+      const p = { x: c.x + dx, y: c.y + dy, z: c.z + dz }
+      const index = world.index(p)
+      const code = world.codeAtIndex(index)
+      if (index < 0 || p.y <= 0 || !code || code === obsidian) continue
+      cells.set(index, p)
+      if (code === bomb && !lit.has(index) && bombs.length < MAX_BLAST_CHAIN) {
+        lit.add(index)
+        bombs.push(p)
+      }
+    }
+  }
+  return { cells: [...cells.values()], bombs }
+}
+
+/** ばくだんを ばくはつさせる。こわれた ばしょに みずが あれば ながれこむ。 */
+export function explode(world: World, center: Position): { changes: Changes; bombs: Position[] } {
+  const { cells, bombs } = blastArea(world, center)
+  return { changes: cells.length ? editWorld(world, cells, 'bomb', 'remove') : [], bombs }
 }
 
 /** さくもつを タッチすると 1だん そだち、こむぎは とれて たねに もどる。 */
@@ -486,7 +596,7 @@ export function growTree(world: World, sapling: Position): Changes {
 
 const solidAt = (world: World, x: number, y: number, z: number) => {
   const code = world.codeAt(x, y, z)
-  return code !== 0 && code !== water && !definitionAt(code).plant
+  return code !== 0 && code !== water && !isPassable(code)
 }
 
 function fall(world: World, p: Position): Position {
@@ -519,7 +629,8 @@ export function walk(world: World, from: Position, dir: { x: number; z: number }
       const up = { ...next, y: at.y + 1 }
       if (up.y < world.height && !solidAt(world, at.x, at.y + 2, at.z) && bodyFree(world, up)) to = up
     }
-    return to && ground(to) !== lava ? to : null
+    // ようがんの うえや、さく・ドアの うえには のらない
+    return to && ground(to) !== lava && !isTall(ground(to)) ? to : null
   }
   let at = step(from, true)
   if (!at) return from

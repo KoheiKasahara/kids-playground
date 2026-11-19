@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ANIMAL_SPAWNS, herdFrom, spawnHerd } from './animals'
 import { biome } from './biomes'
-import { decodeExtra, decodeGame, encodeGame, EXTRA_KEY, MAX_WHEAT, newGame, readGame, readWool, SAVE_KEY, WOOL_KEY, writeGame, writeWool, type Game } from './save'
+import { CRAFTED_KEY, decodeExtra, decodeGame, encodeGame, EXTRA_KEY, MAX_WHEAT, newGame, readCrafted, readGame, readWool, SAVE_KEY, WOOL_KEY, writeCrafted, writeGame, writeWool, type Game } from './save'
 import { createWorld, editWorld, MATERIALS, World, type Block } from './world'
 import { encodeGrid, LEGACY_SAVE_KEY } from './saveCodec'
 import { NEW_WORLD } from './terrain'
@@ -145,4 +145,18 @@ it('stores dense seeded random material layouts with the bounded byte fallback',
   expect(JSON.parse(raw).encoding).toBe('bytes')
   expect(raw.length).toBeLessThan(70_000)
   expect(snapshot(decodeGame(raw)!)).toEqual(snapshot(game))
+})
+
+it('keeps the blocks made at the crafting table across worlds, ignoring unknown or broken data', () => {
+  expect(readCrafted()).toEqual([])
+  writeCrafted(['door', 'torch'])
+  expect(readCrafted()).toEqual(['torch', 'door'])
+  store.set(CRAFTED_KEY, JSON.stringify(['bed', 'stone', 'dragon', 3]))
+  expect(readCrafted()).toEqual(['bed'])
+  for (const raw of ['{broken', '{}', 'null']) {
+    store.set(CRAFTED_KEY, raw)
+    expect(readCrafted()).toEqual([])
+  }
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('quota') })
+  expect(() => writeCrafted(['bed'])).not.toThrow()
 })

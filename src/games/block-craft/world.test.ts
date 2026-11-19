@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  blockAt, brushCells, createWorld, DEFAULT_WORLD, editWorld as mutateWorld, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key, PALETTE, pickAs, tendCrops as mutateCrops, wheatAt,
+  blockAt, brushCells, createWorld, DEFAULT_WORLD, eatCake, editWorld as mutateWorld, explode, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key,
+  materialCode, MAX_BLAST_CHAIN, netMaterialChange, PALETTE, pickAs, SPONGE_LIMIT, tendCrops as mutateCrops, toggleDoor, undoChanges, wheatAt,
   settleWalker, startWalker, surfaceOf, topBlock, TREASURES, walk, World, type Block, type Material, type Position,
 } from './world'
 
@@ -282,5 +283,96 @@ describe('lava, ice and farming', () => {
     let pit = editWorld(createWorld(), { x: 5, y: 2, z: 8 }, 'wood', 'remove')
     pit = editWorld(pit, { x: 5, y: 2, z: 8 }, 'lava', 'place')
     expect(walk(pit, from, { x: 1, z: 0 })).toBe(from)
+  })
+})
+
+describe('blocks made at the crafting table', () => {
+  const east = { x: 1, z: 0 }
+  it('opens and closes stacked doors together, and only an open door lets the walker through', () => {
+    const world = createWorld()
+    for (const z of [7, 9]) for (const y of [3, 4]) mutateWorld(world, { x: 9, y, z }, 'stone', 'place')
+    for (const y of [3, 4]) mutateWorld(world, { x: 9, y, z: 8 }, 'door', 'place')
+    const from = { x: 8, y: 3, z: 8 }
+    // しまった ドアは とおれず、のぼれもしない
+    expect(walk(world, from, east)).toBe(from)
+    expect(toggleDoor(world, { x: 9, y: 4, z: 8 })).toHaveLength(2)
+    expect([3, 4].map(y => world.materialAt({ x: 9, y, z: 8 }))).toEqual(['door_open', 'door_open'])
+    expect(walk(world, from, east)).toEqual({ x: 9, y: 3, z: 8 })
+    // ひらいた ドアは じめんに ならない（どうぶつも とおれる）
+    expect(surfaceOf(world)(9, 8)?.material).toBe('grass')
+    expect(pickAs('door_open')).toBe('door')
+    toggleDoor(world, { x: 9, y: 3, z: 8 })
+    expect([3, 4].map(y => world.materialAt({ x: 9, y, z: 8 }))).toEqual(['door', 'door'])
+    expect(toggleDoor(world, { x: 8, y: 2, z: 8 })).toEqual([])
+  })
+  it('never lets the walker step up onto a fence or a closed door, but a plain block is one step', () => {
+    for (const material of ['fence', 'door', 'stone'] as const) {
+      const world = createWorld()
+      mutateWorld(world, { x: 9, y: 3, z: 8 }, material, 'place')
+      const from = { x: 8, y: 3, z: 8 }
+      expect(walk(world, from, east)).toEqual(material === 'stone' ? { x: 9, y: 4, z: 8 } : from)
+    }
+  })
+  it('soaks up the water around a sponge, within its reach and limit', () => {
+    const world = createWorld()
+    // みずうみは z = 0, 1 の y = 2
+    mutateWorld(world, { x: 8, y: 3, z: 1 }, 'sponge', 'place')
+    for (const x of [4, 8, 12]) expect(world.materialAt({ x, y: 2, z: 1 })).toBeUndefined()
+    for (const x of [3, 13]) expect(world.materialAt({ x, y: 2, z: 1 })).toBe('water')
+    const pool = new World(DEFAULT_WORLD, (function* () {
+      for (let x = 0; x < SIZE; x++) for (let z = 0; z < SIZE; z++) {
+        yield { x, y: 0, z, material: 'stone' as const }
+        for (let y = 1; y <= 3; y++) yield { x, y, z, material: 'water' as const }
+      }
+    })())
+    const changes = mutateWorld(pool, { x: 8, y: 2, z: 8 }, 'sponge', 'place')
+    // スポンジが おきかえた 1つと、すいとった ぶん
+    expect(netMaterialChange(changes, materialCode('water'))).toBe(-(SPONGE_LIMIT + 1))
+  })
+  it('blows up the blocks around a bomb, sets off bombs nearby, and keeps obsidian and the floor', () => {
+    const world = createWorld()
+    const before = snapshot(world)
+    for (const p of [{ x: 8, y: 3, z: 8 }, { x: 6, y: 3, z: 8 }]) mutateWorld(world, p, 'bomb', 'place')
+    mutateWorld(world, { x: 8, y: 3, z: 9 }, 'obsidian', 'place')
+    const built = snapshot(world)
+    const { changes, bombs } = explode(world, { x: 8, y: 3, z: 8 })
+    expect(bombs).toEqual([{ x: 8, y: 3, z: 8 }, { x: 6, y: 3, z: 8 }])
+    expect(world.materialAt({ x: 8, y: 3, z: 9 })).toBe('obsidian')
+    // となりの ばくだんの まわりも こわれる
+    for (const x of [4, 6, 8, 10]) expect(world.materialAt({ x, y: 2, z: 8 })).toBeUndefined()
+    expect(world.materialAt({ x: 3, y: 2, z: 8 })).toBe('grass')
+    expect(snapshot(world).filter(b => b.y === 0)).toHaveLength(SIZE * SIZE)
+    expect(explode(world, { x: 8, y: 3, z: 8 })).toEqual({ changes: [], bombs: [] })
+    undoChanges(world, changes)
+    expect(snapshot(world)).toEqual(built)
+    expect(before.length).toBe(built.length - 3)
+  })
+  it('digs up treasure with a bomb and limits how many bombs go off together', () => {
+    const world = createWorld()
+    const gold = TREASURES.find(t => t.x === 9 && t.z === 10)!
+    mutateWorld(world, { x: 9, y: 3, z: 10 }, 'bomb', 'place')
+    const { changes } = explode(world, { x: 9, y: 3, z: 10 })
+    expect(world.discovered(changes)).toEqual([gold])
+    const field = createWorld()
+    for (let x = 1; x < SIZE - 1; x++) mutateWorld(field, { x, y: 3, z: 8 }, 'bomb', 'place')
+    expect(explode(field, { x: 1, y: 3, z: 8 }).bombs).toHaveLength(MAX_BLAST_CHAIN)
+  })
+  it('eats a cake in two bites', () => {
+    const world = createWorld()
+    const cake = { x: 8, y: 3, z: 8 }
+    mutateWorld(world, cake, 'cake', 'place')
+    expect(eatCake(world, cake)).toHaveLength(1)
+    expect(world.materialAt(cake)).toBe('cake_half')
+    expect(pickAs('cake_half')).toBe('cake')
+    eatCake(world, cake)
+    expect(world.materialAt(cake)).toBeUndefined()
+    expect(eatCake(world, cake)).toEqual([])
+  })
+  it('takes a torch away with the ground under it, like other plants', () => {
+    const world = createWorld()
+    mutateWorld(world, { x: 8, y: 3, z: 8 }, 'torch', 'place')
+    expect(walk(world, { x: 7, y: 3, z: 8 }, east)).toEqual({ x: 8, y: 3, z: 8 })
+    mutateWorld(world, { x: 8, y: 2, z: 8 }, 'wood', 'remove')
+    expect(world.materialAt({ x: 8, y: 3, z: 8 })).toBeUndefined()
   })
 })

@@ -1,5 +1,5 @@
 import { seeded } from './terrain'
-import { DEFAULT_WORLD, landmark, materialCode, materialId, type Material, type World, type Block, type WoolColor } from './world'
+import { DEFAULT_WORLD, isTall, landmark, materialCode, materialId, type Material, type World, type Block, type WoolColor } from './world'
 
 export type AnimalKind = 'sheep' | 'chicken' | 'rabbit'
 export type Cell = { x: number; z: number }
@@ -62,9 +62,9 @@ export function spawnHerd(world: World, animals: readonly Omit<Spawn, 'x' | 'z'>
 const WATER = materialCode('water'), CACTUS = materialCode('cactus'), LAVA = materialCode('lava')
 const STEPS: readonly Cell[] = [{ x: 1, z: 0 }, { x: -1, z: 0 }, { x: 0, z: 1 }, { x: 0, z: -1 }]
 
-/** どうぶつが のれる じめん：みず・サボテン・ようがんの うえには いかない。 */
+/** どうぶつが のれる じめん：みず・サボテン・ようがん・さく・ドアの うえには いかない。 */
 export function walkable(ground: Block | undefined): ground is Block {
-  return !!ground && ground.material !== 'water' && ground.material !== 'cactus' && ground.material !== 'lava'
+  return !!ground && ground.material !== 'water' && ground.material !== 'cactus' && ground.material !== 'lava' && !isTall(materialCode(ground.material))
 }
 
 /** Reuse the destination and direction buffer in the animation loop. */
@@ -76,7 +76,7 @@ export function chooseAnimalStep(world: World, from: Cell, to: Cell, options: In
     const y = world.topY(x, z, true)
     if (y < 0 || (here >= 0 && Math.abs(y - here) > 1)) continue
     const ground = world.codeAt(x, y, z)
-    if (ground !== WATER && ground !== CACTUS && ground !== LAVA) options[count++] = i
+    if (ground !== WATER && ground !== CACTUS && ground !== LAVA && !isTall(ground)) options[count++] = i
   }
   if (!count) return false
   const step = STEPS[options[Math.min(count - 1, Math.floor(random() * count))]]
