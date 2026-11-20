@@ -414,7 +414,9 @@ describe('CarRoadBuilderPlay', () => {
     fireEvent.pointerMove(palette, pointerOptions(2, 450, 50))
     const preview = screen.getByTestId('car-road-drop-preview')
     expect(preview).toHaveAttribute('data-valid', 'true')
-    expect(preview).toHaveStyle({ left: 'calc(var(--road-cell) * 4)', top: 'calc(var(--road-cell) * 0)' })
+    // jsdom may not resolve custom properties for computed offsets; check the authored values.
+    expect(preview.style.left).toBe('calc(var(--road-cell) * 4)')
+    expect(preview.style.top).toBe('calc(var(--road-cell) * 0)')
     expect(board).toHaveAttribute('aria-rowcount', '5')
     expect(board).toHaveAttribute('aria-colcount', '5')
     expect(screen.getAllByRole('gridcell')).toHaveLength(25)

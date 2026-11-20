@@ -1,24 +1,29 @@
-import type { BuildingId, Scale } from './parts'
-import { applyTool, centerTown, COLS, createEmptyTown, GRASS, ROWS, type Ground, type Tile, type Town } from './town'
+import { isLarge, scalesOf, spanOf, type BuildingId, type Scale } from './parts'
+import { centerTown, COLS, createEmptyTown, GRASS, ROWS, type Ground, type Tile, type Town } from './town'
 import { createWorld, STARTER_SEED, WORLDS, type WorldId } from './worlds'
 
 // えらべる ちず（マスタデータ）。どの ちずも まっさらも ふくめ、さいしょから せんろの わと えきが あり でんしゃが はしる。
-// - てがきの ちず: 14×14 の もじの ちずを ひろい ちずの まんなかに おき、まわりは ふちの かわ・うみ・みちを のばして しぜんを ちらす。
+// - てがきの ちず: もじの ちずを ひろい ちずの まんなかに おき、まわりは ふちの かわ・うみ・みちを のばして しぜんを ちらす。
+//   おおきさは ちずごとに ちがって よい（ひろい ちずより ちいさければ よい）。
 // - せかい: worlds.ts が たね（seed）から ひろい ちず ぜんぶを つくる。「さいしょから」の たびに かたちが かわる。
-
-/** てがきの ちずの おおきさ（よこ・たて）。 */
-export const STAMP_SIZE = 14
 
 type StampId = 'starter' | 'seaside' | 'island' | 'lake' | 'city' | 'amusement' | 'empty'
 export type MapId = StampId | `world-${WorldId}`
 
 type MapBase = { readonly id: MapId; readonly name: string; readonly emoji: string }
 
+/** おおきな たてもの。[たてもの, おおきさ, じめん]。おおきさは ちいさい（1）、じめんは くさはらが きまり。 */
+export type BigPart = readonly [part: BuildingId, scale?: Scale, ground?: Exclude<Ground, 'water'>]
+
 export type StampMap = MapBase & {
   readonly kind: 'stamp'
+  /** 1もじ 1マスの ちず。どの ぎょうも おなじ ながさ。 */
   readonly rows: readonly string[]
-  /** [よこ, たて, たてもの, おおきさ] の じゅん。ひだりうえの マスを さす（14×14 の なかの ばしょ）。 */
-  readonly big?: readonly (readonly [col: number, row: number, part: BuildingId, scale?: Scale])[]
+  /**
+   * LEGEND に ない もじ（すうじ など）で かいた しかくに おく おおきな たてもの。
+   * おなじ もじの しかく 1つ（たてものの マスかず × おおきさ）が たてもの 1つ に なる。
+   */
+  readonly big?: Readonly<Record<string, BigPart>>
   /** まわりに きや はなを ちらさない（まっさら）。 */
   readonly plain?: boolean
 }
@@ -31,6 +36,7 @@ const LEGEND: Record<string, Tile> = {
   '~': { ground: 'water', part: null },
   z: { ground: 'sand', part: null },
   '=': { ground: 'grass', part: 'road' },
+  ':': { ground: 'sand', part: 'road' },
   '#': { ground: 'grass', part: 'rail' },
   '+': { ground: 'grass', part: 'crossing' },
   b: { ground: 'water', part: 'road' },
@@ -73,149 +79,207 @@ const LEGEND: Record<string, Tile> = {
 const STAMPS: readonly StampMap[] = [
   {
     // かわが ながれ、はしと ふみきりの ある まち。せんろが まちを ぐるっと かこむ。
+    // おおきな がっこう・かんらんしゃ・き と、ながい スーパー。
     kind: 'stamp',
     id: 'starter',
     name: 'はじめの まち',
     emoji: '🏡',
     rows: [
-      't.k..=...~~.tt',
-      '.####+###BB##.',
-      '.#..h=H..~~.#.',
-      '.#.tH=h..~~.#.',
-      '.#..s=c..~~.#.',
-      '.#.k.=.u.~~.#.',
-      '.#.r.=.S.~~.#t',
-      '=+=======bb=+=',
-      '.#..a=.x.~~e#.',
-      '.#..h=H..~~.#.',
-      '.#...=...~~.#.',
-      '.#...=...~~k#.',
-      '.####+###BB##.',
-      't....=t..~~.tt',
+      't..k...=.....~~..t.t',
+      '..t....=..k..~~.....',
+      '..#####+#####BB###..',
+      '..#.k.h=H.t..~~..#..',
+      '..#...H=s....~~44#..',
+      '..#r..h=c..t.~~44#..',
+      '..#==========~~..#..',
+      '..#hH.k=n11u.~~.j#..',
+      '..#tk.H=i11r.~~.t#..',
+      '..#...P=p....~~.e#..',
+      '==+==========bb==+==',
+      '..#22.h=f.hH.~~55#..',
+      '..#.t.k=c.t..~~55#..',
+      '..#...H=h..k.~~.k#..',
+      '..#==========~~..#..',
+      '..#33.h=s.mmW~~.t#..',
+      '..#33.k=H.mm.~~k.#..',
+      '..#####+#####BB###..',
+      '.t.....=..t..~~.k..t',
+      't..k...=.....~~....t',
     ],
-    big: [[6, 10, 'supermarket'], [2, 10, 'tree', 2]],
+    big: { 1: ['school', 2], 2: ['supermarket'], 3: ['tree', 2], 4: ['sakura', 2], 5: ['ferris', 2] },
   },
   {
-    // みなみに うみと すなはま。とうだいと さんばしが ある。
+    // みなみに うみと すなはま。おおきな とうだい・かんらんしゃ・プールと、うみへ のびる さんばし。
     kind: 'stamp',
     id: 'seaside',
     name: 'うみべの まち',
     emoji: '🏖️',
     rows: [
-      'tt..k..=..t.tt',
-      '.######+#####.',
-      '.#.k..h=H..t#.',
-      '.#hHh.s=i.n.#.',
-      '=+==========+=',
-      '.#e.a.o=.d.f#.',
-      '.#.t..k=x...#.',
-      '.######+#####.',
-      '.r..w..=......',
-      'zzYzzzz=zzYzzl',
-      '~~~~~~~b~~~~~~',
-      '~~~~~~~~~~~~~~',
-      '~~~~~~~~~~~~~~',
-      '~~~~~~~~~~~~~~',
+      't.k..t...=...t..k.tt',
+      '.########+#########.',
+      '.#.k...t.=..55.k..#.',
+      '.#.t....k=..55..t.#.',
+      '.#ehH.s.H=i.nHh..k#.',
+      '=+================+=',
+      '.#h.a.H.o=d.f.H.h.#.',
+      '.#.t.k..t=r..t...k#.',
+      '.#================#.',
+      '.#.hH.r.u=..c.w.k.#.',
+      '.########+#########.',
+      '====================',
+      'z44zz33zY:Y2222z11zz',
+      'z44zY33zz:z2222Y11zz',
+      '~~~~~~~~~b~~~~~~~~~~',
+      '~~~~~~~~~b~~~~~~~~~~',
+      '~~~~~~~~bbb~~~~~~~~~',
+      '~~~~~~~~~~~~~~~~~~~~',
+      '~~~~~~~~~~~~~~~~~~~~',
+      '~~~~~~~~~~~~~~~~~~~~',
     ],
-    big: [[8, 8, 'pool'], [11, 8, 'windmill']],
+    big: {
+      1: ['lighthouse', 2, 'sand'], 2: ['pool', 2, 'sand'], 3: ['ferris', 2, 'sand'], 4: ['palm', 2, 'sand'], 5: ['tree', 2],
+    },
   },
   {
-    // うみに うかぶ しま。ながい はしで ちずの はしまで つながる。
+    // うみに うかぶ しま。おおきな ロケットと とうだいと じんじゃ。ながい はしで ちずの はしまで つながる。
     kind: 'stamp',
     id: 'island',
     name: 'みなみの しま',
     emoji: '🌴',
     rows: [
-      '~~~~~~~~~~~~~~',
-      '~~~lzzzzzzz~~~',
-      '~~zz.=..k.tzz~',
-      '~z.##+#####.z~',
-      '~z.#h=H..R#.z~',
-      '~z.#t=k..t#.z~',
-      '~z.#e=.u.j#.z~',
-      '~z=+======+=bb',
-      '~z.#H=h.x.#.z~',
-      '~z.#w=..m.#.z~',
-      '~z.##+#####.z~',
-      '~zz..=..t..zz~',
-      '~~~zzzzzzzz~~~',
-      '~~~~~~~~~~~~~~',
+      '~~~~~~~~~~~~~~~~~~~~',
+      '~~~11zzzzzzzzz~~~~~~',
+      '~~z11zzz:zzzzzzz~~~~',
+      '~zz.t.k.=.....t.zz~~',
+      '~z..####+#######.z~~',
+      '~z..#.kh=H.222.#.z~~',
+      '~zz.#.tH=s.222.#.z~~',
+      '~z..#..h=i.222.#..z~',
+      '~z..#e.k=..u...#.zz~',
+      '~zz=+==========+=:bb',
+      '~z..#..H=h.y...#.zz~',
+      '~z..#44.=x...w.#..z~',
+      '~zz.#44.=.mm.t.#.zz~',
+      '~z..#.k.=Hw.mm.#.z~~',
+      '~z..####+#######.z~~',
+      '~zz.t...=..k..t.33z~',
+      '~~zz.k..:zzzzzzz33~~',
+      '~~~zzzzzzzzzzzzz~~~~',
+      '~~~~~~zzzzzzz~~~~~~~',
+      '~~~~~~~~~~~~~~~~~~~~',
     ],
+    big: { 1: ['lighthouse', 2, 'sand'], 2: ['rocket', 3], 3: ['palm', 2, 'sand'], 4: ['shrine', 2] },
   },
   {
-    // きたに やまが ならび、まんなかに みずうみ。ぼくじょうと キャンプじょう。
+    // きたに おおきな やまが ならび、まんなかの みずうみを はしが わたる。もりと ぼくじょうと ふうしゃ。
     kind: 'stamp',
     id: 'lake',
     name: 'やまと みずうみ',
     emoji: '⛰️',
     rows: [
-      '..............',
-      '..............',
-      't.k..q...t.k.t',
-      '...########...',
-      '...#.W..W.#...',
-      '...#.~~~~.#...',
-      '...#.~~~~.#...',
-      '...#.~~~~.#...',
-      '...#.~~~~.#...',
-      '===+======+===',
-      '...########.=.',
-      '.hH.e.c.i.Hh=.',
-      '==============',
-      '.t.m......t.r.',
+      '1111..t...1111...k..1111',
+      '1111.1111.1111.1111.1111',
+      '1111.1111.1111.1111.1111',
+      '1111.1111.1111.1111.1111',
+      '.t...1111.k....1111...t.',
+      '.q.t..k...q.t...w..q.t..',
+      '...##################...',
+      '...#.t..k.....t...k.#...',
+      '...#...~~~~~~~~~~44.#...',
+      '...#.k.~~~~~~~~~~44.#...',
+      '...#.t.~~~~~~~~~~.w.#...',
+      '...#e..~~~~~~~~~~..k#...',
+      '===+===bbbbbbbbbb===+===',
+      '...#22.~~~~~b~~~~...#...',
+      '...#22.~~~~~b~~~~.q.#...',
+      '...#.k..t...=..u...k#...',
+      '...#########+########...',
+      '..t.hH.c.n.H=h.s..Hh..t.',
+      '========================',
+      '.k.H.t..33333333..h..r..',
+      '.t.mm.t.33333333.mm.t.k.',
+      '..t.77...k....t...77..t.',
+      '.k..77..t...w....t77....',
+      't...k...t...t...k...t..t',
     ],
-    big: [[0, 0, 'mountain'], [4, 0, 'mountain'], [8, 0, 'mountain'], [11, 0, 'mountain'], [5, 13, 'ranch'], [7, 13, 'ranch']],
+    big: { 1: ['mountain', 2], 2: ['forest'], 3: ['ranch', 2], 4: ['windmill', 2], 7: ['sakura', 2] },
   },
   {
-    // ビルが たちならぶ とし。ちずの ふちを せんろが まわる。
+    // ビルが たちならぶ とし。まんなかに とくだいの タワー、まわりに スタジアム・くうこう・どうぶつえん。
+    // ちずの ふちを せんろが まわり、おおきな えきが ある。
     kind: 'stamp',
     id: 'city',
     name: 'ビルの とし',
     emoji: '🏢',
     rows: [
-      '######+#######',
-      '#TaoT.=.dTo.T#',
-      '#============#',
-      '#hHsc.=.ShP.e#',
-      '#.....=..rkr.#',
-      '#.....=......#',
-      '#...s.=......#',
-      '#============#',
-      '#oTaf.=.pdTo.#',
-      '#.....=..t.k.#',
-      '#..hHa=......#',
-      '#============#',
-      '#ThaH.=.cnTh.#',
-      '######+#######',
+      '##########+###+#########',
+      '#1111=5566=99o=oto=2222#',
+      '#1111=5566=99T=77a=2222#',
+      '#1111=otko=nri=77o=2222#',
+      '#1111=hHsc=huH=csn=2222#',
+      '#======================#',
+      '#3333=88hH=66o=77o=00pf#',
+      '#3333=88kh=66o=77T=00wt#',
+      '#3333=Hrwh=ato=oko=hrkt#',
+      '#3333=hHos=dks=cin=Hshh#',
+      '+======================+',
+      '#hHoH=oo77=444=oTo=!!!!#',
+      '#tuko=ot77=444=auo=!!!!#',
+      '#Hhsc=hHcn=444=sic=hHhH#',
+      '+======================+',
+      '#@@@@=66oo=odo=66a=odoT#',
+      '#@@@@=66ka=oko=66o=arkt#',
+      '#hHhn=Hhcs=sic=hHn=hHch#',
+      '#======================#',
+      '#$$$$=hHhH=cin=odo=hHhH#',
+      '#$$$$=H&&h=cun=srk=H^^t#',
+      '#trkH=h&&H=tww=kwt=h^^w#',
+      '#wuwh=HtkH=kuk=tkt=Hktw#',
+      '##########+###+#########',
     ],
-    big: [
-      [1, 4, 'office', 3], [4, 4, 'big-apartment'], [4, 5, 'supermarket'], [7, 4, 'stadium'], [9, 5, 'depart', 2],
-      [11, 6, 'fire'], [12, 6, 'police'], [1, 9, 'zoo'], [4, 9, 'pool'], [7, 9, 'airport'], [9, 10, 'big-apartment'],
-    ],
+    big: {
+      1: ['stadium', 2], 2: ['airport', 2], 3: ['zoo', 2], 4: ['tv-tower', 3], 5: ['tower', 2], 6: ['office', 2], 7: ['depart', 2],
+      8: ['school', 2], 9: ['station', 2], 0: ['hospital', 2], '!': ['big-apartment', 2], '@': ['supermarket', 2],
+      $: ['pool', 2], '&': ['park', 2], '^': ['sakura', 2],
+    },
   },
   {
-    // かんらんしゃ・メリーゴーランド・ジェットコースターの ある ゆうえんち。えんの まわりを きしゃが はしる。
+    // まんなかに とくだいの おしろ。ジェットコースター・かんらんしゃ・メリーゴーランドが かこむ ゆうえんち。
+    // えんの まわりを でんしゃが はしり、みなみの いりぐちに えきが ある。
     kind: 'stamp',
     id: 'amusement',
     name: 'ゆうえんち',
     emoji: '🎡',
     rows: [
-      '..t.k.=t..k.t.',
-      '.#####+######.',
-      '.#...i=e....#.',
-      '.#...x=g....#.',
-      '.#...Z=.....#.',
-      '.#..k.=.....#.',
-      '.#.u..=.w.k.#.',
-      '.#==========#.',
-      '.#.c.n=x.g.i#.',
-      '.#....=.....#.',
-      '.#.t..=...t.#.',
-      '.#.k.W=.R..k#.',
-      '.#####+######.',
-      '.t..kh=H.t..t.',
+      't..k..t.....=...t..k..t.',
+      '.###########+##########.',
+      '.#.00..k....=99..t.77.#.',
+      '.#.00.t..k..=99.w..77.#.',
+      '.#.t..k..w..=..k..w..t#.',
+      '.#.k..6666.i=n..55.t..#.',
+      '.#.t..6666.c=s..55..k.#.',
+      '.#...==============...#.',
+      '.#.k.=333.w.k.2222=.k.#.',
+      '.#t..=333.k.w.2222=..t#.',
+      '.#..k=333.w.k.2222=.w.#.',
+      '.#.t.=.k.w.1112222=..k#.',
+      '=+====w.k.w111w.k.====+=',
+      '.#.k.=44.w.111.w44=.t.#.',
+      '.#t..=44..kw.wk.44=..k#.',
+      '.#..k=g.k.w.u.w.kx=.w.#.',
+      '.#.t.=Z.w.kw.wk.wi=..t#.',
+      '.#...==============...#.',
+      '.#.k..cn.hH.=.Hh..t.k.#.',
+      '.#.00..t...h=H..t..00.#.',
+      '.#.00.k..w.s=c.w..k00.#.',
+      '.#.t...k...e=u..k...t.#.',
+      '.###########+##########.',
+      't..k..t.....=...t..k..t.',
     ],
-    big: [[7, 4, 'coaster'], [4, 9, 'pool'], [7, 9, 'castle', 2]],
+    big: {
+      0: ['sakura', 2], 1: ['castle', 3], 2: ['coaster', 2], 3: ['ferris', 3], 4: ['merry', 2], 5: ['circus', 2], 6: ['pool', 2],
+      7: ['rocket', 2], 9: ['tv-tower', 2],
+    },
   },
   {
     // ひろい くさはら。まんなかに ちいさな せんろの わと えき だけ あり、のこりは じぶんで つくる。
@@ -265,20 +329,72 @@ export function findMap(id: string): MapDefinition | undefined {
   return MAP_BY_ID.get(id)
 }
 
-/** ちずの もじが ただしく よめるか（テストで ぜんぶの ちずを しらべる）。 */
-export function mapProblems(map: StampMap): string[] {
-  const problems: string[] = []
-  if (map.rows.length !== STAMP_SIZE) problems.push(`${map.id}: ${map.rows.length} rows`)
-  map.rows.forEach((row, index) => {
-    if (row.length !== STAMP_SIZE) problems.push(`${map.id}: row ${index} has ${row.length} cells`)
-    for (const cell of row) if (!LEGEND[cell]) problems.push(`${map.id}: unknown cell "${cell}"`)
-  })
-  return problems
+/** てがきの ちずの おおきさと、ひろい ちずの なかで おく ばしょ（ひだりうえ。まんなかに おく）。 */
+export function stampFrame(map: StampMap): { cols: number; rows: number; left: number; top: number } {
+  const cols = map.rows[0]?.length ?? 0
+  const rows = map.rows.length
+  return { cols, rows, left: Math.floor((COLS - cols) / 2), top: Math.floor((ROWS - rows) / 2) }
 }
 
-/** てがきの ちずを おく ひだりうえ（ひろい ちずの まんなか）。 */
-export const STAMP_LEFT = Math.floor((COLS - STAMP_SIZE) / 2)
-export const STAMP_TOP = Math.floor((ROWS - STAMP_SIZE) / 2)
+/** よみとった てがきの ちず。anchor は その ちずの なかの ばんごう。 */
+type ReadStamp = { readonly tiles: readonly Tile[]; readonly problems: readonly string[] }
+
+function readStamp(map: StampMap): ReadStamp {
+  const { cols, rows } = stampFrame(map)
+  const problems: string[] = []
+  if (!cols || !rows || cols > COLS || rows > ROWS) problems.push(`${map.id}: size ${cols}×${rows}`)
+  map.rows.forEach((row, index) => { if (row.length !== cols) problems.push(`${map.id}: row ${index} has ${row.length} cells`) })
+  const big = map.big ?? {}
+  for (const [key, [part, scale = 1]] of Object.entries(big)) {
+    if (key.length !== 1 || LEGEND[key]) problems.push(`${map.id}: big key "${key}" must be one letter that is not in the legend`)
+    if (!scalesOf(part).includes(scale)) problems.push(`${map.id}: ${part} cannot be ×${scale}`)
+    if (!map.rows.some((row) => row.includes(key))) problems.push(`${map.id}: "${key}" is never drawn`)
+  }
+  const cell = (col: number, row: number) => map.rows[row]?.[col] ?? '.'
+  const tiles: Tile[] = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const char = cell(col, row)
+      const entry = big[char]
+      if (entry) tiles.push({ ground: entry[2] ?? 'grass', part: null })
+      else if (LEGEND[char]) tiles.push(LEGEND[char])
+      else {
+        problems.push(`${map.id}: unknown cell "${char}" at ${col}-${row}`)
+        tiles.push(GRASS)
+      }
+    }
+  }
+  // おなじ もじの しかくを ひだりうえから じゅんに たてものに する。
+  const used = new Set<number>()
+  for (let index = 0; index < tiles.length; index += 1) {
+    const col = index % cols
+    const row = Math.floor(index / cols)
+    const char = cell(col, row)
+    const entry = big[char]
+    if (!entry || used.has(index)) continue
+    const [part, scale = 1, ground = 'grass'] = entry
+    const [width, height] = spanOf(part, scale)
+    const cells: number[] = []
+    for (let dy = 0; dy < height; dy += 1) for (let dx = 0; dx < width; dx += 1) cells.push((row + dy) * cols + col + dx)
+    const fits = col + width <= cols && row + height <= rows
+      && cells.every((other) => !used.has(other) && cell(other % cols, Math.floor(other / cols)) === char)
+    if (!fits) {
+      problems.push(`${map.id}: "${char}" at ${col}-${row} is not a ${width}×${height} block`)
+      continue
+    }
+    for (const other of cells) {
+      used.add(other)
+      if (!isLarge(part, scale)) tiles[other] = { ground, part }
+      else tiles[other] = scale > 1 ? { ground, part, anchor: index, scale } : { ground, part, anchor: index }
+    }
+  }
+  return { tiles, problems }
+}
+
+/** ちずの もじが ただしく よめるか（テストで ぜんぶの ちずを しらべる）。 */
+export function mapProblems(map: StampMap): string[] {
+  return [...readStamp(map).problems]
+}
 
 /** まわりに ちらす しぜん。おなじ ちずなら いつも おなじ ばしょ に なる。 */
 function scatterOf(id: string): (index: number, ground: Ground) => BuildingId | null {
@@ -298,11 +414,12 @@ function scatterOf(id: string): (index: number, ground: Ground) => BuildingId | 
 
 /** てがきの ちずの まわり。ふちの かわ・うみ・すなはまは そのまま のび、みちは ちずの はしまで つづく。 */
 function surroundings(map: StampMap, tiles: readonly Tile[]): Town {
+  const { cols, rows, left, top } = stampFrame(map)
   const scatter = scatterOf(map.id)
   return Array.from({ length: COLS * ROWS }, (_, index) => {
-    const col = Math.max(0, Math.min(STAMP_SIZE - 1, (index % COLS) - STAMP_LEFT))
-    const row = Math.max(0, Math.min(STAMP_SIZE - 1, Math.floor(index / COLS) - STAMP_TOP))
-    const edge = tiles[row * STAMP_SIZE + col]
+    const col = Math.max(0, Math.min(cols - 1, (index % COLS) - left))
+    const row = Math.max(0, Math.min(rows - 1, Math.floor(index / COLS) - top))
+    const edge = tiles[row * cols + col]
     const ground = edge.ground
     if (edge.part === 'road' || edge.part === 'crossing') return { ground, part: 'road' }
     const part = map.plain ? null : scatter(index, ground)
@@ -312,13 +429,9 @@ function surroundings(map: StampMap, tiles: readonly Tile[]): Town {
 }
 
 function createStampTown(map: StampMap): Town {
-  const tiles: Town = map.rows.flatMap((row) => [...row].map((cell) => LEGEND[cell] ?? GRASS))
-  let town = centerTown(surroundings(map, tiles), tiles, STAMP_SIZE, STAMP_SIZE)
-  // おおきな たてものは まんなかへ おいた あとで、14×14 の なかの ばしょに おく。
-  for (const [col, row, part, scale] of map.big ?? []) {
-    town = applyTool(town, (STAMP_TOP + row) * COLS + STAMP_LEFT + col, part, scale ?? 1)
-  }
-  return town
+  const { cols, rows } = stampFrame(map)
+  const { tiles } = readStamp(map)
+  return centerTown(surroundings(map, tiles), tiles, cols, rows)
 }
 
 /**

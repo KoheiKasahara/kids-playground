@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { isBuilding } from './parts'
-import { CENTER_INDEX, carriesRoad, COLS, colOf, decodeTown, encodeTown, populationOf, rankOf, RANKS, ROWS, rowOf } from './town'
+import { CENTER_INDEX, carriesRoad, COLS, colOf, decodeTown, encodeTown, populationOf, rankOf, RANKS, ROWS, rowOf, scaleOf, type Town } from './town'
 import { createWorld, randomSeed, STARTER_SEED, WORLDS } from './worlds'
 
 const SEEDS = [1, 7, 99, 2026, 123456789]
+
+/** たてものの かず（おおきな たてものも 1つと かぞえる）。 */
+function buildings(town: Town, part: string): { scale: number }[] {
+  return town.filter((tile, index) => tile.part === part && (tile.anchor === undefined || tile.anchor === index)).map((tile) => ({ scale: scaleOf(tile) }))
+}
 
 describe('worlds', () => {
   it('offers many different worlds with unique names and icons', () => {
@@ -34,12 +39,13 @@ describe('worlds', () => {
   })
 
   it('starts every world with a small village on a road in the middle of the map', () => {
+    // まんなかに とくだいの おしろが ある せかいも あるので、まんなかの 5×5 に みちが あれば よい。
     for (const world of WORLDS) {
       for (const seed of SEEDS) {
         const town = createWorld(world.id, seed)
         expect(populationOf(town), `${world.id} ${seed}`).toBeGreaterThan(0)
         const nearRoad = town.some((tile, index) => carriesRoad(tile.part)
-          && Math.abs(colOf(index) - colOf(CENTER_INDEX)) <= 1 && Math.abs(rowOf(index) - rowOf(CENTER_INDEX)) <= 1)
+          && Math.abs(colOf(index) - colOf(CENTER_INDEX)) <= 2 && Math.abs(rowOf(index) - rowOf(CENTER_INDEX)) <= 2)
         expect(nearRoad, `${world.id} ${seed}`).toBe(true)
       }
     }
@@ -58,27 +64,43 @@ describe('worlds', () => {
     expect(all(count('island', (tile) => tile.ground === 'sand'), 30)).toBe(true)
     expect(all(count('island', (tile) => tile.part === 'palm'), 5)).toBe(true)
     expect(all(count('island', (tile) => tile.part === 'castle'), 1)).toBe(true)
-    // もり：きが いっぱいで、おくに おしろが かくれて いる。
+    // もり：きが いっぱいで、おくに とくだいの おしろが かくれ、とくだいの きが そびえる。
     expect(all(count('forest', (tile) => tile.part === 'tree' || tile.part === 'pine'), 600)).toBe(true)
-    expect(all(count('forest', (tile) => tile.part === 'castle'), 1)).toBe(true)
+    for (const seed of SEEDS) {
+      expect(buildings(createWorld('forest', seed), 'castle')).toEqual([{ scale: 3 }])
+      expect(buildings(createWorld('forest', seed), 'tree')).toContainEqual({ scale: 3 })
+    }
     // おおきな まち：はじめから ひとが たくさん すみ、えきと せんろが ある。
     for (const seed of SEEDS) expect(populationOf(createWorld('city', seed))).toBeGreaterThanOrEqual(140)
     expect(all(count('city', (tile) => tile.part === 'station'), 1)).toBe(true)
     expect(all(count('city', (tile) => tile.part === 'crossing'), 1)).toBe(true)
-    // でんしゃの まち：せんろが ぐるっと まわり、ふみきりと えきが 4つずつ。
+    // まんなかに とくだいの タワー、ブロック まるごとの スタジアム・どうぶつえん・くうこう。
+    for (const seed of SEEDS) {
+      const city = createWorld('city', seed)
+      expect(city[CENTER_INDEX - COLS - 1]).toMatchObject({ part: 'tv-tower', scale: 3 })
+      for (const part of ['stadium', 'zoo', 'airport']) expect(buildings(city, part), part).toEqual([{ scale: 2 }])
+    }
+    // でんしゃの まち：せんろが ぐるっと まわり、ふみきりと おおきな えきが 4つずつ。
     expect(all(count('rail', (tile) => tile.part === 'rail'), 100)).toBe(true)
     expect(count('rail', (tile) => tile.part === 'crossing')).toEqual(SEEDS.map(() => 4))
-    expect(count('rail', (tile) => tile.part === 'station')).toEqual(SEEDS.map(() => 4))
-    // おしろ：まんなかの おしろを おほりが かこみ、4つの はしで わたる。
-    for (const seed of SEEDS) expect(createWorld('castle', seed)[CENTER_INDEX].part).toBe('castle')
+    for (const seed of SEEDS) expect(buildings(createWorld('rail', seed), 'station')).toEqual([2, 2, 2, 2].map((scale) => ({ scale })))
+    // おしろ：まんなかの とくだいの おしろを おほりが かこみ、4つの はしで わたる。
+    for (const seed of SEEDS) {
+      const center = createWorld('castle', seed)[CENTER_INDEX]
+      expect(center.part).toBe('castle')
+      expect(scaleOf(center)).toBe(3)
+    }
     expect(count('castle', (tile) => tile.ground === 'water' && tile.part === 'road').every((value) => value >= 4)).toBe(true)
     // ゆき：じめんは ゆきで、もみのきと かまくらと ゆきだるま。
     expect(all(count('snow', (tile) => tile.ground === 'snow'), COLS * ROWS * 0.8)).toBe(true)
     expect(all(count('snow', (tile) => tile.part === 'igloo'), 3)).toBe(true)
     expect(all(count('snow', (tile) => tile.part === 'snowman'), 2)).toBe(true)
+    for (const seed of SEEDS) expect(buildings(createWorld('snow', seed), 'snowman')).toContainEqual({ scale: 2 })
     // さばく：すなの なかに オアシスと ピラミッドと サボテン。
     expect(all(count('desert', (tile) => tile.ground === 'sand'), COLS * ROWS * 0.7)).toBe(true)
     expect(all(count('desert', (tile) => tile.part === 'pyramid'), 3)).toBe(true)
+    // ピラミッドは とくだい・おおきい・ちいさい が ならぶ。
+    for (const seed of SEEDS) expect(buildings(createWorld('desert', seed), 'pyramid').map((item) => item.scale)).toEqual(expect.arrayContaining([3, 2, 1]))
     expect(all(count('desert', (tile) => tile.part === 'cactus'), 10)).toBe(true)
     expect(all(count('desert', (tile) => tile.part === 'palm'), 5)).toBe(true)
   })

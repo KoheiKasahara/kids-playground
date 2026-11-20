@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createMapTown, findMap, mapProblems, MAPS, STAMP_LEFT, STAMP_SIZE, STAMP_TOP, type MapId, type StampMap } from './maps'
-import { carriesRail, COLS, decodeTown, encodeTown, isConnected, neighborIndex, ROWS, wantsRoad, type Dir, type Town } from './town'
+import { createMapTown, findMap, mapProblems, MAPS, stampFrame, type MapId, type StampMap } from './maps'
+import { scalesOf } from './parts'
+import { carriesRail, COLS, decodeTown, encodeTown, isConnected, neighborIndex, ROWS, scaleOf, wantsRoad, type Dir, type Town } from './town'
 import { isOnTrack, stepVehicles, syncVehicles, vehicleTarget, type Vehicle } from './vehicles'
 import { WORLDS } from './worlds'
 import { advanceTracks, startTracks, trackPose } from './three/vehicleTracks'
@@ -84,25 +85,61 @@ describe('maps', () => {
     expect(mapProblems(map)).toEqual([])
     const unconnected = town.map((tile, index) => ({ tile, index })).filter(({ index }) => wantsRoad(town, index))
     expect(unconnected.map(({ tile, index }) => `${tile.part}@${index % COLS}-${Math.floor(index / COLS)}`)).toEqual([])
-    // てがきの ちずは まんなかに おき、おおきな たてもの（big）も ぜんぶ おかれて いる。
-    const cell = (col: number, row: number) => town[(STAMP_TOP + row) * COLS + STAMP_LEFT + col]
-    for (const [col, row, part] of map.big ?? []) expect(cell(col, row).part).toBe(part)
-    expect(STAMP_LEFT + STAMP_SIZE <= COLS && STAMP_TOP + STAMP_SIZE <= ROWS).toBe(true)
+    // てがきの ちずは まんなかに おき、おおきな たてもの（big の もじの しかく）も その おおきさで ぜんぶ おかれて いる。
+    const { cols, rows, left, top } = stampFrame(map)
+    expect(left >= 0 && top >= 0 && left + cols <= COLS && top + rows <= ROWS).toBe(true)
+    map.rows.forEach((line, row) => [...line].forEach((char, col) => {
+      const entry = map.big?.[char]
+      if (!entry) return
+      const tile = town[(top + row) * COLS + left + col]
+      expect(tile.part, `${char}@${col}-${row}`).toBe(entry[0])
+      expect(scaleOf(tile), `${char}@${col}-${row}`).toBe(entry[1] ?? 1)
+      expect(tile.ground).toBe(entry[2] ?? 'grass')
+    }))
+  })
+
+  it('shows off big parts on every themed hand-made map, and reports badly drawn big blocks', () => {
+    for (const map of STAMPS.filter((item) => item.id !== 'empty')) {
+      const town = createMapTown(map.id)
+      const anchors = town.filter((tile, index) => tile.anchor === index)
+      // どの ちずにも おおきく おいた たてものが いくつも ある。
+      expect(anchors.filter((tile) => scaleOf(tile) > 1).length, map.id).toBeGreaterThanOrEqual(3)
+    }
+    for (const map of STAMPS) {
+      for (const [part, scale = 1] of Object.values(map.big ?? {})) expect(scalesOf(part), `${map.id} ${part}`).toContain(scale)
+    }
+    const broken: StampMap = {
+      kind: 'stamp', id: 'empty', name: 'x', emoji: 'x',
+      rows: ['11.', '1..', '..2', '..3'],
+      big: { 1: ['castle', 2], 2: ['stadium', 3], 4: ['tree'], h: ['house'] },
+    }
+    expect(mapProblems(broken)).toEqual([
+      'empty: stadium cannot be ×3',
+      'empty: "4" is never drawn',
+      'empty: big key "h" must be one letter that is not in the legend',
+      'empty: "h" is never drawn',
+      'empty: unknown cell "3" at 2-3',
+      'empty: "1" at 0-0 is not a 2×2 block',
+      'empty: "1" at 1-0 is not a 2×2 block',
+      'empty: "1" at 0-1 is not a 2×2 block',
+      'empty: "2" at 2-2 is not a 6×6 block',
+    ])
   })
 
   it('lets rivers, seas and roads at the edge of a hand-made map run on to the edge of the wide map', () => {
+    const frame = (id: MapId) => stampFrame(findMap(id) as StampMap)
     const island = createMapTown('island')
     // うみに かこまれた しまは、まわりも うみ。ながい はしは ちずの はしまで つづく。
-    expect(island.filter((tile) => tile.ground === 'water').length).toBeGreaterThan(COLS * ROWS * 0.8)
-    const bridgeRow = STAMP_TOP + 7
+    expect(island.filter((tile) => tile.ground === 'water').length).toBeGreaterThan(COLS * ROWS * 0.7)
+    const bridgeRow = frame('island').top + 9
     expect(island[bridgeRow * COLS + COLS - 1]).toEqual({ ground: 'water', part: 'road' })
     const starter = createMapTown('starter')
     // かわは きたと みなみの はしまで ながれる。
-    expect(starter[STAMP_LEFT + 9].ground).toBe('water')
-    expect(starter[(ROWS - 1) * COLS + STAMP_LEFT + 9].ground).toBe('water')
+    expect(starter[frame('starter').left + 13].ground).toBe('water')
+    expect(starter[(ROWS - 1) * COLS + frame('starter').left + 13].ground).toBe('water')
     const seaside = createMapTown('seaside')
     expect(seaside[(ROWS - 1) * COLS].ground).toBe('water')
-    expect(seaside[(STAMP_TOP + 9) * COLS].ground).toBe('sand')
+    expect(seaside[(frame('seaside').top + 12) * COLS].ground).toBe('sand')
   })
 
   it.each(PRESETS)('%s has a closed railway loop with a station, and trains run from the start', (id) => {
