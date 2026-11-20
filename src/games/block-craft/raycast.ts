@@ -1,8 +1,12 @@
-import { definitionAt, type Position, type World } from './world'
+import { definitionAt, type MaterialDef, type Position, type World } from './world'
 
 export const BLOCK_WIDTH = 0.97
 export const PLANT_WIDTH_SCALE = 0.45
 export const plantCenterY = (y: number, height: number) => y - BLOCK_WIDTH / 2 * (1 - height)
+/** えがく はこの よこはばと たかさ（ブロック 1つぶんが 1）。ひくい ものは じめんに つける。 */
+export function blockShape(def: MaterialDef) {
+  return { width: def.width ?? (def.plant ? PLANT_WIDTH_SCALE : 1), height: def.height ?? (def.plant ? 0.6 : 1) }
+}
 const HALF = Math.fround(BLOCK_WIDTH / 2)
 const AXES = ['x', 'y', 'z'] as const
 type Axis = typeof AXES[number]
@@ -41,12 +45,11 @@ export function hitBlock(world: World, origin: Position, direction: Position, fa
   while (true) {
     const code = world.codeAt(cell.x, cell.y, cell.z)
     if (code) {
-      const def = definitionAt(code)
-      const height = def.height ?? 0.6
+      const { width, height } = blockShape(definitionAt(code))
       // Instanced matrices store scale and translation in Float32.
-      const horizontal = HALF * (def.plant ? Math.fround(PLANT_WIDTH_SCALE) : 1)
-      const vertical = HALF * (def.plant ? Math.fround(height) : 1)
-      const centerY = def.plant ? Math.fround(plantCenterY(cell.y, height)) : cell.y
+      const horizontal = HALF * Math.fround(width)
+      const vertical = HALF * Math.fround(height)
+      const centerY = Math.fround(plantCenterY(cell.y, height))
       let near = -Infinity, end = exit
       let face: Axis = 'x'
       for (const axis of AXES) {

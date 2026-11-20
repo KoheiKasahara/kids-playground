@@ -6,14 +6,16 @@ import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
 import { feedAnimal, shearSheep, type Animal, type Cell, type FeedResult, type Herd } from './animals'
 import { biome, BIOMES } from './biomes'
-import { MAX_WHEAT, newGame, readGame, readWool, writeGame, writeWool, type Game } from './save'
+import { MAX_WHEAT, newGame, readCrafted, readGame, readWool, writeCrafted, writeGame, writeWool, type Game } from './save'
 import {
-  blockAt, brushCells, editWorld, growTree, isCrop, materialCode, materialDef, netMaterialChange, PALETTE, pickAs, settleWalker,
-  startWalker, tendCrops, topBlock, undoChanges, walk, wheatAt, woolMaterial, type Changes, type Material, type Position, type WoolColor, type World,
+  blockAt, brushCells, eatCake, editWorld, explode, growTree, isCrop, key, materialCode, materialDef, netMaterialChange, PALETTE, pickAs, settleWalker,
+  startWalker, tendCrops, toggleDoor, topBlock, undoChanges, walk, wheatAt, woolMaterial, type Changes, type Material, type Position, type WoolColor, type World,
 } from './world'
 import { useCraftScene } from './useCraftScene'
 import CraftMap from './CraftMap'
-import { playCraftSound, type CraftSound } from './sounds'
+import CraftPanel from './CraftPanel'
+import { isCrafted, type CraftedMaterial } from './recipes'
+import { NOTE_NAMES, noteStep, playCraftSound, playNote, type CraftSound } from './sounds'
 import styles from './BlockCraftPlay.module.css'
 
 /** おしらせを だす じかん [ms]。 */
@@ -27,6 +29,10 @@ const FEED_MESSAGES: Record<FeedResult, string> = {
 }
 type HistoryEntry = { farm: Farm } & ({ changes: Changes } | { world: World })
 const OBSIDIAN = materialCode('obsidian')
+/** ばくだんに ひが ついてから はじけるまで [ms]。 */
+export const FUSE_MS = 1600
+/** ベッドで ねている じかん [ms]。 */
+export const SLEEP_MS = 1500
 /** おしっぱなしで あるきつづける：はじめの まち [ms] と くりかえす はやさ [ms]。 */
 const REPEAT_DELAY_MS = 380
 const REPEAT_MS = 170
@@ -75,6 +81,13 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
   const [resetting, setResetting] = useState(false)
   const [mapOpen, setMapOpen] = useState(false)
   const [wool, setWool] = useState(readWool)
+  const [crafted, setCrafted] = useState(readCrafted)
+  const [crafting, setCrafting] = useState(false)
+  const [sleeping, setSleeping] = useState(false)
+  const [lit, setLit] = useState<Position[]>([])
+  /** ひの ついた ばくだん（ばしょ → はじける タイマー）。 */
+  const fuses = useRef(new Map<string, { at: Position; timer: ReturnType<typeof setTimeout> }>())
+  const boom = useRef<(at: Position) => void>(() => {})
   const [sound, toggleSound] = useSoundToggle()
   const [saveFailed, setSaveFailed] = useState(false)
   const found = world.foundCount
@@ -88,11 +101,40 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
   const settle = useCallback((next: World) => {
     setWalker(previous => previous && settleWalker(next, previous))
   }, [])
+  /** こわした・もどした ばくだんの ひを けす。 */
+  const pruneFuses = useCallback((current: World) => {
+    let pruned = false
+    for (const [id, fuse] of fuses.current) {
+      if (current.materialAt(fuse.at) === 'bomb') continue
+      clearTimeout(fuse.timer)
+      fuses.current.delete(id)
+      pruned = true
+    }
+    if (pruned) setLit([...fuses.current.values()].map(fuse => fuse.at))
+  }, [])
+  useEffect(() => {
+    const active = fuses.current
+    return () => { for (const fuse of active.values()) clearTimeout(fuse.timer) }
+  }, [])
+  useEffect(() => {
+    if (!sleeping) return
+    const timer = setTimeout(() => {
+      setSleeping(false)
+      setNight(false)
+      setToast('🌅 おはよう！ あさに なったよ')
+      playCraftSound('morning')
+      vibrate('success')
+    }, SLEEP_MS)
+    return () => clearTimeout(timer)
+  }, [sleeping])
   /** せかい・こむぎ・どうぶつを かえて、もどす ための きろくを のこす。 */
   const commit = useCallback((changes: Changes, nextFarm: Farm, effect: CraftSound, message?: string) => {
     if (!changes.length && nextFarm === farm) return
     setHistory(previous => [...previous.slice(-29), { changes, farm }])
-    if (changes.length) settle(world)
+    if (changes.length) {
+      settle(world)
+      pruneFuses(world)
+    }
     setFarm(nextFarm)
     const discovered = world.discovered(changes)
     if (discovered.length) {
@@ -105,8 +147,34 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     }
     if (message) setToast(message)
     playCraftSound(effect)
-    vibrate(effect === 'baby' ? 'celebrate' : 'tap')
-  }, [world, farm, settle])
+    vibrate(effect === 'baby' ? 'celebrate' : effect === 'boom' ? 'impact' : 'tap')
+  }, [world, farm, settle, pruneFuses])
+  /** ばくだんに ひを つける。すこし たつと まわりの ブロックごと はじける。 */
+  const light = useCallback((at: Position) => {
+    const id = key(at)
+    if (fuses.current.has(id)) return
+    fuses.current.set(id, { at, timer: setTimeout(() => boom.current(at), FUSE_MS) })
+    setLit([...fuses.current.values()].map(fuse => fuse.at))
+    playCraftSound('fuse')
+    vibrate('tap')
+  }, [])
+  const sleep = useCallback(() => {
+    if (!night) {
+      setToast('☀️ まだ あかるいよ。よるに ねようね')
+      playCraftSound('select')
+      return
+    }
+    setToast(null)
+    setSleeping(true)
+    playCraftSound('sleep')
+    vibrate('tap')
+  }, [night])
+  const unlockCrafted = useCallback((made: CraftedMaterial) => {
+    if (crafted.includes(made)) return
+    const next = [...crafted, made]
+    setCrafted(next)
+    writeCrafted(next)
+  }, [crafted])
   const pick = useCallback((position: Position, normal: Position) => {
     setCursor({ ...position, y: 0 })
     const touched = blockAt(world, position)?.material
@@ -119,6 +187,32 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
       commit(changes, addWheat(farm, harvested), harvested ? 'harvest' : 'grow', harvested ? `🌾 こむぎが ${harvested}こ とれた！` : undefined)
       return
     }
+    // さわると うごく ブロック
+    if (mode === 'place') switch (touched) {
+      case 'workbench':
+        setCrafting(true)
+        playCraftSound('select')
+        return
+      case 'bed':
+        sleep()
+        return
+      case 'door':
+      case 'door_open':
+        commit(toggleDoor(world, position), farm, 'door')
+        return
+      case 'bomb':
+        light(position)
+        return
+      case 'note':
+        playNote(noteStep(position.y))
+        setToast(`🎵 ${NOTE_NAMES[noteStep(position.y)]}`)
+        vibrate('tap')
+        return
+      case 'cake':
+      case 'cake_half':
+        commit(eatCake(world, position), farm, 'eat', touched === 'cake' ? '😋 おいしい！' : '😋 ぜんぶ たべた！')
+        return
+    }
     if (mode === 'remove' && position.y === 0) return
     const target = mode === 'remove' ? position : { x: position.x + normal.x, y: position.y + normal.y, z: position.z + normal.z }
     const cells = brushCells(target, normal, wide)
@@ -128,7 +222,7 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     // ようがんが みずに ふれて くろいしに なった
     const cooled = !(mode === 'place' && material === 'obsidian') && netMaterialChange(changes, OBSIDIAN) > 0
     commit(changes, addWheat(farm, harvested), cooled ? 'cool' : harvested ? 'harvest' : mode, cooled ? '⬛ ようがんが かたまった！' : undefined)
-  }, [world, farm, material, mode, wide, commit])
+  }, [world, farm, material, mode, wide, commit, sleep, light])
   const unlockWool = useCallback((color: WoolColor) => {
     if (wool.includes(color)) return
     const next = [...wool, color]
@@ -142,11 +236,24 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     const picked = pickAs(block.material)
     const color = materialDef(picked).wool
     if (color) unlockWool(color)
+    if (isCrafted(picked)) unlockCrafted(picked)
     setMaterial(picked)
     setMode('place')
     playCraftSound('select')
     vibrate('tap')
-  }, [world, unlockWool])
+  }, [world, unlockWool, unlockCrafted])
+  /** クラフトだいで つくった ブロックを えらぶ（はじめて なら パレットに ふえる）。 */
+  const craft = (made: CraftedMaterial) => {
+    const fresh = !crafted.includes(made)
+    unlockCrafted(made)
+    setMaterial(made)
+    setMode('place')
+    closeCrafting()
+    const def = materialDef(made)
+    setToast(fresh ? `${def.emoji} ${def.label}が できた！` : `${def.emoji} ${def.label}を えらんだよ`)
+    playCraftSound(fresh ? 'craft' : 'select')
+    vibrate(fresh ? 'success' : 'tap')
+  }
   /** こわす で ひつじに さわると けいとが とれ、こむぎが あれば えさを あげる。 */
   const touchAnimal = useCallback((animal: Animal, cell: Cell) => {
     if (mode === 'remove') {
@@ -166,7 +273,29 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     vibrate('tap')
   }, [farm, mode, commit, unlockWool])
   const { setContainer, failed, api } = useCraftScene({
-    world, cursor, night, walker, herd: farm.herd, sky: land.sky, onPick: pick, onHold: hold, onAnimal: touchAnimal,
+    world, cursor, night, walker, herd: farm.herd, sky: land.sky, lit, onPick: pick, onHold: hold, onAnimal: touchAnimal,
+  })
+  const sceneElement = useRef<HTMLDivElement | null>(null)
+  const sceneRef = useCallback((element: HTMLDivElement | null) => {
+    sceneElement.current = element
+    setContainer(element)
+  }, [setContainer])
+  /** クラフトだいを とじたら、キーボードで そのまま せかいを そうさ できる。 */
+  const closeCrafting = () => {
+    setCrafting(false)
+    sceneElement.current?.focus()
+  }
+  useEffect(() => {
+    boom.current = (at: Position) => {
+      fuses.current.delete(key(at))
+      // こわした ばくだんは はじけない。まきこまれた ばくだんの ひは commit で きえる
+      const { changes, bombs } = explode(world, at)
+      if (changes.length) {
+        api.current?.burst(bombs)
+        commit(changes, farm, 'boom', '💥 ドカーン！')
+      }
+      setLit([...fuses.current.values()].map(fuse => fuse.at))
+    }
   })
 
   const move = (dx: number, dz: number) => {
@@ -182,7 +311,9 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     const next = walk(world, walker, back ? { x: -heading.x, z: -heading.z } : heading)
     if (next === walker) return
     setWalker(next)
-    playCraftSound('step')
+    // おんぷ ブロックの うえを あるくと おとが なる
+    if (world.materialAt({ ...next, y: next.y - 1 }) === 'note') playNote(noteStep(next.y - 1))
+    else playCraftSound('step')
   }
   const turn = (side: 'left' | 'right') => {
     api.current?.turn(side)
@@ -217,9 +348,11 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     if ('world' in previous) {
       setWorld(previous.world)
       settle(previous.world)
+      pruneFuses(previous.world)
     } else {
       undoChanges(world, previous.changes)
       settle(world)
+      pruneFuses(world)
     }
     setFarm(previous.farm)
     setHistory(history.slice(0, -1))
@@ -236,6 +369,7 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     setHistory(previous => [...previous.slice(-29), { world, farm }])
     setWorld(next.world)
     settle(next.world)
+    pruneFuses(next.world)
     setFarm({ wheat: next.wheat, herd: next.herd })
     setResetting(false)
     playCraftSound('select')
@@ -269,7 +403,7 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     </header>
     <GamePlaySurface>
       <div className={styles.stage}>
-        <div className={styles.scene} ref={setContainer} role="application" tabIndex={0} onKeyDown={onKeyDown} style={{ background: night ? undefined : land.sky }}
+        <div className={styles.scene} ref={sceneRef} role="application" tabIndex={0} onKeyDown={onKeyDown} style={{ background: night ? undefined : land.sky }}
           aria-label={walker
             ? 'ブロックの せかいを あるく。やじるしで すすむ・むきを かえ、Enterで まんなかの ブロックを おく・こわす'
             : 'ブロックの せかい。やじるしで ばしょを えらび、Enterで おく・こわす。Shift＋Enterで その ブロックを えらぶ'} />
@@ -308,9 +442,11 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
         </div>
         <div className={styles.palette} role="group" aria-label="ブロックを えらぶ">
           {PALETTE.map(item => {
-            // けいとは ひつじの けを とるまで つかえない
-            const locked = 'wool' in item && !wool.includes(item.wool)
-            return <button key={item.id} disabled={locked} aria-pressed={material === item.id} aria-label={locked ? 'ひつじの けを とると つかえる' : undefined}
+            // けいとは ひつじの けを とるまで、クラフトの ブロックは つくるまで つかえない
+            const sheep = 'wool' in item && !wool.includes(item.wool)
+            const locked = sheep || (isCrafted(item.id) && !crafted.includes(item.id))
+            return <button key={item.id} disabled={locked} aria-pressed={material === item.id}
+              aria-label={sheep ? 'ひつじの けを とると つかえる' : locked ? 'クラフトだいで つくると つかえる' : undefined}
               onClick={() => { setMaterial(item.id); setMode('place'); playCraftSound('select') }}>
               <span className={styles.swatch} style={{ background: locked ? '#e7e3d8' : item.color }} aria-hidden="true">{locked ? '❓' : item.emoji}</span>{locked ? '？' : item.label}
             </button>
@@ -322,6 +458,9 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
         </div>
       </div>
     </GamePlaySurface>
+    {crafting && <CraftPanel crafted={crafted} onCraft={craft} onSelect={() => playCraftSound('select')}
+      onClose={() => { closeCrafting(); playCraftSound('select') }} />}
+    {sleeping && <div className={styles.sleep} role="status">💤 ぐうぐう…</div>}
     {resetting && <div className={styles.confirm} role="group" aria-label="せかいを もどす かくにん">
       <p>つくったものを けして、はじめの せかいに もどす？</p>
       <button onClick={reset}>もどして あそぶ</button>
@@ -346,6 +485,6 @@ export default function BlockCraftPlay() {
       </button>)}
     </div>
     {saved && <button className={styles.start} onClick={() => begin(saved)}>💾 つづきから あそぶ</button>}
-    <p className={styles.tips}>👆 タッチで ブロックを おく<br />👉 ドラッグで まわりを みる<br />✌️ 2ほんゆびで いどう・ちかづく<br />✋ ながおしで その ブロックを えらぶ<br />🚶 あるいて たんけん（おしっぱなしで すすむ）<br />🗺️ ちずを タッチすると そこへ とべるよ<br />⛏️ ちずの ✖ を ほると たからが あるよ<br />🌿 なえぎ・🌾 たねは タッチで そだつよ<br />🐑 こむぎを あげると どうぶつと なかよしに<br />💾 おわる まえに「ほぞん」を おしてね</p>
+    <p className={styles.tips}>👆 タッチで ブロックを おく<br />👉 ドラッグで まわりを みる<br />✌️ 2ほんゆびで いどう・ちかづく<br />✋ ながおしで その ブロックを えらぶ<br />🚶 あるいて たんけん（おしっぱなしで すすむ）<br />🗺️ ちずを タッチすると そこへ とべるよ<br />⛏️ ちずの ✖ を ほると たからが あるよ<br />🌿 なえぎ・🌾 たねは タッチで そだつよ<br />🐑 こむぎを あげると どうぶつと なかよしに<br />🛠️ クラフトだいを タッチして あたらしい ブロックを つくろう<br />🛏️ よるは ベッドで ねると あさに なるよ<br />💣 ばくだんを タッチすると ドカーン！<br />💾 おわる まえに「ほぞん」を おしてね</p>
   </div>
 }

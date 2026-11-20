@@ -66,6 +66,52 @@
 .confirm { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; width: min(92%, 420px); box-sizing: border-box; padding: 16px; border: 3px solid #86ab63; background: #fff9df; border-radius: 16px; text-align: center; box-shadow: 0 0 0 100vmax #17352c99; }
 .confirm button { margin: 5px; }
 
+/* クラフトだい（ほかの ゲームの まどと おなじく「もどる」より てまえ。「とじる」で もどる） */
+.craftPanel {
+  position: absolute; inset: 0; z-index: 1100; box-sizing: border-box; overflow: hidden auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  background: #fff9dff5; text-align: center;
+}
+.craftPanel:focus { outline: none; }
+.craftColumn { display: flex; flex-direction: column; gap: 6px; width: min(100%, 520px); flex: none; }
+.craftPanel p { margin: 0; font-weight: 800; }
+.craftTitle { font-size: clamp(15px, 4.4vw, 19px); }
+.craftHint { font-size: 13px; }
+.craftTable { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px; border: 3px solid #b07a43; border-radius: 16px; background: #e9c48f; box-sizing: border-box; }
+.slot { display: grid; place-items: center; box-sizing: border-box; width: 52px; height: 52px; border: 3px solid #8a5a2b; border-radius: 10px; background: #f7e3c2; }
+.game .slot { min-height: 0; padding: 0; border-color: #8a5a2b; background: #f7e3c2; }
+.slot .swatch, .craftResult .swatch { width: 34px; height: 34px; margin: 0; font-size: 21px; }
+.arrow { font-size: 22px; }
+.game .craftResult { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 80px; min-height: 60px; padding: 4px; border-color: #e2b43c; background: #fffef7; font-size: 13px; }
+.game .craftResult:not(:disabled) { border-color: #267652; background: #def4d3; animation: pop .35s ease-out; }
+.slotEmpty { font-size: 26px; color: #8a5a2b; }
+.ingredients { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 5px; }
+.game .ingredients button { min-height: 0; padding: 3px 0; font-size: 11px; letter-spacing: -.04em; white-space: nowrap; overflow: hidden; border-radius: 10px; }
+.recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 5px; }
+.game .recipes button { position: relative; min-height: 38px; padding: 2px 6px; font-size: 16px; white-space: nowrap; }
+.done { position: absolute; right: 4px; top: 2px; color: #267652; font-size: 13px; font-weight: 900; }
+.craftActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+
+/* ベッドで ねている */
+.sleep {
+  position: absolute; inset: 0; z-index: 1100; display: grid; place-items: center; margin: 0;
+  background: #0d1430; color: #fff; font-size: clamp(28px, 8vw, 44px); font-weight: 900; animation: sleep 1.5s ease-in-out both;
+}
+@keyframes sleep { 0% { opacity: 0; } 30%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sleep, .game .craftResult:not(:disabled) { animation: none; } }
+
+/* よこむきの スマホ：ひだりで ならべて、みぎに レシピ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .craftPanel { flex-direction: row; align-items: flex-start; justify-content: center; gap: 10px; }
+  .craftColumn { width: auto; flex: 1 1 0; max-width: 420px; min-width: 0; }
+  .craftTitle { font-size: 15px; }
+  .ingredients { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
+  .game .ingredients button { min-height: 0; padding-block: 2px; }
+  .recipes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .game .recipes button { min-height: 36px; font-size: 15px; padding-inline: 2px; }
+}
+
 /* たかさに よゆうが あれば ざいりょうを 3だん ならべる */
 @media (min-height: 760px) and (orientation: portrait) { .palette { grid-template-rows: repeat(3, auto); } }
 

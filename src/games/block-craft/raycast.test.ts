@@ -10,8 +10,9 @@ function legacyRaycast(blocks: readonly Block[]) {
   const matrix = new THREE.Matrix4()
   blocks.forEach(({ x, y, z, material }, index) => {
     const def = materialDef(material)
-    const height = def.height ?? 0.6
-    if (def.plant) matrix.makeScale(0.45, height, 0.45).setPosition(x, y - 0.485 * (1 - height), z)
+    const width = def.width ?? (def.plant ? 0.45 : 1)
+    const height = def.height ?? (def.plant ? 0.6 : 1)
+    if (width !== 1 || height !== 1) matrix.makeScale(width, height, width).setPosition(x, y - 0.485 * (1 - height), z)
     else matrix.makeTranslation(x, y, z)
     mesh.setMatrixAt(index, matrix)
   })
@@ -27,9 +28,10 @@ function legacyRaycast(blocks: readonly Block[]) {
   }
 }
 
-it('matches Three front faces, angles, plants, translucent boxes, gaps and the reach limit', () => {
+it('matches Three front faces, angles, plants, low and thin blocks, translucent boxes, gaps and the reach limit', () => {
   const world = createWorld()
-  const blocks = [...world.blocks(), { x: 8, y: 7, z: 8, material: 'glass' } as const, { x: 9, y: 7, z: 8, material: 'ice' } as const]
+  const blocks = [...world.blocks(), { x: 8, y: 7, z: 8, material: 'glass' } as const, { x: 9, y: 7, z: 8, material: 'ice' } as const,
+    { x: 4, y: 3, z: 4, material: 'bed' } as const, { x: 5, y: 3, z: 4, material: 'torch' } as const, { x: 6, y: 3, z: 4, material: 'cake' } as const]
   const grid = new World(world, blocks)
   const legacy = legacyRaycast(blocks)
   const compare = (from: Position, toward: Position, far = Infinity) => {
@@ -54,6 +56,10 @@ it('matches Three front faces, angles, plants, translucent boxes, gaps and the r
     compare({ x: 7, y: 8, z: 7 }, { x: 1, y: -1, z: 1 }) // corner
     compare({ x: 6, y: 10, z: 9 }, { x: 0, y: -1, z: 0 }) // flower
     compare({ x: 6.35, y: 10, z: 9 }, { x: 0, y: -1, z: 0 }) // beside flower
+    compare({ x: 4, y: 10, z: 4 }, { x: 0, y: -1, z: 0 }) // top of the low bed
+    compare({ x: 0, y: 3.1, z: 4 }, { x: 1, y: 0, z: 0 }) // over the bed, into the thin torch
+    compare({ x: 0, y: 2.8, z: 4 }, { x: 1, y: 0, z: 0 }) // side of the bed
+    compare({ x: 6.45, y: 10, z: 4 }, { x: 0, y: -1, z: 0 }) // beside the narrow cake
     compare({ x: 8, y: 16, z: 8 }, { x: 0, y: -1, z: 0 }, 7)
     compare({ x: 8, y: 14, z: 8 }, { x: 0, y: -1, z: 0 }, 7)
     let seed = 321
