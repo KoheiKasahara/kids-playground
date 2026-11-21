@@ -5,8 +5,10 @@ import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { useGameInterval } from '../../utils/useGameInterval'
 import { advance, grid, LAPS, position, RECHARGE, STEP } from './race'
-import { drawRace, makeCircuit } from './scenery'
+import { drawRace, makeLoadingCircuit } from './scenery'
 import { raceChime } from './sounds'
+import carSheetUrl from './rally-cars.webp'
+import valleyUrl from './alpine-valley.webp'
 import styles from './StripeRally.module.css'
 
 export default function StripeRally() {
@@ -24,18 +26,36 @@ export default function StripeRally() {
     const surface = canvas.current
     const ctx = surface?.getContext('2d')
     if (!surface || !ctx) return
-    const circuit = makeCircuit()
+    let circuit: HTMLCanvasElement | HTMLImageElement = makeLoadingCircuit()
+    let sprites: HTMLImageElement | null = null
     const paint = () => {
-      const width = Math.max(1, Math.round(surface.clientWidth / 2.25))
-      const height = Math.max(1, Math.round(surface.clientHeight / 2.25))
+      const width = Math.max(1, Math.round(surface.clientWidth * 1.08))
+      const height = Math.max(1, Math.round(surface.clientHeight * 1.08))
       if (surface.width !== width) surface.width = width
       if (surface.height !== height) surface.height = height
-      drawRace(ctx, circuit, latestRace.current)
+      drawRace(ctx, circuit, sprites, latestRace.current)
     }
+    const valley = new Image()
+    valley.onload = () => {
+      circuit = valley
+      paint()
+    }
+    valley.src = valleyUrl
+    const cars = new Image()
+    cars.onload = () => {
+      sprites = cars
+      paint()
+    }
+    cars.src = carSheetUrl
     redraw.current = paint
     const observer = new ResizeObserver(paint)
     observer.observe(surface)
-    return () => { observer.disconnect(); redraw.current = null }
+    return () => {
+      observer.disconnect()
+      valley.onload = null
+      cars.onload = null
+      redraw.current = null
+    }
   }, [])
   useEffect(() => {
     latestRace.current = race
