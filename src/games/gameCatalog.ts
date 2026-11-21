@@ -1460,6 +1460,20 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
     intro: { howToPlay: ['スタートで あおい くるまが はしるよ', 'ダッシュが たまったら おしてみよう'] },
   },
+  {
+    id: 'star-parade',
+    slug: 'star-parade',
+    title: 'ほしぞらパレード',
+    emoji: '🌠',
+    category: 'learning',
+    seo: {
+      headline: 'ほしぞらパレード｜数字のゲートで星をふやすランゲーム',
+      description: '星たちが宇宙の道をかけぬける数あそびです。左右のゲートをえらんで、星をふやそう。ゴールでは星の数にあわせて花火がひらきます。',
+    },
+    intro: {
+      howToPlay: ['タッチした ところに ほしが うごくよ', '「＋」や「×2」で なかまを ふやそう', 'いんせきは よけるか ジャンプで とびこえよう'],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
