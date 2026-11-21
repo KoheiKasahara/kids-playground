@@ -47,6 +47,7 @@ import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as flagPuzzle from '../../games/flag-roll-puzzle/sounds'
 import * as hanabi from '../../games/hanabi-don/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
+import * as starParade from '../../games/star-parade/sounds'
 import { raceChime } from '../../games/stripe-rally/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
 import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
@@ -422,6 +423,14 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('スタート', () => raceChime('start')),
     sample('ダッシュ', () => raceChime('boost')),
     sample('ゴール', () => raceChime('finish')),
+  ],
+  'star-parade': [
+    sample('しゅっぱつ', starParade.playStart),
+    sample('ほしが ふえる', starParade.playGrow),
+    sample('ほしが へる', starParade.playShrink),
+    sample('ジャンプ', starParade.playJump),
+    sample('いんせきに あたる', starParade.playHit),
+    sample('はなび', starParade.playFinish),
   ],
   'robo-kuzushi': [
     sample('とばす', robo.playLaunchSound),
