@@ -1,3 +1,5 @@
+import { formation } from './formation'
+import { flightSeconds, GOAL_COUNT, METERS_PER_STAR } from './progression'
 import type { GateRow } from './course'
 import { meteorX } from './game'
 
@@ -8,7 +10,7 @@ export type WorldFrame = {
   count: number
   gates: readonly GateRow[]
   finish: number
-  phase: 'ready' | 'running' | 'finished'
+  phase: 'ready' | 'running' | 'launching' | 'finished'
   time: number
   celebration: number
 }
@@ -501,34 +503,17 @@ function starBuddy(ctx: Brush, x: number, floor: number, radius: number, step: n
 }
 
 function squad(ctx: Brush, road: Road, frame: WorldFrame) {
-  const total = Math.max(1, frame.count)
-  const crowdScale = 1 / (1 + Math.max(0, total - 5) * 0.004)
-  const playerScale = Math.min(road.height * 0.088, road.width * 0.167) * crowdScale
+  const stars = formation(frame.count, frame.playerX)
   const [x, ground] = roadPoint(road, frame.playerX, 1)
+  const unit = Math.min(road.width, road.height * 0.72)
+  const playerScale = stars[0].radius * unit
   const lift = frame.jump * Math.min(road.height * 0.235, road.width * 0.60)
-  const spacing = playerScale * 1.19
-  // Grow the parade in rows, keeping the lead star in front and readable.
-  let left = total - 1
-  const rows: number[] = []
-  while (left > 0) {
-    const members = Math.min(left, 2 + rows.length)
-    rows.push(members)
-    left -= members
-  }
   const beat = frame.time * (frame.phase === 'running' ? 8.5 : 2.5)
-  for (let row = rows.length - 1; row >= 0; row--) {
-    const depth = 1 / (1.18 + row * 0.22)
-    const rowOffset = playerScale * (0.84 + row * 0.55) / (1 + row * 0.13)
-    const rowGroundScale = 1 - rowOffset / road.depth
-    const rowSpacing = spacing * 1.85 * depth
-    const edge = Math.min(road.cx, road.width * rowGroundScale) - (rows[row] - 1) * rowSpacing / 2 - playerScale * depth
-    const rowX = road.cx + Math.max(-edge, Math.min(edge, (x - road.cx) * rowGroundScale))
-    for (let i = 0; i < rows[row]; i++) {
-      const offset = (i - (rows[row] - 1) / 2) * rowSpacing
-      starBuddy(ctx, rowX + offset, ground - rowOffset, playerScale * 0.84 * depth, beat + i + row + 2, lift * rowGroundScale)
-    }
+  for (let i = stars.length - 1; i >= 0; i--) {
+    const star = stars[i]
+    starBuddy(ctx, road.cx + road.width * star.x, ground - star.depth * playerScale,
+      star.radius * unit, beat + i, lift)
   }
-  starBuddy(ctx, x, ground, playerScale, beat, lift)
   for (let i = 0; i < 4; i++) {
     const t = (frame.time * 0.55 + i * 0.27) % 1
     const dx = (i % 2 ? -1 : 1) * (0.82 + i * 0.24)
@@ -537,35 +522,64 @@ function squad(ctx: Brush, road: Road, frame: WorldFrame) {
   }
 }
 
-function fireworks(ctx: Brush, w: number, h: number, count: number, time: number) {
-  const bursts = Math.min(9, 1 + Math.floor(count / 4))
-  const colors = ['#ffd78b', '#83eddc', '#ffaebe', '#c7bdff']
-  for (let i = 0; i < bursts; i++) {
-    const elapsed = time - i * 0.19
-    if (elapsed < 0) continue
-    const cycle = Math.floor(elapsed / 2.15)
-    const progress = elapsed / 2.15 - cycle
-    const seed = i * 13 + cycle * 38
-    const x = w * (i === 0 ? 0.47 + fraction(seed + 3) * 0.09 : 0.1 + fraction(seed + 3) * 0.8)
-    const y = h * (0.12 + fraction(seed + 17) * 0.32)
-    const radius = Math.min(w, h) * (0.08 + Math.min(70, count) * 0.0014) * (i === 0 ? 1.28 : 0.75)
+function ascent(ctx: Brush, w: number, h: number, frame: WorldFrame, road: Road) {
+  const t = Math.min(1, frame.celebration / flightSeconds(frame.count))
+  const rise = t * (2 - t)
+  const meters = frame.count * METERS_PER_STAR * rise
+  const travel = meters / 160
+  const sky = ctx.createLinearGradient(0, 0, 0, h)
+  sky.addColorStop(0, '#101034')
+  sky.addColorStop(0.55, '#39295e')
+  sky.addColorStop(1, '#946899')
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, w, h)
+  for (let i = 0; i < 76; i++) {
+    const depth = 0.15 + fraction(i + 113) * 0.7
+    sparkle(ctx, fraction(i + 9) * w, ((fraction(i + 88) + travel * depth) % 1) * h,
+      0.8 + depth * 2, '#f7dfc4')
+  }
+  // Let the runway fall away as the camera follows the same stars into orbit.
+  const takeoff = Math.min(1, t * 3)
+  const launchEase = takeoff * (2 - takeoff)
+  if (takeoff < 1) {
     ctx.save()
-    ctx.globalAlpha = Math.sin(Math.PI * progress) ** 0.6
-    for (let k = 0; k < 14; k++) {
-      const angle = k * circle / 14 + i
-      const reach = radius * Math.sqrt(progress) * (k % 2 ? 1 : 0.76)
-      const dx = Math.cos(angle) * reach, dy = Math.sin(angle) * reach
-      const sag = progress * progress * radius * 0.52
-      ctx.beginPath()
-      ctx.moveTo(x + dx * 0.68, y + dy * 0.68 + sag * 0.64)
-      ctx.lineTo(x + dx, y + dy + sag)
-      ctx.lineWidth = i === 0 ? 2 : 1.5
-      ctx.strokeStyle = colors[(i + k % 2) % colors.length]
-      ctx.stroke()
-      sparkle(ctx, x + dx, y + dy + sag, 2.7, '#fff3ce')
-    }
+    ctx.globalAlpha = 1 - takeoff
+    ctx.translate(0, h * takeoff)
+    paintSky(ctx, w, h)
+    track(ctx, road, frame.distance)
+    finishLine(ctx, road, 1)
     ctx.restore()
   }
+  const leadY = h * (0.79 - 0.27 * launchEase - 0.22 * Math.min(1, meters / (GOAL_COUNT * METERS_PER_STAR)))
+  const moonY = leadY + (meters - GOAL_COUNT * METERS_PER_STAR) * h / 190
+  const moonR = Math.min(w, h) * 0.09
+  oval(ctx, w * 0.76, moonY, moonR, moonR, '#ffdf96')
+  oval(ctx, w * 0.76 - moonR * 0.3, moonY + moonR * 0.22, moonR * 0.2, moonR * 0.18, '#eabc7f')
+  const size = Math.min(w, h)
+  const launchFormation = formation(frame.count, frame.playerX)
+  for (let i = frame.count - 1; i >= 0; i--) {
+    const depth = Math.sqrt(i / frame.count)
+    const radius = size * (i === 0 ? 0.066 : 0.032 - depth * 0.013)
+    const star = launchFormation[i]
+    const y = leadY + depth * h * 0.33 * launchEase - size * 0.06 * star.depth * (1 - launchEase)
+    const x = road.cx + star.x * road.width * (1 - launchEase)
+      + w * depth * 0.32 * Math.sin(i * 2.4 + t * 5) * launchEase
+    const tail = radius * (2 + rise * 2)
+    const glow = ctx.createLinearGradient(x, y, x, y + tail)
+    glow.addColorStop(0, '#ffe694bb')
+    glow.addColorStop(1, '#ffaec900')
+    polygon(ctx, [[x - radius * 0.6, y], [x + radius * 0.6, y], [x, y + tail]], glow)
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.scale(radius, radius)
+    if (face) ctx.drawImage(face, -1, -1, 2, 2)
+    else paintStarFace(ctx)
+    ctx.restore()
+  }
+  ctx.textAlign = 'center'
+  ctx.font = 'bold 24px sans-serif'
+  ctx.fillStyle = '#fff3c7'
+  ctx.fillText(Math.floor(meters) + ' m', w / 2, leadY - size * 0.09)
 }
 
 export function drawWorld(ctx: Brush, width: number, height: number, frame: WorldFrame): void {
@@ -575,6 +589,11 @@ export function drawWorld(ctx: Brush, width: number, height: number, frame: Worl
     width: trackHalfWidth(width, height), height,
   }
   ctx.save()
+  if (frame.phase === 'launching' || frame.phase === 'finished') {
+    ascent(ctx, width, height, frame, road)
+    ctx.restore()
+    return
+  }
   paintSky(ctx, width, height)
   track(ctx, road, frame.distance)
   finishLine(ctx, road, perspective(frame.finish - frame.distance))
@@ -595,6 +614,5 @@ export function drawWorld(ctx: Brush, width: number, height: number, frame: Worl
     }
   }
   squad(ctx, road, frame)
-  if (frame.phase === 'finished') fireworks(ctx, width, height, frame.count, frame.celebration)
   ctx.restore()
 }

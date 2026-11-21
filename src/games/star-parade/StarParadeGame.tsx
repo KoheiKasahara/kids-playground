@@ -3,6 +3,7 @@ import { useSoundToggle } from '../../audio/useSoundToggle'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import GamePlaySurface from '../../components/GamePlaySurface'
+import { GOAL_COUNT, METERS_PER_STAR, upgradeCost } from './progression'
 import { Icon } from './ParadeIcons'
 import { useStarParade } from './useStarParade'
 import { trackHalfWidth } from './world'
@@ -11,7 +12,7 @@ import styles from './StarParadeGame.module.css'
 const laneNames = ['ひだり', 'まんなか', 'みぎ']
 
 export default function StarParadeGame() {
-  const { canvasRef, course, phase, paused, setPaused, hud, start, backToStart, steer, hold, nudge, jump } = useStarParade()
+  const { progress, result, upgrade, canvasRef, course, phase, paused, setPaused, hud, start, backToStart, steer, hold, nudge, jump } = useStarParade()
   const [sound, toggleSound] = useSoundToggle()
   const [full, setFull] = useState(false)
   const page = useRef<HTMLElement>(null)
@@ -23,9 +24,9 @@ export default function StarParadeGame() {
 
   useEffect(() => {
     if (phase === 'running' && !paused) field.current?.focus({ preventScroll: true })
-    if (phase === 'finished' || paused) action.current?.focus({ preventScroll: true })
+    if (phase === 'finished' || (phase === 'ready' && result) || paused) action.current?.focus({ preventScroll: true })
     pointer.current = null
-  }, [phase, paused])
+  }, [phase, paused, result])
 
   useEffect(() => {
     const update = () => setFull(document.fullscreenElement === page.current)
@@ -142,16 +143,24 @@ export default function StarParadeGame() {
         </div>
       </GamePlaySurface>}
 
-      {(phase !== 'running' || paused) && <div className={styles.actionArea}>
-        {phase === 'finished' && <p className={styles.result} role="status"><span aria-hidden="true">✦</span> {hud.count}この ほしで はなび！</p>}
+      {(phase === 'ready' || phase === 'finished' || paused) && <div className={styles.actionArea}>
+        {phase === 'ready' && <div className={styles.shop}>
+          <strong>☾ つきまで {GOAL_COUNT * METERS_PER_STAR} m</strong>
+          <span>{result ? `${result.count * METERS_PER_STAR} m に とうちゃく！ ＋${result.points} pt` : `ほし ${GOAL_COUNT}こで とどくよ`}</span>
+          <button type="button" disabled={progress.points < upgradeCost(progress.level) || progress.level >= GOAL_COUNT}
+            onClick={upgrade}>さいしょの ★ ＋1 {upgradeCost(progress.level)} pt</button>
+          <small>もっている ポイント {progress.points} pt</small>
+        </div>}
+        {phase === 'finished' && <p className={styles.result} role="status">☾ つきに とどいた！ {hud.count * METERS_PER_STAR} m ＋{result?.points} pt</p>}
         <button ref={action} type="button" className={styles.start} onClick={paused ? () => setPaused(false) : start}>
           <Icon name={phase === 'finished' ? 'replay' : 'play'} />
           {paused ? 'つづける' : phase === 'finished' ? 'もういちど' : 'スタート'}
         </button>
       </div>}
       <div className={styles.srOnly} role="status" aria-live="polite" aria-atomic="true">
+        {phase === 'launching' && `ほし ${hud.count}こで うちあげ！${hud.count * METERS_PER_STAR}メートルへ`}
         {phase === 'running' && `ほし ${hud.count}こ。${nextGate ? nextGate.lanes.map((label, i) =>
-          laneNames[i] + ' ' + (nextGate.meteor?.to === i - 1 ? 'いんせき' : label ?? 'あき')).join('、') : 'つぎは ゴール'}`}
+          laneNames[i] + ' ' + (nextGate.meteor?.to === i - 1 ? 'いんせき ' + (label ?? '') : label ?? 'あき')).join('、') : 'つぎは ゴール'}`}
       </div>
     </div>
 

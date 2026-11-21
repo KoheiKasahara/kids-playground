@@ -437,7 +437,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('ほしが へる', starParade.playShrink),
     sample('ジャンプ', starParade.playJump),
     sample('いんせきに あたる', starParade.playHit),
-    sample('はなび', starParade.playFinish),
+    sample('うちあげ', starParade.playFinish),
   ],
   'robo-kuzushi': [
     sample('とばす', robo.playLaunchSound),
