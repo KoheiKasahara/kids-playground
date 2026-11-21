@@ -1,3 +1,4 @@
+import { formation } from './formation'
 import type { GateLabel, GateRow } from './course'
 
 const SECONDS_PER_GATE = 2.75
@@ -19,9 +20,9 @@ export type RunState = {
   lastEvent: RunEvent | null
 }
 
-export function initialRun(): RunState {
+export function initialRun(level = 0): RunState {
   return {
-    distance: 0, playerX: 0, count: 3, passed: 0, finished: false,
+    distance: 0, playerX: 0, count: 3 + level, passed: 0, finished: false,
     jumpTime: 0, jumpCooldown: 0, lastEvent: null,
   }
 }
@@ -62,9 +63,10 @@ function applyGate(count: number, label: GateLabel) {
 
 function crossRow(row: GateRow, x: number, height: number, count: number): { count: number; event: RunEvent } {
   const lane = Math.round(x * 1.5)
-  if (row.meteor?.to === lane) {
-    if (height >= 0.36) return { count, event: 'dodge' }
-    return { count: Math.max(1, count - 2), event: 'hit' }
+  if (row.meteor && height < 0.36) {
+    const rockX = meteorX(row, row.distance)
+    const hits = formation(count, x).filter(star => Math.abs(star.x - rockX) <= 0.13 + star.radius * 0.8)
+    if (hits.length) return { count: Math.max(1, count - hits.length), event: 'hit' }
   }
   const gate = row.lanes[lane + 1]
   if (!gate) return { count, event: row.meteor ? 'dodge' : 'pass' }

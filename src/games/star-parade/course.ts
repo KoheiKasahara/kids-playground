@@ -30,9 +30,9 @@ export function createCourse(random = Math.random): GateRow[] {
     { lanes: [null, pick('+2', '+4'), null] },
     { lanes: [null, null, null], meteor: { from: -1, to: 0 } },
     { lanes: [pick('−2', '−3'), null, pick('+4', '+5')] },
-    { lanes: [null, '×2', null], meteor: { from: 1, to: -1 } },
-    { lanes: [pick('+4', '+6'), null, null] },
-    { lanes: [null, null, null], meteor: { from: 0, to: 1 } },
+    { lanes: ['×3', '+4', null], meteor: { from: 1, to: -1 } },
+    { lanes: [pick('+4', '+6'), null, '−4'] },
+    { lanes: [null, '+3', '×2'], meteor: { from: 0, to: 1 } },
     { lanes: [pick('+5', '+7'), '×2', null] },
   ]
   return layouts.map((layout, index) => ({

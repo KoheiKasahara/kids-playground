@@ -12,7 +12,7 @@ function chime(notes: readonly number[], interval: number, duration: number): vo
       playTone(ctx, frequency * 2, start, 0.09, 0.04, 'sine')
     })
   } catch {
-    // 星の数と花火の演出は、音声を利用できない端末でも進める。
+    // 星の数と打ち上げの演出は、音声を利用できない端末でも進める。
   }
 }
 

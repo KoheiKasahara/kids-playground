@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { observeGameActivity } from '../../utils/gameActivity'
 import { vibrate } from '../../utils/haptics'
 import { createCourse } from './course'
+import { flightSeconds, GOAL_COUNT, loadProgress, saveProgress, upgradeCost, type Progress } from './progression'
 import { initialRun, jumpHeight, jumpRun, stepRun } from './game'
 import { playFinish, playGrow, playHit, playJump, playShrink, playStart } from './sounds'
 import { drawWorld, type WorldFrame } from './world'
@@ -24,24 +25,42 @@ function sampleSteering(input: Steering, now: number) {
 
 export function useStarParade() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [progress, setProgress] = useState(loadProgress)
+  const [result, setResult] = useState<{ count: number; points: number } | null>(null)
   const [course, setCourse] = useState(() => createCourse())
   const [phase, setPhase] = useState<WorldFrame['phase']>('ready')
   const [paused, setPaused] = useState(false)
   // Keep continuous movement out of React. Only gate crossings change the HUD.
-  const [hud, setHud] = useState(() => ({ count: initialRun().count, passed: 0, delta: 0, hit: false }))
-  const run = useRef(initialRun())
+  const [hud, setHud] = useState(() => ({ count: initialRun(progress.level).count, passed: 0, delta: 0, hit: false }))
+  const run = useRef(initialRun(progress.level))
   const steering = useRef(clearSteering(0))
   const finish = course.length + 1
 
   function resetRun() {
-    const start = initialRun()
+    const start = initialRun(progress.level)
     run.current = start
     steering.current = clearSteering(start.playerX)
     setHud({ count: start.count, passed: start.passed, delta: 0, hit: false })
     setPaused(false)
   }
 
+  function upgrade() {
+    const cost = upgradeCost(progress.level)
+    if (phase !== 'ready' || progress.points < cost || progress.level >= GOAL_COUNT) return
+    const next = { points: progress.points - cost, level: progress.level + 1 }
+    updateProgress(next)
+    run.current = initialRun(next.level)
+    setHud({ count: run.current.count, passed: 0, delta: 0, hit: false })
+    playGrow()
+  }
+
+  function updateProgress(next: Progress) {
+    saveProgress(next)
+    setProgress(next)
+  }
+
   function start() {
+    setResult(null)
     if (phase === 'finished') setCourse(createCourse())
     resetRun()
     playStart()
@@ -71,7 +90,7 @@ export function useStarParade() {
       drawWorld(ctx, width, height, {
         ...run.current, gates: course, phase, finish, jump: jumpHeight(run.current),
         time: reduceMotion ? 0 : elapsed,
-        celebration: phase === 'finished' ? (reduceMotion ? 1 : elapsed) : 0,
+        celebration: phase === 'finished' || reduceMotion ? flightSeconds(run.current.count) : elapsed,
       })
     }
 
@@ -117,11 +136,27 @@ export function useStarParade() {
           if (next.finished) {
             playFinish()
             vibrate('celebrate')
-            setPhase('finished')
+            setPhase('launching')
             return
           }
         }
         paint()
+        if (phase === 'launching' && elapsed >= (reduceMotion ? 1 : flightSeconds(run.current.count) + 0.6)) {
+          const count = run.current.count
+          const earned = 4 + count
+          setResult({ count, points: earned })
+          updateProgress({ ...progress, points: progress.points + earned })
+          if (count >= GOAL_COUNT) {
+            setPhase('finished')
+          } else {
+            const next = initialRun(progress.level)
+            run.current = next
+            setHud({ count: next.count, passed: 0, hit: false, delta: 0 })
+            setCourse(createCourse())
+            setPhase('ready')
+          }
+          return
+        }
       }
       raf = requestAnimationFrame(frame)
     }
@@ -134,7 +169,7 @@ export function useStarParade() {
       cancelAnimationFrame(raf)
       last = undefined
       if (!active || paused) steering.current = clearSteering(run.current.playerX)
-      if (active && !paused && (!reduceMotion || phase === 'running')) {
+      if (active && !paused && (phase === 'launching' || phase === 'running' || (!reduceMotion && phase === 'ready'))) {
         raf = requestAnimationFrame(frame)
       }
     })
@@ -144,7 +179,7 @@ export function useStarParade() {
       observer?.disconnect()
       window.removeEventListener('resize', resize)
     }
-  }, [course, finish, paused, phase])
+  }, [course, finish, paused, phase, progress])
 
   function steer(x: number) {
     if (phase === 'running' && !paused) steering.current = clearSteering(x)
@@ -173,5 +208,5 @@ export function useStarParade() {
     vibrate('tap')
   }
 
-  return { canvasRef, course, phase, paused, setPaused, hud, start, backToStart, steer, hold, nudge, jump }
+  return { progress, result, upgrade, canvasRef, course, phase, paused, setPaused, hud, start, backToStart, steer, hold, nudge, jump }
 }

@@ -19,7 +19,7 @@ describe('ほしぞらパレード', () => {
       for (const row of rows) {
         expect(row.lanes.some((label, i) => label === null && row.meteor?.to !== i - 1)).toBe(true)
         if (row.meteor) {
-          expect(row.lanes[row.meteor.to + 1]).toBeNull()
+          expect([null, '×2', '×3']).toContain(row.lanes[row.meteor.to + 1])
           expect(row.meteor.to).not.toBe(row.meteor.from)
         }
       }
@@ -39,13 +39,16 @@ describe('ほしぞらパレード', () => {
     expect(stepRun(first, 3, 0.7, rows)).toMatchObject({ count: 8, passed: 2, lastEvent: 'grow' })
   })
 
-  test('隕石は手前でレーンに収まり、地上で当たると2つ減り、残りは最低ひとつ', () => {
+  test('隕石は手前でレーンに収まり、地上で触れた星だけが減り、残りは最低ひとつ', () => {
     expect(meteorX(meteorRow, -1)).toBeCloseTo(-2 / 3)
     expect(meteorX(meteorRow, 0.25)).toBeCloseTo(-1 / 3)
     expect(meteorX(meteorRow, 0.75)).toBe(0)
     expect(meteorX(meteorRow, 1)).toBe(0)
     expect(stepRun(initialRun(), 3, 0, [meteorRow])).toMatchObject({ count: 1, lastEvent: 'hit' })
     expect(stepRun({ ...initialRun(), count: 2 }, 3, 0, [meteorRow])).toMatchObject({ count: 1, lastEvent: 'hit' })
+    const crowd = { ...initialRun(), count: 7 }
+    expect(stepRun(crowd, 3, 0, [meteorRow]).count).toBe(1)
+    expect(stepRun(crowd, 3, 0.32, [meteorRow]).count).toBe(6)
     expect(stepRun(initialRun(), 3, 0.7, [meteorRow])).toMatchObject({ count: 3, lastEvent: 'dodge' })
   })
 
@@ -66,6 +69,14 @@ describe('ほしぞらパレード', () => {
     expect(jumpRun(landed).jumpTime).toBeGreaterThan(0)
     expect(stepRun(jumping, 1.32, -0.7, rows)).toMatchObject({ count: 7, lastEvent: 'grow' })
     expect(stepRun(jumpRun(initialRun()), 3, 0, rows).lastEvent).toBe('hit')
+  })
+
+  test('隕石のレーンではジャンプしたときだけ倍率を取れる', () => {
+    const hazard: GateRow[] = [{ distance: 1, lanes: [null, '×3', '+4'], meteor: { from: -1, to: 0 } }]
+    const approach = stepRun(initialRun(), 2.2, 0, hazard)
+    expect(stepRun(approach, 0.6, 0, hazard)).toMatchObject({ count: 1, lastEvent: 'hit' })
+    expect(stepRun(jumpRun(approach), 0.6, 0, hazard)).toMatchObject({ count: 9, lastEvent: 'grow' })
+    expect(stepRun(approach, 0.6, 0.7, hazard)).toMatchObject({ count: 7, lastEvent: 'grow' })
   })
 
   test('長いフレームでも各列を横切った瞬間の位置で数を決める', () => {
