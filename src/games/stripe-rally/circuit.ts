@@ -46,3 +46,42 @@ export function pose(laps: number, offset = 0) {
   return { angle, x: a.x + (b.x - a.x) * t - offset * Math.sin(angle),
     y: a.y + (b.y - a.y) * t + offset * Math.cos(angle) }
 }
+
+export const roadLimit = 36
+
+// Pull a closed string taut between cross-sections of the drivable road.
+// The shortest detour through each section meets the chord to its neighbours,
+// or touches the nearest edge if that chord passes outside the road.
+function shortestLine() {
+  const sampleCount = 96
+  const sections = Array.from({ length: sampleCount }, (_, i) => {
+    const center = pose(i / sampleCount)
+    return { ...center, nx: -Math.sin(center.angle), ny: Math.cos(center.angle),
+      px: center.x, py: center.y, offset: 0 }
+  })
+  for (let pass = 0; pass < 500; pass++) {
+    let largestMove = 0
+    sections.forEach((s, i) => {
+      const prev = sections[(i + sections.length - 1) % sections.length]
+      const next = sections[(i + 1) % sections.length]
+      const dx = next.px - prev.px, dy = next.py - prev.py
+      const chordOffset = ((prev.px - s.x) * dy - (prev.py - s.y) * dx) / (s.nx * dy - s.ny * dx)
+      const offset = Math.max(-roadLimit, Math.min(roadLimit, chordOffset))
+      largestMove = Math.max(largestMove, Math.abs(offset - s.offset))
+      s.offset = offset
+      s.px = s.x + offset * s.nx
+      s.py = s.y + offset * s.ny
+    })
+    if (largestMove < 0.01) break
+  }
+  return sections.map(s => s.offset)
+}
+
+const racingOffsets = shortestLine()
+
+export function racingLine(laps: number) {
+  const sample = (laps - Math.floor(laps)) * racingOffsets.length
+  const i = Math.floor(sample)
+  const from = racingOffsets[i], to = racingOffsets[(i + 1) % racingOffsets.length]
+  return from + (to - from) * (sample - i)
+}

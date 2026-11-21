@@ -1,5 +1,5 @@
 import { drawCar } from './cars'
-import { BOOST_TIME, RECHARGE, rivals, type Race } from './race'
+import { BOOST_TIME, RECHARGE, type Race } from './race'
 
 import { line, pose } from './circuit'
 
@@ -24,7 +24,7 @@ const reflections = [[641, 477], [715, 505], [790, 483], [685, 521], [804, 617],
 
 export function drawRace(g: CanvasRenderingContext2D, map: HTMLCanvasElement | HTMLImageElement,
   stacks: HTMLCanvasElement[], race: Race) {
-  const cars = [race.distance, ...rivals(race.elapsed)].map((laps, index) => ({
+  const cars = [race.distance, ...race.rivalDistances].map((laps, index) => ({
     ...pose(laps, race.offsets[index]), angle: race.headings[index], index,
   }))
   const player = cars[0]
