@@ -1,47 +1,61 @@
-import { circuitLength, pose } from './circuit'
+import { circuitLength, pose, racingLine, roadLimit } from './circuit'
 
 export const LAPS = 2
 export const STEP = 1 / 30
 export const RECHARGE = 4
 export const BOOST_TIME = 1.35
 
-export function grid() {
+// Entry and exit as fractions of the painted circuit; side points to the outside.
+const corners = [
+  { entry: 0.10, exit: 0.30, side: 1 },
+  { entry: 0.30, exit: 0.38, side: -1 },
+  { entry: 0.38, exit: 0.55, side: 1 },
+  { entry: 0.55, exit: 0.64, side: -1 },
+  { entry: 0.64, exit: 0.79, side: 1 },
+  { entry: 0.79, exit: 0.85, side: -1 },
+  { entry: 0.85, exit: 0.94, side: 1 },
+]
+
+export function grid(random = Math.random) {
   const offsets = [0, -35, 32]
-  const headings = [0, ...rivals(0)].map(laps => pose(laps).angle)
-  return { distance: 0, elapsed: 0, cooldown: 0, offsets, headings }
+  const rivalDistances = [0.024, 0.052]
+  const headings = [0, ...rivalDistances].map(laps => pose(laps).angle)
+  // Draw once per car, lap and corner so replaying a simulation tick is pure.
+  const plans = offsets.map(() => Array.from({ length: LAPS }, () => corners.map(() => ({
+    wide: 22 * random() ** 2,
+    pace: (random() - 0.5) * 0.40,
+  }))))
+  return { distance: 0, elapsed: 0, cooldown: 0, rivalDistances, offsets, headings, plans }
 }
 export type Race = ReturnType<typeof grid>
 
-// Distances are in laps, including the two rivals' staggered grid positions.
-export function rivals(elapsed: number) {
-  return [0.024 + elapsed / 14.3, 0.052 + elapsed / 13.9]
-}
-
 export function position(race: Race) {
-  return 1 + rivals(race.elapsed).filter(distance => distance > race.distance).length
+  return 1 + race.rivalDistances.filter(distance => distance > race.distance).length
 }
 
-const roadLimit = 36
-const clampOffset = (value: number) => Math.max(-roadLimit, Math.min(roadLimit, value))
-
-function racingLine(laps: number, index: number) {
-  const look = [0.018, 0.021, 0.016][index]
-  const entry = pose(laps - look).angle
-  const exit = pose(laps + look).angle
-  const approach = pose(laps + 3 * look).angle
-  // Cut toward the apex; approach the next corner from the outside.
-  return clampOffset(32 * Math.sin(exit - entry) - 22 * Math.sin(approach - exit))
+function cornering(distance: number, plan: Race['plans'][number]) {
+  const lap = Math.floor(distance)
+  const progress = distance - lap
+  const index = corners.findIndex(c => progress >= c.entry && progress < c.exit)
+  if (index < 0 || lap >= LAPS) return { offset: 0, pace: 1 }
+  const { entry, exit, side } = corners[index]
+  const phase = (progress - entry) / (exit - entry)
+  const weight = Math.sin(Math.PI * phase) ** 2
+  const { wide, pace } = plan[lap][index]
+  // A wider arc costs distance. Blend the pace change in and out at the ends.
+  return { offset: side * wide * weight, pace: 1 + (pace - wide * 0.003) * weight }
 }
 
-function steer(distances: number[], previous: number[], dt: number) {
-  const targets = distances.map(racingLine)
+function steer(distances: number[], speeds: number[], previous: number[], targets: number[], dt: number) {
   // Keep the current lateral order while alongside. Farther apart, all cars
   // can take the same apex. Scale the clearance up before their bumpers meet.
   const order = previous.map((_, i) => i).sort((a, b) => previous[a] - previous[b] || a - b)
   const gaps = order.map(a => order.map(b => {
     const laps = distances[a] - distances[b]
-    const gap = Math.abs(laps - Math.round(laps)) * circuitLength
-    return gap < 240 ? 36 * Math.min(1, (240 - gap) / 110) : 0
+    const separation = laps - Math.round(laps)
+    const closingSpeed = Math.max(0, -Math.sign(separation) * (speeds[a] - speeds[b]))
+    const predictedGap = (Math.abs(separation) - closingSpeed * 0.47) * circuitLength
+    return 36 * Math.max(0, Math.min(1, (100 - predictedGap) / 24))
   }))
   // Reserve space on the right first, then place cars from left to right.
   // This also leaves the middle car room when three cars run abreast.
@@ -63,7 +77,7 @@ function steer(distances: number[], previous: number[], dt: number) {
     targets[car] = Math.max(lower, Math.min(limits[i], targets[car]))
   })
   return previous.map((offset, index) => {
-    const speed = Math.max(-85, Math.min(85, (targets[index] - offset) * 3))
+    const speed = Math.max(-120, Math.min(120, (targets[index] - offset) * 6))
     return offset + speed * dt
   })
 }
@@ -71,17 +85,21 @@ function steer(distances: number[], previous: number[], dt: number) {
 export function advance(race: Race): Race {
   if (race.distance >= LAPS) return race
   const boosted = race.cooldown > RECHARGE - BOOST_TIME
-  const speed = (boosted ? 1.62 : 1) / 15
-  const dt = Math.min(STEP, (LAPS - race.distance) / speed)
-  const distance = Math.min(LAPS, race.distance + dt * speed)
-  const elapsed = race.elapsed + dt
-  const distances = [distance, ...rivals(elapsed)]
-  const previous = [race.distance, ...rivals(race.elapsed)]
-  const offsets = steer(distances, race.offsets, dt)
+  const previous = [race.distance, ...race.rivalDistances]
+  const turns = previous.map((laps, i) => cornering(laps, race.plans[i]))
+  const cruise = [boosted ? 1.62 / 15 : 1 / 15, 1 / 14.85, 1 / 14.75]
+  const speeds = turns.map((turn, i) => cruise[i] * turn.pace)
+  const dt = Math.min(STEP, (LAPS - race.distance) / speeds[0])
+  const distances = previous.map((laps, i) => laps + dt * speeds[i])
+  distances[0] = Math.min(LAPS, distances[0])
+  const targets = distances.map((laps, i) => Math.max(-roadLimit, Math.min(roadLimit,
+    racingLine(laps + speeds[i] * 0.16) + turns[i].offset)))
+  const offsets = steer(distances, speeds, race.offsets, targets, dt)
   const headings = distances.map((laps, i) => {
     const from = pose(previous[i], race.offsets[i])
     const to = pose(laps, offsets[i])
     return Math.atan2(to.y - from.y, to.x - from.x)
   })
-  return { distance, elapsed, cooldown: Math.max(0, race.cooldown - dt), offsets, headings }
+  return { ...race, distance: distances[0], rivalDistances: distances.slice(1), elapsed: race.elapsed + dt,
+    cooldown: Math.max(0, race.cooldown - dt), offsets, headings }
 }
