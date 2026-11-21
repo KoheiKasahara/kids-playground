@@ -354,8 +354,12 @@ def bake_clip(armature: bpy.types.Object, clip: Clip, fps: int = FPS) -> bpy.typ
         t = 0.0 if (clip.loop and f == frames) else clip.duration * f / frames
         poses.append(clip.sample(t))
     rig = poses[0].rig
+    only = set(clip.meta.get('bones', []))  # 重ねがけ用のクリップ（まばたき等）は指定した骨だけを持つ
     moved = {n for p in poses for n in rig.order if p.basis[n].translation.length > 1e-6} | {'hips'}
     scaled = {n for p in poses for n in p.scale}
+    if only:
+        moved &= only
+        scaled &= only
     action = bpy.data.actions.new(clip.name)
     action.use_fake_user = True
     armature.animation_data_create()
@@ -365,12 +369,13 @@ def bake_clip(armature: bpy.types.Object, clip: Clip, fps: int = FPS) -> bpy.typ
         for name in rig.order:
             pb = armature.pose.bones[name]
             b = pose.basis[name]
-            q = b.to_quaternion()
-            if name in prev and prev[name].dot(q) < 0:
-                q.negate()
-            prev[name] = q
-            pb.rotation_quaternion = q
-            pb.keyframe_insert('rotation_quaternion', frame=f, group=name)
+            if not only or name in only:
+                q = b.to_quaternion()
+                if name in prev and prev[name].dot(q) < 0:
+                    q.negate()
+                prev[name] = q
+                pb.rotation_quaternion = q
+                pb.keyframe_insert('rotation_quaternion', frame=f, group=name)
             if name in moved:
                 pb.location = b.translation
                 pb.keyframe_insert('location', frame=f, group=name)

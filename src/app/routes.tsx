@@ -95,6 +95,7 @@ export const routes: RouteObject[] = [
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotAdventurePlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-adventure', element: lazyRoute(() => import('../games/dot-adventure/DotAdventurePlay')) },
+  { path: '/games/zoo-3d', element: lazyRoute(() => import('../games/zoo-3d/Zoo3dPlay')) },
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotZooPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-zoo', element: lazyRoute(() => import('../games/dot-zoo/DotZooPlay')) },

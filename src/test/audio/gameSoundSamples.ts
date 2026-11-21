@@ -50,6 +50,7 @@ import * as hoshi from '../../games/hoshi-tsunagi/sounds'
 import * as starParade from '../../games/star-parade/sounds'
 import { fleetSound } from '../../games/sea-breeze-fleet/sounds'
 import { raceChime } from '../../games/stripe-rally/sounds'
+import { playZooSound } from '../../games/zoo-3d/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
 import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
 import * as kabukuwa from '../../games/kabukuwa-battle/sounds'
@@ -425,6 +426,16 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('しぶき', () => fleetSound('splash')), sample('おいかえす', () => fleetSound('retreat')),
     sample('ぶつかる', () => fleetSound('bump')), sample('クリア', () => fleetSound('clear')),
     sample('きこう', () => fleetSound('return')),
+  ],
+  'zoo-3d': [
+    sample('えらぶ', () => playZooSound('select')),
+    sample('えさを なげる', () => playZooSound('drop')),
+    sample('もぐもぐ', () => playZooSound('munch')),
+    sample('よろこぶ', () => playZooSound('happy')),
+    sample('パオーン', () => playZooSound('trumpet')),
+    sample('がおー', () => playZooSound('roar')),
+    sample('みずあび', () => playZooSound('splash')),
+    sample('ハミング', () => playZooSound('hum')),
   ],
   'stripe-rally': [
     sample('スタート', () => raceChime('start')),

@@ -1,0 +1,105 @@
+// 3Dどうぶつえんの効果音。音声ファイルは持たず Web Audio で合成し、共通の出口（getSoundOutput）へつなぐ。
+// 音が出ない環境でも遊べるよう、失敗は握りつぶす（見た目の反応だけで遊びが成り立つ）。
+
+import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
+
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'info' | 'snore'
+
+function withContext(play: (ctx: AudioContext, now: number) => void): void {
+  if (!isSoundEnabled()) return
+  try {
+    const ctx = getSharedAudioContext()
+    if (!ctx) return
+    play(ctx, ctx.currentTime)
+  } catch {
+    // 音を鳴らせない端末でも、動物の反応（動き・ハート）だけで遊べる
+  }
+}
+
+/** 音程が滑らかに変わる、フィルタ付きの声（ゾウ・ライオン・キリンの鳴き声のもと）。 */
+function voice(ctx: AudioContext, start: number, points: [number, number][], volume: number, type: OscillatorType,
+  cutoff: number, vibrato = 0): void {
+  const osc = ctx.createOscillator()
+  const filter = ctx.createBiquadFilter()
+  const gain = ctx.createGain()
+  osc.type = type
+  filter.type = 'lowpass'
+  filter.frequency.value = cutoff
+  filter.Q.value = 2
+  const end = start + points[points.length - 1][0]
+  osc.frequency.setValueAtTime(points[0][1], start)
+  for (const [t, f] of points.slice(1)) osc.frequency.linearRampToValueAtTime(f, start + t)
+  gain.gain.setValueAtTime(0, start)
+  gain.gain.linearRampToValueAtTime(volume, start + 0.05)
+  gain.gain.setValueAtTime(volume, Math.max(start + 0.05, end - 0.12))
+  gain.gain.linearRampToValueAtTime(0, end)
+  if (vibrato > 0) {
+    const lfo = ctx.createOscillator()
+    const depth = ctx.createGain()
+    lfo.frequency.value = 7
+    depth.gain.value = vibrato
+    lfo.connect(depth)
+    depth.connect(osc.frequency)
+    lfo.start(start)
+    lfo.stop(end)
+  }
+  osc.connect(filter)
+  filter.connect(gain)
+  gain.connect(getSoundOutput(ctx))
+  osc.start(start)
+  osc.stop(end)
+}
+
+export function playZooSound(sound: ZooSound): void {
+  withContext((ctx, now) => {
+    switch (sound) {
+      case 'select':
+        playTone(ctx, 660, now, 0.09, 0.14, 'triangle')
+        playTone(ctx, 990, now + 0.06, 0.12, 0.12, 'triangle')
+        return
+      case 'info':
+        ;[523, 659, 784].forEach((f, i) => playTone(ctx, f, now + i * 0.07, 0.14, 0.12, 'sine'))
+        return
+      case 'drop':
+        // ひゅーっと落ちて、ぽとん
+        {
+          const tone = createToneNodes(ctx, 900, now, 0.28, 0.08, 'sine')
+          tone.oscillator.frequency.linearRampToValueAtTime(420, now + 0.28)
+          tone.oscillator.start(now)
+          tone.oscillator.stop(now + 0.28)
+        }
+        playTone(ctx, 220, now + 0.3, 0.1, 0.2, 'sine')
+        playNoiseBurst(ctx, now + 0.3, 0.08, 0.12, 'lowpass', 900)
+        return
+      case 'munch':
+        for (let i = 0; i < 3; i++) {
+          playNoiseBurst(ctx, now + i * 0.17, 0.07, 0.2, 'bandpass', 1300 + i * 120)
+          playTone(ctx, 180 - i * 10, now + i * 0.17, 0.06, 0.1, 'triangle')
+        }
+        return
+      case 'happy':
+        ;[784, 988, 1175, 1568].forEach((f, i) => playTone(ctx, f, now + i * 0.075, 0.16, 0.11, 'triangle'))
+        return
+      case 'trumpet':
+        // パオーン: のこぎり波を持ち上げて伸ばす
+        voice(ctx, now, [[0, 260], [0.12, 420], [0.5, 520], [0.85, 470], [1.0, 380]], 0.2, 'sawtooth', 1800, 12)
+        voice(ctx, now, [[0, 520], [0.12, 840], [0.5, 1040], [0.85, 940], [1.0, 760]], 0.05, 'square', 2600, 20)
+        return
+      case 'splash':
+        for (let i = 0; i < 4; i++) playNoiseBurst(ctx, now + i * 0.12, 0.25, 0.14, 'highpass', 2200 + i * 300)
+        return
+      case 'roar':
+        // ガオー: 低いうなりを下げていく（こわすぎない高さ）
+        voice(ctx, now, [[0, 170], [0.15, 240], [0.7, 150], [0.9, 120]], 0.22, 'sawtooth', 900, 18)
+        playNoiseBurst(ctx, now + 0.05, 0.7, 0.08, 'bandpass', 600)
+        return
+      case 'hum':
+        // キリンのやさしいハミング
+        voice(ctx, now, [[0, 110], [0.3, 125], [0.9, 105]], 0.2, 'triangle', 700, 4)
+        return
+      case 'snore':
+        voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)
+        return
+    }
+  })
+}

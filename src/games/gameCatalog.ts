@@ -937,6 +937,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'zoo-3d',
+    slug: 'zoo-3d',
+    title: '3Dどうぶつえん',
+    emoji: '🐘',
+    category: 'threeD',
+    seo: {
+      headline: '3Dどうぶつえん｜うごく ゾウや キリン、ライオンと ふれあう 3Dの どうぶつえん',
+      description:
+        'ゾウ・キリン・ライオンが 3Dの どうぶつえんで あるいたり、ねたり、ごはんを たべたり する 子ども向けゲーム。どうぶつを タップして えさを あげたり、みずあびや なきごえを みたり、カメラで おいかけたり できるよ。',
+    },
+    intro: {
+      howToPlay: [
+        'どうぶつを タップすると えらべるよ',
+        'えさの ボタンで ごはんを あげると、たべに くるよ',
+        'ゆびで うごかすと まわりを ぐるっと みられるよ。2ほんゆびで ちかづけるよ',
+      ],
+    },
+  },
+  {
     id: 'dot-aquarium',
     slug: 'dot-aquarium',
     title: 'ドットの すいぞくかん',

@@ -39,6 +39,9 @@ def main() -> None:
     args = parser.parse_args(argv)
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    # 焼き込み（anim.FPS）と書き出しのフレームレートをそろえる（Blender の既定は 24fps）
+    bpy.context.scene.render.fps = A.FPS
+    bpy.context.scene.render.fps_base = 1.0
     shape = importlib.import_module(f'zoo3d.animals.{args.animal}')
     motion = importlib.import_module(f'zoo3d.animals.{args.animal}_motion')
     mesh, arm = shape.build()

@@ -113,22 +113,6 @@ def ear(side: int) -> Body:
     return b
 
 
-def ear_inner_mask(side: int):
-    """耳の前面のうち、縁を残した内側だけを選ぶ関数を返す。"""
-    from ..sdf import rotation_matrix
-
-    rot = rotation_matrix(ear_rotation(side))
-    anterior = rot[:, 0] * side
-    center = np.asarray(ear_center(side))
-
-    def mask(c: np.ndarray, n: np.ndarray, _r: np.ndarray) -> np.ndarray:
-        local = (c - center) @ rot
-        inset = (local[:, 1] / EAR_RADII[1]) ** 2 + (local[:, 2] / EAR_RADII[2]) ** 2 < 0.72 ** 2
-        return inset & (n @ anterior > 0.35)
-
-    return mask
-
-
 # ---------------------------------------------------------------------------
 # Blender 上での組み立て
 
