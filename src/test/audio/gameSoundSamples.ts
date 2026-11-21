@@ -47,6 +47,7 @@ import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as flagPuzzle from '../../games/flag-roll-puzzle/sounds'
 import * as hanabi from '../../games/hanabi-don/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
+import { raceChime } from '../../games/stripe-rally/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
 import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
 import * as kabukuwa from '../../games/kabukuwa-battle/sounds'
@@ -417,6 +418,11 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
   'water-wheel-maze': [sample('みず', waterWheel.playDropSound), sample('のせる', () => waterWheel.playRiderSound(1, 3)), sample('クリア', waterWheel.playWheelClearSound)],
   'pyoko-touch': [sample('タッチ', pyoko.playCatchSound), sample('おっと', pyoko.playOopsSound), sample('おしまい', pyoko.playFinishSound)],
   'hoshi-tsunagi': [sample('つなぐ', () => hoshi.playConnectSound(2)), sample('ちがう', hoshi.playWrongSound), sample('できた', hoshi.playCompleteSound)],
+  'stripe-rally': [
+    sample('スタート', () => raceChime('start')),
+    sample('ダッシュ', () => raceChime('boost')),
+    sample('ゴール', () => raceChime('finish')),
+  ],
   'robo-kuzushi': [
     sample('とばす', robo.playLaunchSound),
     sample('あたる', () => robo.playHitSound('wood', 0.7)),

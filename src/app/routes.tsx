@@ -293,5 +293,6 @@ export const routes: RouteObject[] = [
   },
   { path: '/games/mini-4wd', element: lazyRoute(() => import('../games/mini-4wd/Mini4wdPlay')) },
   { path: '/games/hanabi-don', element: lazyRoute(() => import('../games/hanabi-don/HanabiDonPlay')) },
+  { path: '/games/stripe-rally', element: lazyRoute(() => import('../games/stripe-rally/StripeRally')) },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

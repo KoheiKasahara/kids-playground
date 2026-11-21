@@ -1448,6 +1448,18 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'stripe-rally',
+    slug: 'stripe-rally',
+    title: 'しましまラリー',
+    emoji: '🏁',
+    category: 'learning',
+    seo: {
+      headline: 'しましまラリー｜青いドット絵の車で自動走行レース',
+      description: '白いしまの青い車で、芝生のサーキットを2周するレースです。車は自分でカーブを曲がります。ダッシュでライバルを追いぬこう。',
+    },
+    intro: { howToPlay: ['スタートで あおい くるまが はしるよ', 'ダッシュが たまったら おしてみよう'] },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
