@@ -60,6 +60,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'rail-builder': 16.5,
   'rhythm-pon': 6,
   'robo-kuzushi': 7.5,
+  'sea-breeze-fleet': 2,
   'shabon-pachin': 1.5,
   shinkeisuijaku: -1,
   'snowball-roll': 8,

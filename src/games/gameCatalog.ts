@@ -1449,6 +1449,18 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'sea-breeze-fleet',
+    slug: 'sea-breeze-fleet',
+    title: 'しおかぜせんたい',
+    emoji: '🚢',
+    category: 'threeD',
+    seo: {
+      headline: 'しおかぜせんたい｜積層ドット絵の船で海を守るゲーム',
+      description: '灯台の港からドット絵の船で出発。島をめぐり、水でっぽうで海賊船を追いかえそう。郵便船を守る珊瑚礁と、親分船の待つ夕焼けの海峡も探検できます。',
+    },
+    intro: { howToPlay: ['うみを タッチすると そこへ すすむよ', 'かいぞくせんを タッチして みずでっぽう！', 'オレンジの わから はなれると よけられるよ'] },
+  },
+  {
     id: 'stripe-rally',
     slug: 'stripe-rally',
     title: 'しましまラリー',
