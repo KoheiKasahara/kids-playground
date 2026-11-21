@@ -536,11 +536,12 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   await user.click(within(panel).getByRole('button', { name: 'けす' }))
   expect(within(panel).queryByRole('button', { name: /とりだす/ })).not.toBeInTheDocument()
   // 3つ ならべたら もう ならべられない
-  for (let i = 0; i < 3; i++) await user.click(within(panel).getByRole('button', { name: 'いたを ならべる' }))
+  const plank = within(panel).getByRole('button', { name: 'いたを ならべる' })
+  plank.focus()
+  await user.keyboard('{Enter}{Enter} ')
   expect(within(panel).getByRole('button', { name: 'きを ならべる' })).toBeDisabled()
-  expect(within(panel).getByRole('button', { name: 'ドアを つくる' })).toBeEnabled()
-  expect(panel).toContainElement(document.activeElement as HTMLElement)
-  fireEvent.keyDown(panel, { key: 'Escape' })
+  expect(within(panel).getByRole('button', { name: 'ドアを つくる' })).toHaveFocus()
+  await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('application')).toHaveFocus()
   // つくった ものは ほかの せかいでも つかえる
@@ -548,6 +549,23 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   await user.click(screen.getByRole('button', { name: 'さばく' }))
   expect(screen.getByRole('button', { name: 'たいまつ' })).toBeEnabled()
   expect(screen.getAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(CRAFTED.length - 1)
+})
+
+it('keeps keyboard focus in the crafting table when full slots do not match a recipe', async () => {
+  const placed = createWorld()
+  editWorld(placed, { x: 8, y: 3, z: 8 }, 'workbench', 'place')
+  const user = await start(placed)
+  tap({ x: 8, y: 3, z: 8 })
+  const panel = screen.getByRole('dialog', { name: 'クラフトだい' })
+  const wood = within(panel).getByRole('button', { name: 'きを ならべる' })
+  wood.focus()
+  await user.keyboard('{Enter}{Enter} ')
+  expect(wood).toBeDisabled()
+  expect(within(panel).getByRole('button', { name: 'まだ できない' })).toBeDisabled()
+  expect(panel).toHaveFocus()
+  await user.keyboard('{Escape}')
+  expect(panel).not.toBeInTheDocument()
+  expect(screen.getByRole('application')).toHaveFocus()
 })
 
 it('chooses an already crafted block again from the crafting table, and by a long press on it in the world', async () => {
