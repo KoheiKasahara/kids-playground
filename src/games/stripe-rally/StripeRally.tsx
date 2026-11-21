@@ -7,7 +7,7 @@ import { useGameInterval } from '../../utils/useGameInterval'
 import { advance, grid, LAPS, position, RECHARGE, STEP } from './race'
 import { drawRace, makeLoadingCircuit } from './scenery'
 import { raceChime } from './sounds'
-import carSheetUrl from './rally-cars.webp'
+import { makeCarStacks } from './cars'
 import valleyUrl from './alpine-valley.webp'
 import styles from './StripeRally.module.css'
 
@@ -27,13 +27,13 @@ export default function StripeRally() {
     const ctx = surface?.getContext('2d')
     if (!surface || !ctx) return
     let circuit: HTMLCanvasElement | HTMLImageElement = makeLoadingCircuit()
-    let sprites: HTMLImageElement | null = null
+    const stacks = makeCarStacks()
     const paint = () => {
       const width = Math.max(1, Math.round(surface.clientWidth * 1.08))
       const height = Math.max(1, Math.round(surface.clientHeight * 1.08))
       if (surface.width !== width) surface.width = width
       if (surface.height !== height) surface.height = height
-      drawRace(ctx, circuit, sprites, latestRace.current)
+      drawRace(ctx, circuit, stacks, latestRace.current)
     }
     const valley = new Image()
     valley.onload = () => {
@@ -41,19 +41,12 @@ export default function StripeRally() {
       paint()
     }
     valley.src = valleyUrl
-    const cars = new Image()
-    cars.onload = () => {
-      sprites = cars
-      paint()
-    }
-    cars.src = carSheetUrl
     redraw.current = paint
     const observer = new ResizeObserver(paint)
     observer.observe(surface)
     return () => {
       observer.disconnect()
       valley.onload = null
-      cars.onload = null
       redraw.current = null
     }
   }, [])
