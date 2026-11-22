@@ -97,6 +97,10 @@ def auto_weights(mesh: bpy.types.Object, armature: bpy.types.Object, bones: Iter
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
     for b in armature.data.bones:
         b.use_deform = saved[b.name]
+    # 熱拡散が解けないと、ウェイトのない頂点が休止姿勢のまま残る（体が動かない）。気づけるように知らせる
+    empty = sum(1 for v in mesh.data.vertices if not any(g.weight > 0 for g in v.groups))
+    if empty:
+        print(f'[zoo3d] WARNING: {mesh.name}: {empty} vertices have no bone weights (bone heat failed?)')
     mesh.select_set(False)
     armature.select_set(False)
 

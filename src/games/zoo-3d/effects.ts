@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -249,6 +249,19 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
     }
+  } else if (kind === 'grass') {
+    // ほし草のたば: 細い葉を放射状に立て、根元をひもで結ぶ
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2
+      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.34, 4), mat(i % 3 ? '#9bc45a' : '#c8c46a'))
+      blade.position.set(Math.sin(a) * 0.05, 0.17, Math.cos(a) * 0.05)
+      blade.rotation.set(Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35)
+      group.add(blade)
+    }
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 10), mat('#c98b54'))
+    tie.rotation.x = Math.PI / 2
+    tie.position.y = 0.08
+    group.add(tie)
   } else if (kind === 'fish') {
     // 魚: 青い体に白いおなか、三角の尾びれ
     const fish = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 7), mat('#5b8fd6'))

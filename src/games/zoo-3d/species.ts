@@ -7,10 +7,11 @@ import lionManifest from './models/lion.json'
 import pandaManifest from './models/panda.json'
 import penguinManifest from './models/penguin.json'
 import tigerManifest from './models/tiger.json'
+import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra'
 
 export type SpecialAction = {
   clip: string
@@ -191,9 +192,34 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2, 4.5], wander: 5, run: 0.6, special: 1.3, graze: 0.8, sleep: 0.5 },
   },
+  zebra: {
+    id: 'zebra',
+    name: 'シマウマ',
+    emoji: '🦓',
+    color: '#8d8f9c',
+    manifest: zebraManifest as AnimalManifest,
+    food: { id: 'grass', label: 'ほしくさ', emoji: '🌾' },
+    specials: [
+      { clip: 'Rear', label: 'ヒヒーン', emoji: '🐴' },
+      { clip: 'Roll', label: 'ごろごろ', emoji: '🌀' },
+    ],
+    facts: [
+      'しましまの もようは 1とう ずつ ちがうよ',
+      'ウマの なかまで、はしるのが はやいよ',
+      'すなの うえで ごろごろして からだを きれいにするよ',
+    ],
+    reach: (zebraManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.9,
+    hit: [{ y: 1.0, z: 0, r: 0.55 }, { y: 1.55, z: 0.75, r: 0.4 }],
+    follow: { height: 1.0, distance: 7 },
+    members: [
+      { id: 'zebra-mom', scale: 1, label: 'おかあさん' },
+      { id: 'zebra-foal', scale: 0.62, label: 'こども' },
+    ],
+    mood: { idle: [2.5, 5], wander: 5, run: 1.0, special: 1.0, graze: 1.4, sleep: 0.35 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

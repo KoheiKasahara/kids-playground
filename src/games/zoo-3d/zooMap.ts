@@ -58,6 +58,7 @@ function facingCenter(c: Vec2): number {
 
 const TIGER = outer(-36)
 const PENGUIN = outer(36)
+const ZEBRA = outer(-72)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -152,6 +153,19 @@ export const ZOO_MAP: ZooMap = {
         { ...near(PENGUIN, -2.6, 1.2), r: 0.4, h: 0.3, color: '#eef7fb' },
       ],
       gate: facingCenter(PENGUIN),
+    },
+    {
+      id: 'zebra',
+      center: ZEBRA,
+      radius: 5.0,
+      fence: '#b48a5a',
+      ground: '#dccf8e',
+      trees: [
+        { ...near(ZEBRA, -2.6, 2.0), kind: 'acacia', size: 0.9 },
+        { ...near(ZEBRA, 2.4, -2.6), kind: 'bush', size: 0.75 },
+      ],
+      rocks: [{ ...near(ZEBRA, -2.3, -2.3), r: 0.45, h: 0.35 }],
+      gate: facingCenter(ZEBRA),
     },
   ],
   outerTrees: [
