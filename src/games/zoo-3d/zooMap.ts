@@ -72,6 +72,7 @@ const MONKEY = outer(180)
 const SHEEP = outer(112.5)
 const GORILLA = outer(-112.5)
 const RED_PANDA = outer(157.5)
+const RHINO = outer(-157.5)
 
 export const ZOO_MAP: ZooMap = {
   radius: 34,
@@ -357,6 +358,21 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(RED_PANDA, 1.6, -2.6), r: 0.45, h: 0.35 }],
       gate: facingCenter(RED_PANDA),
+    },
+    {
+      id: 'rhino',
+      center: RHINO,
+      radius: 5.1,
+      fence: '#9a7a55',
+      ground: '#d9c98c',
+      // どろあびの池
+      pond: { ...near(RHINO, -1.6, -1.6), r: 1.6 },
+      trees: [
+        { ...near(RHINO, 2.5, -2.4), kind: 'acacia', size: 0.85 },
+        { ...near(RHINO, 2.6, 2.2), kind: 'bush', size: 0.7 },
+      ],
+      rocks: [{ ...near(RHINO, -2.8, 2.0), r: 0.5, h: 0.4 }],
+      gate: facingCenter(RHINO),
     },
   ],
   outerTrees: [

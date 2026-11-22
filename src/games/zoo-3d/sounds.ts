@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -171,6 +171,13 @@ export function playZooSound(sound: ZooSound): void {
           tone.oscillator.frequency.exponentialRampToValueAtTime(70, now + i * 0.14 + 0.12)
           tone.oscillator.start(now + i * 0.14)
           tone.oscillator.stop(now + i * 0.14 + 0.12)
+        }
+        return
+      case 'snort':
+        // サイの「ふんっ」: 鼻から勢いよく息を出す音を2回
+        for (const t of [0, 0.35]) {
+          playNoiseBurst(ctx, now + t, 0.22, 0.26, 'lowpass', 700)
+          playTone(ctx, 110, now + t, 0.16, 0.14, 'sawtooth')
         }
         return
       case 'snore':
