@@ -22,6 +22,13 @@ describe('どうぶつえんの マップ', () => {
     }
   })
 
+  test('柵の外の木はどのエリアにも入らず、すべてのエリアが園の中に収まる', () => {
+    for (const t of ZOO_MAP.outerTrees) {
+      for (const e of ZOO_MAP.enclosures) expect(distance(t, e.center), `${e.id} と木 (${t.x}, ${t.z})`).toBeGreaterThan(e.radius + 0.6)
+    }
+    for (const e of ZOO_MAP.enclosures) expect(distance(e.center, { x: 0, z: 0 }) + e.radius).toBeLessThan(ZOO_MAP.radius)
+  })
+
   test('ゾウのエリアには水浴びの池があり、ほとりはエリアの内側', () => {
     const e = enclosureById('elephant')
     expect(e.pond).toBeDefined()

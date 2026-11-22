@@ -331,9 +331,14 @@ export function useZooEngine(options: ZooEngineOptions) {
         const a = inst.state
         inst.root.position.set(a.x, 0, a.z)
         inst.root.rotation.y = a.heading
-        sphere.center.set(a.x, 1, a.z)
-        sphere.radius = SPECIES[a.species].manifest.bounds.length * a.scale
+        const { length, height } = SPECIES[a.species].manifest.bounds
+        sphere.center.set(a.x, height * a.scale * 0.5, a.z)
+        sphere.radius = Math.max(length, height) * a.scale * 0.6
         const visible = frustum.intersectsSphere(sphere)
+        // 画面外の動物は描かない（影が画面に入る分だけ広めに判定する）。スキンメッシュは
+        // 自前の境界球を持たないので、Three.js の視錐台カリングの代わりにここで判定する
+        sphere.radius += 2.5
+        inst.root.visible = frustum.intersectsSphere(sphere)
         // 画面外の動物はアニメーションの更新を間引く（移動そのものは毎フレーム進める）
         inst.skipped += dt
         if (visible || inst.skipped > 0.12) {

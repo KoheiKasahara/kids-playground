@@ -56,11 +56,12 @@ function facingCenter(c: Vec2): number {
   return Math.atan2(-c.x, -c.z)
 }
 
-const TIGER = outer(-36)
-const PENGUIN = outer(36)
-const ZEBRA = outer(-72)
-const HIPPO = outer(72)
+// 外側の輪は 30 度ずつ 12 か所。0 度が手前（俯瞰のカメラ側）
 const RABBIT = outer(0, 21.2)
+const PENGUIN = outer(30)
+const TIGER = outer(-30)
+const HIPPO = outer(60)
+const ZEBRA = outer(-60)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -204,12 +205,12 @@ export const ZOO_MAP: ZooMap = {
     { x: 0.1, z: 14.6, kind: 'bush', size: 0.9 },
     { x: -14.0, z: -1.9, kind: 'bush', size: 0.8 },
     { x: 14.2, z: -1.7, kind: 'bush', size: 0.8 },
-    // 外側のエリアのすきま（18度ずつずらした方向）と、園の外周
-    ...[18, 54, 90, 126, 162, 198, 234, 270, 306, 342].map((deg, i) => ({
-      ...outer(deg, 21.4 + (i % 2) * 1.2), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 1.0 + (i % 3) * 0.1,
+    // 外側のエリアのすきまの奥（15度ずつずらした方向）と、園の外周
+    ...Array.from({ length: 12 }, (_, i) => ({
+      ...outer(15 + i * 30, 25.6 + (i % 2) * 0.8), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 0.95 + (i % 3) * 0.1,
     })),
-    ...[0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((deg, i) => ({
-      ...outer(deg + 9, 29.5), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.2,
+    ...Array.from({ length: 12 }, (_, i) => ({
+      ...outer(i * 30, 29.8), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.15,
     })),
   ],
 }
