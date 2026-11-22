@@ -5,11 +5,12 @@ import elephantManifest from './models/elephant.json'
 import giraffeManifest from './models/giraffe.json'
 import lionManifest from './models/lion.json'
 import pandaManifest from './models/panda.json'
+import penguinManifest from './models/penguin.json'
 import tigerManifest from './models/tiger.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin'
 
 export type SpecialAction = {
   clip: string
@@ -164,9 +165,35 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2.5, 5], wander: 4.5, run: 0.9, special: 1.1, graze: 0.6, sleep: 0.8 },
   },
+  penguin: {
+    id: 'penguin',
+    name: 'ペンギン',
+    emoji: '🐧',
+    color: '#6a7a99',
+    manifest: penguinManifest as AnimalManifest,
+    food: { id: 'fish', label: 'さかな', emoji: '🐟' },
+    specials: [
+      { clip: 'Flap', label: 'ぱたぱた', emoji: '🙌' },
+      { clip: 'Hop', label: 'ぴょんぴょん', emoji: '⬆️' },
+    ],
+    facts: [
+      'とりの なかまだけど、そらは とべないよ',
+      'うみの なかを とっても はやく およぐよ',
+      'よちよち あるくよ。おなかで すべることも あるよ',
+    ],
+    reach: (penguinManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.4,
+    hit: [{ y: 0.45, z: 0, r: 0.36 }, { y: 0.82, z: 0.1, r: 0.26 }],
+    follow: { height: 0.45, distance: 4.6 },
+    members: [
+      { id: 'penguin-dad', scale: 1, label: 'おとうさん' },
+      { id: 'penguin-mom', scale: 0.94, label: 'おかあさん' },
+      { id: 'penguin-chick', scale: 0.6, label: 'ひな' },
+    ],
+    mood: { idle: [2, 4.5], wander: 5, run: 0.6, special: 1.3, graze: 0.8, sleep: 0.5 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

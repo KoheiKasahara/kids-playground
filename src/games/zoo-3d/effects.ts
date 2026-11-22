@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -249,6 +249,21 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
     }
+  } else if (kind === 'fish') {
+    // 魚: 青い体に白いおなか、三角の尾びれ
+    const fish = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 7), mat('#5b8fd6'))
+    fish.scale.set(0.55, 0.6, 1.3)
+    fish.position.y = 0.08
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 5), mat('#e8f2fb'))
+    belly.scale.set(0.5, 0.35, 1.2)
+    belly.position.set(0, 0.05, 0.01)
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.12, 4), mat('#4a78bd'))
+    fin.rotation.x = -Math.PI / 2
+    fin.scale.set(0.35, 1, 1)
+    fin.position.set(0, 0.08, 0.2)
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), mat('#1d2233'))
+    eye.position.set(0.05, 0.1, -0.08)
+    group.add(fish, belly, fin, eye)
   } else {
     const meat = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 1), mat('#d8625a'))
     meat.scale.set(1.2, 0.8, 1)

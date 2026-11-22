@@ -214,8 +214,9 @@ function addTree(batch: Batch, t: Tree, canopies: THREE.Sphere[], seed: number):
 }
 
 function addRock(batch: Batch, r: Rock, seed: number): void {
-  batch.add(new THREE.DodecahedronGeometry(r.r, 0), '#b7aa98', m4(r.x, r.h * 0.4, r.z, 1, r.h / r.r, 0.9, seed), 0.22, seed)
-  batch.add(new THREE.DodecahedronGeometry(r.r * 0.5, 0), '#c8bca9',
+  const base = new THREE.Color(r.color ?? '#b7aa98')
+  batch.add(new THREE.DodecahedronGeometry(r.r, 0), base, m4(r.x, r.h * 0.4, r.z, 1, r.h / r.r, 0.9, seed), 0.22, seed)
+  batch.add(new THREE.DodecahedronGeometry(r.r * 0.5, 0), r.color ? base.clone().multiplyScalar(1.04) : '#c8bca9',
     m4(r.x + r.r * 0.7, r.h * 0.2, r.z + r.r * 0.3, 1, 0.8, 1, seed * 2), 0.22, seed + 1)
 }
 

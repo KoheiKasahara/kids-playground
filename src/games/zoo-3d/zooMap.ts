@@ -7,7 +7,7 @@ export type Circle = Vec2 & { r: number }
 
 export type TreeKind = 'round' | 'acacia' | 'palm' | 'bush' | 'bamboo'
 export type Tree = Vec2 & { kind: TreeKind; size: number }
-export type Rock = Vec2 & { r: number; h: number }
+export type Rock = Vec2 & { r: number; h: number; color?: string }
 
 export type Enclosure = {
   id: string
@@ -57,6 +57,7 @@ function facingCenter(c: Vec2): number {
 }
 
 const TIGER = outer(-36)
+const PENGUIN = outer(36)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -136,6 +137,21 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(TIGER, -2.0, -2.2), r: 0.75, h: 0.6 }],
       gate: facingCenter(TIGER),
+    },
+    {
+      id: 'penguin',
+      center: PENGUIN,
+      radius: 4.6,
+      fence: '#7f9fb5',
+      ground: '#e4eef0',
+      pond: { ...near(PENGUIN, 1.2, 1.4), r: 1.6 },
+      trees: [],
+      rocks: [
+        { ...near(PENGUIN, -2.1, -1.6), r: 0.7, h: 0.55, color: '#e8f3f8' },
+        { ...near(PENGUIN, 2.4, -1.9), r: 0.5, h: 0.4, color: '#dcebf3' },
+        { ...near(PENGUIN, -2.6, 1.2), r: 0.4, h: 0.3, color: '#eef7fb' },
+      ],
+      gate: facingCenter(PENGUIN),
     },
   ],
   outerTrees: [
