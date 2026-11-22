@@ -47,12 +47,17 @@ type Instance = {
   hold?: THREE.Object3D
   head?: THREE.Object3D
   skipped: number
+  /** 影を落とすメッシュ（遠くの動物は影を省く）。 */
+  meshes: THREE.Mesh[]
 }
 
 /** 効果（水しぶき）を出すクリップが指定する骨。指定がなければゾウの鼻先。 */
 function effectBone(manifest: AnimalManifest): string {
   return Object.values(manifest.clips).find(c => c.effect && c.bone)?.bone ?? 'trunk_tip'
 }
+
+/** これより遠い動物は影を落とさず、アニメーションの更新を間引く（m）。 */
+const FAR_DISTANCE = 32
 
 type FoodView = { group: THREE.Group; y: number; vy: number; heldBy?: string; vanishAt?: number; age: number }
 type Timeline = { id: string; clip: string; t: number; fired: Set<string> }
@@ -339,9 +344,12 @@ export function useZooEngine(options: ZooEngineOptions) {
         // 自前の境界球を持たないので、Three.js の視錐台カリングの代わりにここで判定する
         sphere.radius += 2.5
         inst.root.visible = frustum.intersectsSphere(sphere)
+        // 遠くの動物（俯瞰で小さく見える）は、影を省き、アニメーションの更新を 20 回/秒に抑える
+        const far = camera.position.distanceTo(sphere.center) > FAR_DISTANCE
+        for (const m of inst.meshes) m.castShadow = !far
         // 画面外の動物はアニメーションの更新を間引く（移動そのものは毎フレーム進める）
         inst.skipped += dt
-        if (visible || inst.skipped > 0.12) {
+        if ((visible && (!far || inst.skipped >= 0.05)) || inst.skipped > 0.12) {
           inst.animator.update(inst.skipped, a)
           inst.skipped = 0
         }
@@ -554,9 +562,11 @@ export function useZooEngine(options: ZooEngineOptions) {
             const gltf = models.get(state.species)!
             const model = cloneSkinned(gltf.scene)
             model.scale.setScalar(state.scale)
+            const meshes: THREE.Mesh[] = []
             model.traverse(o => {
               const mesh = o as THREE.SkinnedMesh
               if (mesh.isMesh) {
+                meshes.push(mesh)
                 mesh.castShadow = true
                 mesh.frustumCulled = false
                 const material = mesh.material as THREE.MeshStandardMaterial
@@ -571,7 +581,7 @@ export function useZooEngine(options: ZooEngineOptions) {
             const mixer = new THREE.AnimationMixer(model)
             const animator = new AnimalAnimator(mixer, gltf.animations, SPECIES[state.species].manifest, state.scale)
             instances.push({
-              state, root, animator, skipped: 0,
+              state, root, animator, skipped: 0, meshes,
               // 水しぶきなどの効果の出どころ（モーション情報の bone。ゾウは鼻先）
               tip: model.getObjectByName(effectBone(SPECIES[state.species].manifest)) ?? undefined,
               hold: model.getObjectByName(SPECIES[state.species].manifest.clips.Eat?.food?.bone ?? '') ?? undefined,
