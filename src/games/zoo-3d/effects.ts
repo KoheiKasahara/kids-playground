@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -247,6 +247,18 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.scale.set(0.4, 0.15, 1.3)
       leaf.position.set((i - 1) * 0.05, 0.06, 0.32)
       leaf.rotation.y = (i - 1) * 0.6
+      group.add(leaf)
+    }
+  } else if (kind === 'carrot') {
+    // にんじん: オレンジの円すいと緑の葉
+    const root = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 8), mat('#f28a2e'))
+    root.rotation.x = Math.PI / 2
+    root.position.set(0, 0.06, 0.02)
+    group.add(root)
+    for (let i = 0; i < 3; i++) {
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.16, 4), mat('#5cb84d'))
+      leaf.rotation.set(-Math.PI / 2 - 0.3, 0, (i - 1) * 0.45)
+      leaf.position.set((i - 1) * 0.025, 0.08, -0.18)
       group.add(leaf)
     }
   } else if (kind === 'watermelon') {

@@ -7,12 +7,13 @@ import hippoManifest from './models/hippo.json'
 import lionManifest from './models/lion.json'
 import pandaManifest from './models/panda.json'
 import penguinManifest from './models/penguin.json'
+import rabbitManifest from './models/rabbit.json'
 import tigerManifest from './models/tiger.json'
 import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit'
 
 export type SpecialAction = {
   clip: string
@@ -243,9 +244,35 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [3, 6], wander: 3.5, run: 0.4, special: 1.3, graze: 1.4, sleep: 0.9 },
   },
+  rabbit: {
+    id: 'rabbit',
+    name: 'ウサギ',
+    emoji: '🐰',
+    color: '#e3c49b',
+    manifest: rabbitManifest as AnimalManifest,
+    food: { id: 'carrot', label: 'にんじん', emoji: '🥕' },
+    specials: [
+      { clip: 'Binky', label: 'ぴょーん', emoji: '✨' },
+      { clip: 'Stand', label: 'たっち', emoji: '👀' },
+    ],
+    facts: [
+      'ながい みみで とおくの おとも きこえるよ',
+      'うしろあしで ぴょんぴょん はねて すすむよ',
+      'うれしいと、とびあがって からだを ひねるよ',
+    ],
+    reach: (rabbitManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.35,
+    hit: [{ y: 0.3, z: 0, r: 0.3 }, { y: 0.55, z: 0.22, r: 0.24 }],
+    follow: { height: 0.35, distance: 4.6 },
+    members: [
+      { id: 'rabbit-mom', scale: 1, label: 'おかあさん' },
+      { id: 'rabbit-kid', scale: 0.75, label: 'こども' },
+      { id: 'rabbit-baby', scale: 0.58, label: 'あかちゃん' },
+    ],
+    mood: { idle: [1.5, 3.5], wander: 6, run: 1.4, special: 1.3, graze: 1.5, sleep: 0.5 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`
