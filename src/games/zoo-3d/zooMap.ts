@@ -67,6 +67,7 @@ const FLAMINGO = outer(90)
 const POLAR_BEAR = outer(120)
 const CAMEL = outer(-120)
 const MONKEY = outer(180)
+const CAPYBARA = outer(150)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -282,6 +283,21 @@ export const ZOO_MAP: ZooMap = {
         { ...near(MONKEY, 2.4, 1.6), r: 0.45, h: 0.35 },
       ],
       gate: facingCenter(MONKEY),
+    },
+    {
+      id: 'capybara',
+      center: CAPYBARA,
+      radius: 4.6,
+      fence: '#a3794f',
+      ground: '#c6db8f',
+      // お風呂の池
+      pond: { ...near(CAPYBARA, 1.0, -1.7), r: 1.5 },
+      trees: [
+        { ...near(CAPYBARA, -2.4, -1.5), kind: 'bush', size: 0.75 },
+        { ...near(CAPYBARA, -1.4, 2.6), kind: 'round', size: 0.75 },
+      ],
+      rocks: [{ ...near(CAPYBARA, 2.7, 1.3), r: 0.4, h: 0.3 }],
+      gate: facingCenter(CAPYBARA),
     },
   ],
   outerTrees: [
