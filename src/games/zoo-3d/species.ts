@@ -2,6 +2,7 @@
 // モデルとモーションの実体は public/models/zoo-3d/*.glb、長さや移動量は models/*.json を正とする。
 
 import elephantManifest from './models/elephant.json'
+import flamingoManifest from './models/flamingo.json'
 import giraffeManifest from './models/giraffe.json'
 import hippoManifest from './models/hippo.json'
 import kangarooManifest from './models/kangaroo.json'
@@ -14,7 +15,7 @@ import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo'
 
 export type SpecialAction = {
   clip: string
@@ -296,9 +297,35 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2, 4.5], wander: 5.5, run: 1.2, special: 1.2, graze: 1.3, sleep: 0.6 },
   },
+  flamingo: {
+    id: 'flamingo',
+    name: 'フラミンゴ',
+    emoji: '🦩',
+    color: '#f59ab2',
+    manifest: flamingoManifest as AnimalManifest,
+    food: { id: 'shrimp', label: 'エビ', emoji: '🦐' },
+    specials: [
+      { clip: 'Display', label: 'ばさばさ', emoji: '🪶' },
+      { clip: 'March', label: 'マーチ', emoji: '🎵' },
+    ],
+    facts: [
+      'かたあしで たったまま ねむるよ',
+      'エビなどを たべて からだが ピンクに なるよ',
+      'みんなで ならんで ダンスのように あるくよ',
+    ],
+    reach: (flamingoManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.4,
+    hit: [{ y: 0.9, z: 0, r: 0.3 }, { y: 1.35, z: 0.2, r: 0.22 }, { y: 0.45, z: 0, r: 0.2 }],
+    follow: { height: 0.95, distance: 5 },
+    members: [
+      { id: 'flamingo-a', scale: 1, label: 'おとうさん' },
+      { id: 'flamingo-b', scale: 0.96, label: 'おかあさん' },
+      { id: 'flamingo-chick', scale: 0.62, label: 'ひな' },
+    ],
+    mood: { idle: [2.5, 5], wander: 4, run: 0.5, special: 1.2, graze: 1.6, sleep: 0.7 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -248,6 +248,24 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.position.set((i - 1) * 0.05, 0.06, 0.32)
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
+    }
+  } else if (kind === 'shrimp') {
+    // エビ: まるく曲がったピンクの節と、細いひげ
+    for (let i = 0; i < 5; i++) {
+      const a = -0.4 + i * 0.45
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(0.045 - i * 0.005, 7, 5), mat(i % 2 ? '#ff8a73' : '#ff9f86'))
+      seg.position.set(0, 0.05 + Math.sin(a) * 0.06, Math.cos(a) * 0.09 - 0.02)
+      seg.scale.set(1, 0.8, 0.9)
+      group.add(seg)
+    }
+    const fan = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.05, 4), mat('#ff7a63'))
+    fan.position.set(0, 0.12, -0.03)
+    group.add(fan)
+    for (const s of [-1, 1]) {
+      const whisker = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.14, 3), mat('#e86a55'))
+      whisker.rotation.set(0.9, 0, s * 0.4)
+      whisker.position.set(s * 0.02, 0.06, 0.13)
+      group.add(whisker)
     }
   } else if (kind === 'carrot') {
     // にんじん: オレンジの円すいと緑の葉

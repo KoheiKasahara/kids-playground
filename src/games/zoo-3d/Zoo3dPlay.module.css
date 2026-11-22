@@ -170,13 +170,13 @@
   align-items: center;
   gap: 4px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 9px;
   border: 2px solid #e3d4a8;
   border-radius: 22px;
   white-space: nowrap;
   background: #fff;
   color: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 

@@ -16,6 +16,8 @@ describe('どうぶつえんの マップ', () => {
 
   test('木・岩・池はエリアの内側にあり、動物が歩ける広さが残る', () => {
     for (const e of ZOO_MAP.enclosures) {
+      // 行き先が見つからないときはエリアの中心へ向かうので、中心は池・岩・木の外にする
+      for (const o of obstaclesOf(e)) expect(distance(o, e.center), `${e.id} の中心`).toBeGreaterThan(o.r + 0.3)
       for (const o of obstaclesOf(e)) expect(distance(o, e.center) + o.r).toBeLessThan(e.radius + 0.5)
       const blocked = obstaclesOf(e).reduce((sum, o) => sum + Math.PI * o.r * o.r, 0)
       expect(blocked).toBeLessThan(Math.PI * e.radius * e.radius * 0.25)

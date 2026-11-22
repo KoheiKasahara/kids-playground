@@ -63,6 +63,7 @@ const TIGER = outer(-30)
 const HIPPO = outer(60)
 const ZEBRA = outer(-60)
 const KANGAROO = outer(-90)
+const FLAMINGO = outer(90)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -149,7 +150,7 @@ export const ZOO_MAP: ZooMap = {
       radius: 4.6,
       fence: '#7f9fb5',
       ground: '#e4eef0',
-      pond: { ...near(PENGUIN, 1.2, 1.4), r: 1.6 },
+      pond: { ...near(PENGUIN, 1.4, 1.6), r: 1.6 },
       trees: [],
       rocks: [
         { ...near(PENGUIN, -2.1, -1.6), r: 0.7, h: 0.55, color: '#e8f3f8' },
@@ -177,7 +178,7 @@ export const ZOO_MAP: ZooMap = {
       radius: 5.0,
       fence: '#9b7d62',
       ground: '#c7d68c',
-      pond: { ...near(HIPPO, 1.6, -1.3), r: 2.0 },
+      pond: { ...near(HIPPO, 1.9, -1.4), r: 1.9 },
       trees: [
         { ...near(HIPPO, -2.7, 1.9), kind: 'palm', size: 0.8 },
         { ...near(HIPPO, -1.6, -3.4), kind: 'bush', size: 0.7 },
@@ -214,6 +215,20 @@ export const ZOO_MAP: ZooMap = {
         { ...near(KANGAROO, -3.2, -1.2), r: 0.4, h: 0.3, color: '#d29a6c' },
       ],
       gate: facingCenter(KANGAROO),
+    },
+    {
+      id: 'flamingo',
+      center: FLAMINGO,
+      radius: 4.8,
+      fence: '#d08aa0',
+      ground: '#cfe39a',
+      pond: { ...near(FLAMINGO, 1.9, 1.3), r: 1.8 },
+      trees: [
+        { ...near(FLAMINGO, -2.4, 2.4), kind: 'palm', size: 0.8 },
+        { ...near(FLAMINGO, -2.0, -2.6), kind: 'bush', size: 0.65 },
+      ],
+      rocks: [{ ...near(FLAMINGO, 3.1, -2.2), r: 0.35, h: 0.25 }],
+      gate: facingCenter(FLAMINGO),
     },
   ],
   outerTrees: [
