@@ -1,0 +1,133 @@
+{
+  "animal": "flamingo",
+  "model": "flamingo.glb",
+  "fps": 30,
+  "triangles": 4416,
+  "bounds": {
+    "width": 0.307,
+    "length": 0.775,
+    "height": 1.52,
+    "front": 0.416,
+    "back": 0.359
+  },
+  "clips": {
+    "Idle": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "idle"
+    },
+    "Walk": {
+      "duration": 1.1,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.6,
+      "turnPerCycle": 0.0,
+      "duty": 0.6,
+      "speed": 0.5455,
+      "turnSpeed": 0.0
+    },
+    "WalkLeft": {
+      "duration": 1.1,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.6,
+      "turnPerCycle": 26,
+      "duty": 0.6,
+      "speed": 0.5455,
+      "turnSpeed": 23.636
+    },
+    "WalkRight": {
+      "duration": 1.1,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.6,
+      "turnPerCycle": -26,
+      "duty": 0.6,
+      "speed": 0.5455,
+      "turnSpeed": -23.636
+    },
+    "Run": {
+      "duration": 0.6,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 1.0,
+      "turnPerCycle": 0,
+      "duty": 0.42,
+      "speed": 1.6667,
+      "turnSpeed": 0.0
+    },
+    "TurnLeft": {
+      "duration": 1.0,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": 80,
+      "duty": 0.65,
+      "speed": 0.0,
+      "turnSpeed": 80.0
+    },
+    "TurnRight": {
+      "duration": 1.0,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": -80,
+      "duty": 0.65,
+      "speed": 0.0,
+      "turnSpeed": -80.0
+    },
+    "Eat": {
+      "duration": 3.8,
+      "loop": false,
+      "kind": "eat",
+      "food": {
+        "bone": "head",
+        "grab": 1.0,
+        "release": 2.8,
+        "reach": 0.335
+      }
+    },
+    "LieDown": {
+      "duration": 1.6,
+      "loop": false,
+      "kind": "sleep"
+    },
+    "Sleep": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "sleep"
+    },
+    "GetUp": {
+      "duration": 1.6,
+      "loop": false,
+      "kind": "sleep"
+    },
+    "Display": {
+      "duration": 3.0,
+      "loop": false,
+      "kind": "special",
+      "sound": "honk",
+      "callStart": 0.8,
+      "callEnd": 2.2
+    },
+    "March": {
+      "duration": 3.2,
+      "loop": false,
+      "kind": "special"
+    },
+    "Happy": {
+      "duration": 1.6,
+      "loop": false,
+      "kind": "react"
+    },
+    "Blink": {
+      "duration": 0.2,
+      "loop": false,
+      "kind": "overlay",
+      "bones": [
+        "eye_l",
+        "eye_r"
+      ]
+    }
+  }
+}

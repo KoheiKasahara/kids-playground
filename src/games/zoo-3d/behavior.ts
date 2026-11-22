@@ -542,6 +542,8 @@ function steer(world: ZooWorld, a: AnimalState, lc: Locomotion, dt: number, rand
   if (a.blocked > 2.5) {
     a.blocked = 0
     if (goal.plan.kind === 'wander') begin(world, a, { kind: 'wander' }, random)
+    // 仲間とゆずり合ったまま動けないときは、固有アクションをその場で見せる（ずっと待たせない）
+    else if (goal.plan.kind === 'special') perform(a, goal.plan)
   }
 }
 
@@ -568,6 +570,12 @@ function separate(world: ZooWorld): void {
       a.z += nz * share * wa
       b.x -= nx * share * wb
       b.z -= nz * share * wb
+      // 押し離した先が池・岩・木にかからないよう、もう一度外へ出す
+      for (const c of [a, b]) {
+        const free = pushOutOfObstacles(c, areaOf(c).obstacles, c.radius * 0.85)
+        c.x = free.x
+        c.z = free.z
+      }
     }
   }
 }

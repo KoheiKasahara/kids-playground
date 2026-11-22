@@ -16,10 +16,19 @@ describe('どうぶつえんの マップ', () => {
 
   test('木・岩・池はエリアの内側にあり、動物が歩ける広さが残る', () => {
     for (const e of ZOO_MAP.enclosures) {
+      // 行き先が見つからないときはエリアの中心へ向かうので、中心は池・岩・木の外にする
+      for (const o of obstaclesOf(e)) expect(distance(o, e.center), `${e.id} の中心`).toBeGreaterThan(o.r + 0.3)
       for (const o of obstaclesOf(e)) expect(distance(o, e.center) + o.r).toBeLessThan(e.radius + 0.5)
       const blocked = obstaclesOf(e).reduce((sum, o) => sum + Math.PI * o.r * o.r, 0)
       expect(blocked).toBeLessThan(Math.PI * e.radius * e.radius * 0.25)
     }
+  })
+
+  test('柵の外の木はどのエリアにも入らず、すべてのエリアが園の中に収まる', () => {
+    for (const t of ZOO_MAP.outerTrees) {
+      for (const e of ZOO_MAP.enclosures) expect(distance(t, e.center), `${e.id} と木 (${t.x}, ${t.z})`).toBeGreaterThan(e.radius + 0.6)
+    }
+    for (const e of ZOO_MAP.enclosures) expect(distance(e.center, { x: 0, z: 0 }) + e.radius).toBeLessThan(ZOO_MAP.radius)
   })
 
   test('ゾウのエリアには水浴びの池があり、ほとりはエリアの内側', () => {

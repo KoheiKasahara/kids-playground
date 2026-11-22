@@ -60,7 +60,7 @@ const m4 = (x: number, y: number, z: number, sx = 1, sy = 1, sz = 1, ry = 0, rx 
 
 function groundGeometry(map: ZooMap): THREE.BufferGeometry {
   const size = map.radius * 2 + 16
-  const seg = 72
+  const seg = 116
   const g = new THREE.PlaneGeometry(size, size, seg, seg).rotateX(-Math.PI / 2).toNonIndexed()
   const pos = g.attributes.position as THREE.BufferAttribute
   const colors = new Float32Array(pos.count * 3)
@@ -69,10 +69,17 @@ function groundGeometry(map: ZooMap): THREE.BufferGeometry {
   const sand = new THREE.Color('#efdcab')
   const edge = new THREE.Color('#7fae58')
   const tmp = new THREE.Color()
-  const gates = map.enclosures.map(e => ({
-    x: e.center.x + Math.sin(e.gate) * e.radius, z: e.center.z + Math.cos(e.gate) * e.radius,
-  }))
-  const pathDist = (x: number, z: number) => Math.min(...gates.map(g => segDist(x, z, map.plaza.x, map.plaza.z, g.x, g.z)))
+  // 入口から広場へ（外側のエリアは環状の園路へ）まっすぐ道を引き、広場と園路は spokes で結ぶ
+  const segments: [number, number, number, number][] = map.enclosures.map(e => {
+    const gx = e.center.x + Math.sin(e.gate) * e.radius
+    const gz = e.center.z + Math.cos(e.gate) * e.radius
+    const r = Math.hypot(gx, gz)
+    if (r > map.ringRoad + 0.5) return [gx, gz, gx * map.ringRoad / r, gz * map.ringRoad / r]
+    return [gx, gz, map.plaza.x, map.plaza.z]
+  })
+  for (const [a, b] of map.spokes) segments.push([a.x, a.z, b.x, b.z])
+  const pathDist = (x: number, z: number) => Math.min(Math.abs(Math.hypot(x, z) - map.ringRoad),
+    ...segments.map(([ax, az, bx, bz]) => segDist(x, z, ax, az, bx, bz)))
   for (let tri = 0; tri < pos.count / 3; tri++) {
     let cx = 0
     let cz = 0
@@ -207,8 +214,9 @@ function addTree(batch: Batch, t: Tree, canopies: THREE.Sphere[], seed: number):
 }
 
 function addRock(batch: Batch, r: Rock, seed: number): void {
-  batch.add(new THREE.DodecahedronGeometry(r.r, 0), '#b7aa98', m4(r.x, r.h * 0.4, r.z, 1, r.h / r.r, 0.9, seed), 0.22, seed)
-  batch.add(new THREE.DodecahedronGeometry(r.r * 0.5, 0), '#c8bca9',
+  const base = new THREE.Color(r.color ?? '#b7aa98')
+  batch.add(new THREE.DodecahedronGeometry(r.r, 0), base, m4(r.x, r.h * 0.4, r.z, 1, r.h / r.r, 0.9, seed), 0.22, seed)
+  batch.add(new THREE.DodecahedronGeometry(r.r * 0.5, 0), r.color ? base.clone().multiplyScalar(1.04) : '#c8bca9',
     m4(r.x + r.r * 0.7, r.h * 0.2, r.z + r.r * 0.3, 1, 0.8, 1, seed * 2), 0.22, seed + 1)
 }
 
@@ -340,6 +348,8 @@ export function createScenery(map: ZooMap = ZOO_MAP): Scenery {
     const gz = e.center.z + Math.cos(e.gate) * (e.radius + 0.9)
     board.position.set(gx, 1.75, gz)
     board.rotation.y = e.gate
+    // 看板が追いかけるカメラと動物のあいだに入らないよう、よける球として登録する
+    canopies.push(new THREE.Sphere(new THREE.Vector3(gx, 1.6, gz), 0.95))
     board.castShadow = true
     board.name = `zoo-sign-${e.id}`
     group.add(board)

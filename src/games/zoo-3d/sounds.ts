@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -101,6 +101,88 @@ export function playZooSound(sound: ZooSound): void {
         // パンダの「めぇー」: 高めの声を2回、少しゆらしながら
         voice(ctx, now, [[0, 620], [0.12, 820], [0.28, 700]], 0.16, 'triangle', 2400, 18)
         voice(ctx, now + 0.34, [[0, 660], [0.14, 880], [0.34, 720]], 0.16, 'triangle', 2400, 18)
+        return
+      case 'honk':
+        // ペンギンの「クワッ クワッ」: 短く鼻にかかった声を2回
+        voice(ctx, now, [[0, 480], [0.07, 720], [0.2, 560]], 0.15, 'sawtooth', 1900, 10)
+        voice(ctx, now + 0.28, [[0, 520], [0.07, 760], [0.24, 590]], 0.15, 'sawtooth', 1900, 10)
+        return
+      case 'neigh':
+        // シマウマの「ヒヒーン」: 高く上がってふるえながら下がる声
+        voice(ctx, now, [[0, 420], [0.15, 900], [0.55, 780], [0.9, 520]], 0.15, 'sawtooth', 2200, 40)
+        return
+      case 'yawn':
+        // カバの大あくび「ふわぁ〜」: 低い声がゆっくり上がって下がる
+        voice(ctx, now, [[0, 130], [0.35, 210], [0.9, 170], [1.3, 110]], 0.24, 'sawtooth', 700, 6)
+        return
+      case 'sniff':
+        // ウサギの鼻ひくひく「ぷすぷす」と、小さな「きゅっ」
+        for (let i = 0; i < 4; i++) playNoiseBurst(ctx, now + i * 0.11, 0.06, 0.2, 'bandpass', 2600)
+        playTone(ctx, 1320, now + 0.5, 0.1, 0.12, 'sine')
+        return
+      case 'punch':
+        // カンガルーのボクシング「ぽこぽこ」: やわらかい打音を4回
+        for (let i = 0; i < 4; i++) {
+          playTone(ctx, 220 + (i % 2) * 60, now + i * 0.2, 0.08, 0.22, 'triangle')
+          playNoiseBurst(ctx, now + i * 0.2, 0.05, 0.12, 'lowpass', 1200)
+        }
+        return
+      case 'boing':
+        // 大ジャンプ「びよーん」: 音程が上がってはずむ
+        {
+          const tone = createToneNodes(ctx, 180, now, 0.5, 0.2, 'triangle')
+          tone.oscillator.frequency.exponentialRampToValueAtTime(720, now + 0.3)
+          tone.oscillator.frequency.exponentialRampToValueAtTime(520, now + 0.5)
+          tone.oscillator.start(now)
+          tone.oscillator.stop(now + 0.5)
+        }
+        return
+      case 'growl':
+        // シロクマの「ぐるる」: 低い声をふるわせる（こわくない大きさ）
+        voice(ctx, now, [[0, 140], [0.3, 175], [0.8, 120]], 0.22, 'sawtooth', 650, 22)
+        return
+      case 'clap':
+        // ぱちぱち: 短い手びょうしを5回
+        for (let i = 0; i < 5; i++) playNoiseBurst(ctx, now + i * 0.32, 0.05, 0.24, 'bandpass', 1800)
+        return
+      case 'kiki':
+        // サルの「キッキッ」: 高く短い声を3回
+        for (let i = 0; i < 3; i++) voice(ctx, now + i * 0.16, [[0, 1100], [0.05, 1500], [0.11, 1200]], 0.13, 'square', 3200, 0)
+        return
+      case 'purr':
+        // カピバラの「キュルル」: やわらかい声を小さくふるわせる
+        voice(ctx, now, [[0, 380], [0.25, 430], [0.6, 360], [0.9, 400]], 0.16, 'triangle', 1400, 28)
+        return
+      case 'chomp':
+        // ワニの「パクッ」: 口を閉じる音を2回
+        for (const t of [0, 0.9]) {
+          playNoiseBurst(ctx, now + t, 0.08, 0.26, 'bandpass', 900)
+          playTone(ctx, 150, now + t, 0.12, 0.22, 'triangle')
+        }
+        return
+      case 'baa':
+        // ヒツジの「メェー」: ふるえる声をのばす
+        voice(ctx, now, [[0, 340], [0.1, 470], [0.75, 420], [0.95, 360]], 0.17, 'sawtooth', 1500, 34)
+        return
+      case 'drum':
+        // ゴリラのドラミング「ドンドコ」: 低い太鼓の音を速く6回
+        for (let i = 0; i < 6; i++) {
+          const tone = createToneNodes(ctx, 150 - (i % 2) * 25, now + i * 0.14, 0.12, 0.26, 'sine')
+          tone.oscillator.frequency.exponentialRampToValueAtTime(70, now + i * 0.14 + 0.12)
+          tone.oscillator.start(now + i * 0.14)
+          tone.oscillator.stop(now + i * 0.14 + 0.12)
+        }
+        return
+      case 'snort':
+        // サイの「ふんっ」: 鼻から勢いよく息を出す音を2回
+        for (const t of [0, 0.35]) {
+          playNoiseBurst(ctx, now + t, 0.22, 0.26, 'lowpass', 700)
+          playTone(ctx, 110, now + t, 0.16, 0.14, 'sawtooth')
+        }
+        return
+      case 'kon':
+        // キツネの「コーン」: 高く澄んだ声を長くのばす
+        voice(ctx, now, [[0, 620], [0.15, 900], [0.8, 820], [1.1, 640]], 0.15, 'triangle', 2600, 10)
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import Zoo3dPlay from './Zoo3dPlay'
+import { SPECIES, SPECIES_ORDER } from './species'
 import type { ZooEngineOptions } from './useZooEngine'
 
 const engine = vi.hoisted(() => ({
@@ -83,6 +84,7 @@ describe('3Dどうぶつえんの画面', () => {
     // どうぶつの種類ごとに1つずつ、選ぶボタンが並ぶ
     const picker = screen.getByRole('group', { name: 'どうぶつを えらぶ' })
     expect(within(picker).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(
-      ['ゾウを みる', 'キリンを みる', 'ライオンを みる', 'パンダを みる'])
+      SPECIES_ORDER.map(id => `${SPECIES[id].name}を みる`))
+    expect(SPECIES_ORDER.slice(0, 4)).toEqual(['elephant', 'giraffe', 'lion', 'panda'])
   })
 })

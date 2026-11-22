@@ -22,7 +22,7 @@ for animal in "${ANIMALS[@]}"; do
     args+=(--qa "$QA_DIR/$animal")
   fi
   "$BLENDER" -b --factory-startup --python scripts/zoo-3d/build_animal.py -- "${args[@]}" 2>&1 \
-    | grep -E '^\[zoo3d\]|Error|Traceback|^  File' || true
+    | grep -E '^\[zoo3d\]|Error|Traceback|^  File|Bone Heat' || true
   glb=public/models/zoo-3d/$animal.glb
   if [[ ! -f "$glb" ]]; then
     echo "GLB が生成されませんでした: $glb" >&2

@@ -141,7 +141,23 @@ describe('どうぶつの ふるまい', () => {
         const a = world.animals.find(x => x.species === id)!
         command(world, a.id, { kind: 'special', clip: spec.clip }, random)
         const { events } = run(world, 30, random)
-        expect(events).toContainEqual({ type: 'special', animal: a.id, clip: spec.clip })
+        expect(events, `${id} の ${spec.clip}`).toContainEqual({ type: 'special', animal: a.id, clip: spec.clip })
+      }
+    }
+  })
+
+  test('池で見せるアクションは、仲間が行く手をふさいでいても、しばらく待てば始まる', () => {
+    for (const id of SPECIES_ORDER) {
+      for (const spec of SPECIES[id].specials.filter(s => s.atPond)) {
+        for (let seed = 1; seed <= 20; seed++) {
+          const random = seeded(seed)
+          const world = createZoo(random)
+          for (const a of world.animals.filter(x => x.species === id)) {
+            command(world, a.id, { kind: 'special', clip: spec.clip }, random)
+            const { events } = run(world, 30, random)
+            expect(events, `${a.id} の ${spec.clip}（seed ${seed}）`).toContainEqual({ type: 'special', animal: a.id, clip: spec.clip })
+          }
+        }
       }
     }
   })

@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana' | 'cracker'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -249,6 +249,96 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
     }
+  } else if (kind === 'cracker') {
+    // しかせんべい: 平たいまるいせんべいを2枚重ねる
+    for (let i = 0; i < 2; i++) {
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.025, 14), mat(i ? '#e6b873' : '#d9a55e'))
+      disc.position.set(i * 0.05, 0.015 + i * 0.028, i * 0.03)
+      disc.rotation.set(i * 0.15, 0, i * 0.1)
+      group.add(disc)
+    }
+  } else if (kind === 'banana') {
+    // バナナ: 曲がった黄色い実を3本、根元をまとめる
+    for (let i = 0; i < 3; i++) {
+      const fruit = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.035, 6, 10, Math.PI * 0.55), mat(i === 1 ? '#ffd84d' : '#ffe066'))
+      fruit.rotation.set(Math.PI / 2, 0, Math.PI * 0.72 + (i - 1) * 0.35)
+      fruit.position.set(0, 0.04 + i * 0.012, 0)
+      group.add(fruit)
+    }
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.06, 5), mat('#7a6a2a'))
+    stem.rotation.z = Math.PI / 2
+    stem.position.set(-0.11, 0.05, -0.06)
+    group.add(stem)
+  } else if (kind === 'shrimp') {
+    // エビ: まるく曲がったピンクの節と、細いひげ
+    for (let i = 0; i < 5; i++) {
+      const a = -0.4 + i * 0.45
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(0.045 - i * 0.005, 7, 5), mat(i % 2 ? '#ff8a73' : '#ff9f86'))
+      seg.position.set(0, 0.05 + Math.sin(a) * 0.06, Math.cos(a) * 0.09 - 0.02)
+      seg.scale.set(1, 0.8, 0.9)
+      group.add(seg)
+    }
+    const fan = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.05, 4), mat('#ff7a63'))
+    fan.position.set(0, 0.12, -0.03)
+    group.add(fan)
+    for (const s of [-1, 1]) {
+      const whisker = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.14, 3), mat('#e86a55'))
+      whisker.rotation.set(0.9, 0, s * 0.4)
+      whisker.position.set(s * 0.02, 0.06, 0.13)
+      group.add(whisker)
+    }
+  } else if (kind === 'carrot') {
+    // にんじん: オレンジの円すいと緑の葉
+    const root = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 8), mat('#f28a2e'))
+    root.rotation.x = Math.PI / 2
+    root.position.set(0, 0.06, 0.02)
+    group.add(root)
+    for (let i = 0; i < 3; i++) {
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.16, 4), mat('#5cb84d'))
+      leaf.rotation.set(-Math.PI / 2 - 0.3, 0, (i - 1) * 0.45)
+      leaf.position.set((i - 1) * 0.025, 0.08, -0.18)
+      group.add(leaf)
+    }
+  } else if (kind === 'watermelon') {
+    // スイカ: 緑の玉に濃い緑のしま
+    const melon = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 9), mat('#4caf50'))
+    melon.scale.set(1, 0.9, 1.05)
+    melon.position.y = 0.16
+    group.add(melon)
+    for (let i = 0; i < 6; i++) {
+      const stripe = new THREE.Mesh(new THREE.SphereGeometry(0.183, 3, 9, (i / 6) * Math.PI * 2, 0.22), mat('#1f6e34'))
+      stripe.scale.copy(melon.scale)
+      stripe.position.y = 0.16
+      group.add(stripe)
+    }
+  } else if (kind === 'grass') {
+    // ほし草のたば: 細い葉を放射状に立て、根元をひもで結ぶ
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2
+      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.34, 4), mat(i % 3 ? '#9bc45a' : '#c8c46a'))
+      blade.position.set(Math.sin(a) * 0.05, 0.17, Math.cos(a) * 0.05)
+      blade.rotation.set(Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35)
+      group.add(blade)
+    }
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 10), mat('#c98b54'))
+    tie.rotation.x = Math.PI / 2
+    tie.position.y = 0.08
+    group.add(tie)
+  } else if (kind === 'fish') {
+    // 魚: 青い体に白いおなか、三角の尾びれ
+    const fish = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 7), mat('#5b8fd6'))
+    fish.scale.set(0.55, 0.6, 1.3)
+    fish.position.y = 0.08
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 5), mat('#e8f2fb'))
+    belly.scale.set(0.5, 0.35, 1.2)
+    belly.position.set(0, 0.05, 0.01)
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.12, 4), mat('#4a78bd'))
+    fin.rotation.x = -Math.PI / 2
+    fin.scale.set(0.35, 1, 1)
+    fin.position.set(0, 0.08, 0.2)
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), mat('#1d2233'))
+    eye.position.set(0.05, 0.1, -0.08)
+    group.add(fish, belly, fin, eye)
   } else {
     const meat = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 1), mat('#d8625a'))
     meat.scale.set(1.2, 0.8, 1)
