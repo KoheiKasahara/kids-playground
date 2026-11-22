@@ -79,6 +79,7 @@ const RED_PANDA = outer(157.5)
 const RHINO = outer(-157.5)
 const DEER = outer(-11.25, THIRD_RING)
 const FOX = outer(11.25, THIRD_RING)
+const OSTRICH = outer(-33.75, THIRD_RING)
 
 export const ZOO_MAP: ZooMap = {
   radius: 44,
@@ -406,6 +407,19 @@ export const ZOO_MAP: ZooMap = {
       // 巣あなのある丘
       rocks: [{ ...near(FOX, -1.4, -2.4), r: 0.7, h: 0.55, color: '#c9a77a' }],
       gate: facingCenter(FOX),
+    },
+    {
+      id: 'ostrich',
+      center: OSTRICH,
+      radius: 5.1,
+      fence: '#b38b5e',
+      ground: '#e4cf92',
+      trees: [
+        { ...near(OSTRICH, -2.6, 2.2), kind: 'acacia', size: 0.9 },
+        { ...near(OSTRICH, 2.7, 1.6), kind: 'bush', size: 0.7 },
+      ],
+      rocks: [{ ...near(OSTRICH, 2.2, -2.6), r: 0.45, h: 0.3 }],
+      gate: facingCenter(OSTRICH),
     },
   ],
   outerTrees: [

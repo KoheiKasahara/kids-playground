@@ -14,6 +14,7 @@ import hippoManifest from './models/hippo.json'
 import kangarooManifest from './models/kangaroo.json'
 import lionManifest from './models/lion.json'
 import monkeyManifest from './models/monkey.json'
+import ostrichManifest from './models/ostrich.json'
 import pandaManifest from './models/panda.json'
 import penguinManifest from './models/penguin.json'
 import polarBearManifest from './models/polar_bear.json'
@@ -26,7 +27,7 @@ import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer' | 'fox'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer' | 'fox' | 'ostrich'
 
 export type SpecialAction = {
   clip: string
@@ -611,9 +612,34 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2, 4.5], wander: 5, run: 1.2, special: 1.3, graze: 0.8, sleep: 0.8 },
   },
+  ostrich: {
+    id: 'ostrich',
+    name: 'ダチョウ',
+    emoji: '🐦',
+    color: '#4a4245',
+    manifest: ostrichManifest as AnimalManifest,
+    food: { id: 'leaves', label: 'はっぱ', emoji: '🌿' },
+    specials: [
+      { clip: 'Dance', label: 'ダンス', emoji: '💃' },
+      { clip: 'Lookout', label: 'みはり', emoji: '👀' },
+    ],
+    facts: [
+      'せかいで いちばん おおきな とりだよ',
+      'とべないけれど、はしるのが とても はやいよ',
+      'たまごも せかいで いちばん おおきいよ',
+    ],
+    reach: (ostrichManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.6,
+    hit: [{ y: 1.15, z: 0, r: 0.42 }, { y: 1.9, z: 0.35, r: 0.25 }, { y: 0.55, z: 0, r: 0.25 }],
+    follow: { height: 1.2, distance: 6.5 },
+    members: [
+      { id: 'ostrich-dad', scale: 1, label: 'おとうさん' },
+      { id: 'ostrich-chick', scale: 0.5, label: 'ひな' },
+    ],
+    mood: { idle: [2, 4.5], wander: 4.5, run: 1.4, special: 1.2, graze: 1.4, sleep: 0.5 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer', 'fox']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer', 'fox', 'ostrich']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`
