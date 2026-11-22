@@ -62,6 +62,7 @@ const PENGUIN = outer(30)
 const TIGER = outer(-30)
 const HIPPO = outer(60)
 const ZEBRA = outer(-60)
+const KANGAROO = outer(-90)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -197,6 +198,22 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(RABBIT, -1.5, -1.9), r: 0.35, h: 0.25 }],
       gate: facingCenter(RABBIT),
+    },
+    {
+      id: 'kangaroo',
+      center: KANGAROO,
+      radius: 5.0,
+      fence: '#b06e45',
+      ground: '#e3b57c',
+      trees: [
+        { ...near(KANGAROO, -2.8, 1.9), kind: 'round', size: 0.85 },
+        { ...near(KANGAROO, -1.2, -3.3), kind: 'bush', size: 0.7 },
+      ],
+      rocks: [
+        { ...near(KANGAROO, 1.4, 2.8), r: 0.6, h: 0.45, color: '#c98f63' },
+        { ...near(KANGAROO, -3.2, -1.2), r: 0.4, h: 0.3, color: '#d29a6c' },
+      ],
+      gate: facingCenter(KANGAROO),
     },
   ],
   outerTrees: [

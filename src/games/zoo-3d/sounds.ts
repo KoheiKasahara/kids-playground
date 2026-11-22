@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -119,6 +119,23 @@ export function playZooSound(sound: ZooSound): void {
         // ウサギの鼻ひくひく「ぷすぷす」と、小さな「きゅっ」
         for (let i = 0; i < 4; i++) playNoiseBurst(ctx, now + i * 0.11, 0.06, 0.2, 'bandpass', 2600)
         playTone(ctx, 1320, now + 0.5, 0.1, 0.12, 'sine')
+        return
+      case 'punch':
+        // カンガルーのボクシング「ぽこぽこ」: やわらかい打音を4回
+        for (let i = 0; i < 4; i++) {
+          playTone(ctx, 220 + (i % 2) * 60, now + i * 0.2, 0.08, 0.22, 'triangle')
+          playNoiseBurst(ctx, now + i * 0.2, 0.05, 0.12, 'lowpass', 1200)
+        }
+        return
+      case 'boing':
+        // 大ジャンプ「びよーん」: 音程が上がってはずむ
+        {
+          const tone = createToneNodes(ctx, 180, now, 0.5, 0.2, 'triangle')
+          tone.oscillator.frequency.exponentialRampToValueAtTime(720, now + 0.3)
+          tone.oscillator.frequency.exponentialRampToValueAtTime(520, now + 0.5)
+          tone.oscillator.start(now)
+          tone.oscillator.stop(now + 0.5)
+        }
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)

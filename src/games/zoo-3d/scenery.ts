@@ -348,6 +348,8 @@ export function createScenery(map: ZooMap = ZOO_MAP): Scenery {
     const gz = e.center.z + Math.cos(e.gate) * (e.radius + 0.9)
     board.position.set(gx, 1.75, gz)
     board.rotation.y = e.gate
+    // 看板が追いかけるカメラと動物のあいだに入らないよう、よける球として登録する
+    canopies.push(new THREE.Sphere(new THREE.Vector3(gx, 1.6, gz), 0.95))
     board.castShadow = true
     board.name = `zoo-sign-${e.id}`
     group.add(board)
