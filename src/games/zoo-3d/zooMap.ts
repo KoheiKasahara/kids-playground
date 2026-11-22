@@ -66,6 +66,7 @@ const KANGAROO = outer(-90)
 const FLAMINGO = outer(90)
 const POLAR_BEAR = outer(120)
 const CAMEL = outer(-120)
+const MONKEY = outer(180)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -263,6 +264,24 @@ export const ZOO_MAP: ZooMap = {
         { ...near(CAMEL, 1.2, 3.0), r: 0.4, h: 0.3, color: '#dcbb86' },
       ],
       gate: facingCenter(CAMEL),
+    },
+    {
+      id: 'monkey',
+      center: MONKEY,
+      radius: 5.0,
+      fence: '#8a6a4c',
+      ground: '#c3d08a',
+      trees: [
+        { ...near(MONKEY, -2.9, -1.4), kind: 'round', size: 0.95 },
+        { ...near(MONKEY, 2.8, -1.8), kind: 'round', size: 0.85 },
+      ],
+      // サル山: 大きな岩を重ねる
+      rocks: [
+        { ...near(MONKEY, 0.4, -2.3), r: 1.15, h: 1.0, color: '#b9ab96' },
+        { ...near(MONKEY, -1.4, -2.9), r: 0.6, h: 0.5 },
+        { ...near(MONKEY, 2.4, 1.6), r: 0.45, h: 0.35 },
+      ],
+      gate: facingCenter(MONKEY),
     },
   ],
   outerTrees: [

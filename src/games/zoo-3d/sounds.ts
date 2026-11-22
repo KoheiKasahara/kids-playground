@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -140,6 +140,14 @@ export function playZooSound(sound: ZooSound): void {
       case 'growl':
         // シロクマの「ぐるる」: 低い声をふるわせる（こわくない大きさ）
         voice(ctx, now, [[0, 140], [0.3, 175], [0.8, 120]], 0.22, 'sawtooth', 650, 22)
+        return
+      case 'clap':
+        // ぱちぱち: 短い手びょうしを5回
+        for (let i = 0; i < 5; i++) playNoiseBurst(ctx, now + i * 0.32, 0.05, 0.24, 'bandpass', 1800)
+        return
+      case 'kiki':
+        // サルの「キッキッ」: 高く短い声を3回
+        for (let i = 0; i < 3; i++) voice(ctx, now + i * 0.16, [[0, 1100], [0.05, 1500], [0.11, 1200]], 0.13, 'square', 3200, 0)
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)

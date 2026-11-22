@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -249,6 +249,18 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
     }
+  } else if (kind === 'banana') {
+    // バナナ: 曲がった黄色い実を3本、根元をまとめる
+    for (let i = 0; i < 3; i++) {
+      const fruit = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.035, 6, 10, Math.PI * 0.55), mat(i === 1 ? '#ffd84d' : '#ffe066'))
+      fruit.rotation.set(Math.PI / 2, 0, Math.PI * 0.72 + (i - 1) * 0.35)
+      fruit.position.set(0, 0.04 + i * 0.012, 0)
+      group.add(fruit)
+    }
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.06, 5), mat('#7a6a2a'))
+    stem.rotation.z = Math.PI / 2
+    stem.position.set(-0.11, 0.05, -0.06)
+    group.add(stem)
   } else if (kind === 'shrimp') {
     // エビ: まるく曲がったピンクの節と、細いひげ
     for (let i = 0; i < 5; i++) {
