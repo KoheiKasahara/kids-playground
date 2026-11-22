@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -179,6 +179,10 @@ export function playZooSound(sound: ZooSound): void {
           playNoiseBurst(ctx, now + t, 0.22, 0.26, 'lowpass', 700)
           playTone(ctx, 110, now + t, 0.16, 0.14, 'sawtooth')
         }
+        return
+      case 'kon':
+        // キツネの「コーン」: 高く澄んだ声を長くのばす
+        voice(ctx, now, [[0, 620], [0.15, 900], [0.8, 820], [1.1, 640]], 0.15, 'triangle', 2600, 10)
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)

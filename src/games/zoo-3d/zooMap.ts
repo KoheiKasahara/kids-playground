@@ -78,6 +78,7 @@ const GORILLA = outer(-112.5)
 const RED_PANDA = outer(157.5)
 const RHINO = outer(-157.5)
 const DEER = outer(-11.25, THIRD_RING)
+const FOX = outer(11.25, THIRD_RING)
 
 export const ZOO_MAP: ZooMap = {
   radius: 44,
@@ -391,6 +392,20 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(DEER, 1.8, -2.4), r: 0.4, h: 0.3 }],
       gate: facingCenter(DEER),
+    },
+    {
+      id: 'fox',
+      center: FOX,
+      radius: 4.6,
+      fence: '#a8754a',
+      ground: '#d3dc95',
+      trees: [
+        { ...near(FOX, 2.3, 1.7), kind: 'round', size: 0.85 },
+        { ...near(FOX, -2.4, 1.4), kind: 'bush', size: 0.7 },
+      ],
+      // 巣あなのある丘
+      rocks: [{ ...near(FOX, -1.4, -2.4), r: 0.7, h: 0.55, color: '#c9a77a' }],
+      gate: facingCenter(FOX),
     },
   ],
   outerTrees: [
