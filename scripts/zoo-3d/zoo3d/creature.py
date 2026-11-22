@@ -19,14 +19,24 @@ def new_roles() -> Roles:
 
 
 def add_eyes(roles: Roles, body: Body, center: Sequence[float], direction: Callable[[int], Sequence[float]],
-             size: tuple[float, float, float], eye: str = '#24273A', sparkle: str = '#FFFFFF') -> dict:
-    """左右の目（黒い楕円＋ハイライト）を顔の表面に置き、目の骨の位置と向きを返す。"""
+             size: tuple[float, float, float], eye: str = '#24273A', sparkle: str = '#FFFFFF',
+             sclera: str | None = None) -> dict:
+    """左右の目（黒い楕円＋ハイライト）を顔の表面に置き、目の骨の位置と向きを返す。
+
+    sclera を指定すると黒目の後ろに白目を敷く（パンダのように目のまわりが黒い動物で目を読ませる）。
+    """
     out = {}
     for side, lr in ((1, 'l'), (-1, 'r')):
         p, n = surface_point(body, center, direction(side))
         normal = Vector(n)
-        e = M.primitive('sphere', f'eye_{lr}', M.look_matrix(Vector(p) - normal * size[2] * 0.4, normal, scale=size),
-                        segments=12, rings=8)
+        if sclera:
+            white_size = (size[0] * 1.45, size[1] * 1.35, size[2] * 1.1)
+            w = M.primitive('sphere', f'sclera_{lr}', M.look_matrix(Vector(p) - normal * white_size[2] * 0.5, normal,
+                            scale=white_size), segments=12, rings=8)
+            M.solid(w, sclera)
+            roles[f'eye_{lr}'].append(w)
+        e = M.primitive('sphere', f'eye_{lr}', M.look_matrix(Vector(p) - normal * size[2] * (0.1 if sclera else 0.4),
+                        normal, scale=size), segments=12, rings=8)
         M.solid(e, eye)
         x_axis = Vector((0, 0, 1)).cross(normal).normalized()
         up_axis = normal.cross(x_axis).normalized()

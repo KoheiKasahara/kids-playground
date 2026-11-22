@@ -94,12 +94,16 @@ export default function Zoo3dPlay() {
               </button>
             </div>
           </> : <div className={styles.picker} role="group" aria-label="どうぶつを えらぶ">
-            {MEMBERS.map(m => (
-              <button type="button" key={m.id} disabled={!ready} onClick={() => choose(m)} aria-label={`${m.species.name}の ${m.label}を みる`}>
-                <span aria-hidden="true" style={{ fontSize: m.species.members[0].id === m.id ? undefined : '1.4rem' }}>{m.species.emoji}</span>
-                <b>{m.species.name}</b><small>{m.label}</small>
-              </button>
-            ))}
+            {/* 動物の種類ごとに1つ（親を選ぶ）。子どもは画面の中でタップして選べる。動物が増えても並びが崩れない */}
+            {SPECIES_ORDER.map(id => {
+              const m = MEMBERS.find(x => x.species.id === id)!
+              return (
+                <button type="button" key={id} disabled={!ready} onClick={() => choose(m)} aria-label={`${m.species.name}を みる`}>
+                  <span aria-hidden="true">{m.species.emoji}</span>
+                  <b>{m.species.name}</b>
+                </button>
+              )
+            })}
           </div>}
         </section>
         {info && member && <div className={styles.infoBackdrop} onClick={() => setInfo(false)}>

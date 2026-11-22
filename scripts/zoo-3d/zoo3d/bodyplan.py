@@ -1,6 +1,10 @@
-"""四足の動物に共通するモーションの組み立て（歩き・走り・方向転換・待機・喜ぶ・まばたき・伏せ）。
+"""体型（ボディプラン）ごとに共通するモーションの組み立て。
 
-ゾウ（鼻の動きが中心）は elephant_motion.py に個別に書き、キリン・ライオンはここを使う。
+歩き・走り・方向転換・待機・喜ぶ・まばたき・伏せを、脚の本数と配置だけを変えて使い回す。
+- quadruped: 四足（キリン・ライオン・パンダ）。脚は front_l / back_l / front_r / back_r。
+- biped: 二足（ペンギン・ダチョウ・フラミンゴなど）。脚は left / right。鳥の翼は別の骨の並びとして
+  固有アクション側で動かす（歩容には含めない）。
+ゾウ（鼻の動きが中心）は最初の成功例として elephant_motion.py に専用実装がある。
 Mesh2Motion からリターゲットした姿勢（retarget.py）とも組み合わせられる。
 """
 
@@ -17,6 +21,22 @@ from . import retarget as RT
 from .anim import X, Y, Z, Clip, Gait, LegSpec, Pose, RigModel, blink, keys, window
 
 LEG_KEYS = ('front_l', 'back_l', 'front_r', 'back_r')
+BIPED_KEYS = ('left', 'right')
+
+# 歩容の位相（脚が胴の真下を通る瞬間が周期のどこに来るか）。動物の歩き方に合わせて選ぶ。
+GAITS = {
+    # 後ろ足→同じ側の前足の順に着く4拍子（ゾウ・ライオン・パンダの常歩）
+    'lateral_walk': {'back_l': 0.0, 'front_l': 0.25, 'back_r': 0.5, 'front_r': 0.75},
+    # 同じ側の前後がほぼ一緒に出る側対歩（キリン・ラクダ）
+    'pace': {'back_l': 0.0, 'front_l': 0.1, 'back_r': 0.5, 'front_r': 0.6},
+    # 後ろ2本→前2本の順に着くギャロップ（キリン・ライオンの走り）
+    'gallop': {'back_l': 0.0, 'back_r': 0.08, 'front_l': 0.45, 'front_r': 0.53},
+    # 後ろ2本・前2本がほぼ同時に着くバウンド（ウサギ・リス）
+    'bound': {'back_l': 0.0, 'back_r': 0.02, 'front_l': 0.5, 'front_r': 0.52},
+    # 二足の歩き（左右交互）と両足跳び
+    'biped_walk': {'left': 0.0, 'right': 0.5},
+    'biped_hop': {'left': 0.0, 'right': 0.0},
+}
 
 
 @dataclass
@@ -26,22 +46,37 @@ class Config:
     front_pole: Vector
     hind_pole: Vector
     toe: tuple[float, float, float, float]
-    """(前足のつま先の前方距離, 前足の高さ, 後ろ足の前方距離, 後ろ足の高さ)"""
+    """(前足のつま先の前方距離, 前足の高さ, 後ろ足の前方距離, 後ろ足の高さ)。二足は後ろ足の値を使う。"""
     head: str = 'head'
     ears: tuple[str, str] = ('ear_l', 'ear_r')
     ear_axis: Vector = field(default_factory=lambda: Vector((0, 1, 0)))
     ear_mirror: bool = True
     """左右の耳で回転の向きを反転するか（左右へ向いた軸まわりなら True）。"""
     jaw: str | None = None
+    plan: str = 'quadruped'
+    """'quadruped'（四足）または 'biped'（二足・鳥）。"""
+
+
+def leg_keys(cfg: Config) -> tuple[str, ...]:
+    return BIPED_KEYS if cfg.plan == 'biped' else LEG_KEYS
+
+
+def leg_bones(cfg: Config, key: str) -> tuple[str, str, str, bool]:
+    """脚の (上の骨, 下の骨, 足の骨, 前脚か)。骨の名前はリグの標準命名に従う。"""
+    if cfg.plan == 'biped':
+        side = 'l' if key == 'left' else 'r'
+        return f'leg_upper_{side}', f'leg_lower_{side}', f'leg_foot_{side}', False
+    front = key.startswith('front')
+    side = key[-1]
+    prefix = 'front_leg' if front else 'back_leg'
+    return f'{prefix}_upper_{side}', f'{prefix}_lower_{side}', f'{prefix}_foot_{side}', front
 
 
 def legs(cfg: Config, phases: dict[str, float], lift: tuple[float, float], pitch: tuple[float, float]) -> dict[str, LegSpec]:
     out = {}
-    for key in LEG_KEYS:
-        front = key.startswith('front')
-        side = key[-1]
-        prefix = 'front_leg' if front else 'back_leg'
-        out[key] = LegSpec(f'{prefix}_upper_{side}', f'{prefix}_lower_{side}', f'{prefix}_foot_{side}', phases[key],
+    for key in leg_keys(cfg):
+        upper, lower, foot, front = leg_bones(cfg, key)
+        out[key] = LegSpec(upper, lower, foot, phases[key],
                            lift[0] if front else lift[1], cfg.front_pole if front else cfg.hind_pole,
                            toe=cfg.toe[0] if front else cfg.toe[2], toe_drop=cfg.toe[1] if front else cfg.toe[3],
                            swing_pitch=pitch[0] if front else pitch[1])
@@ -53,7 +88,7 @@ def rest_ankles(rig: RigModel, lg: dict[str, LegSpec]) -> dict[str, Vector]:
 
 
 def standing(rig: RigModel, cfg: Config):
-    lg = legs(cfg, {k: 0.0 for k in LEG_KEYS}, (0, 0), (0, 0))
+    lg = legs(cfg, {k: 0.0 for k in leg_keys(cfg)}, (0, 0), (0, 0))
     return lg, rest_ankles(rig, lg)
 
 
@@ -82,7 +117,9 @@ def locomotion(rig: RigModel, cfg: Config, name: str, *, period: float, stride: 
     lg = legs(cfg, phases, lift, pitch)
     gait = Gait(period=period, stride=stride, duty=duty, legs=lg, turn=turn, rest_ankles=rest_ankles(rig, lg))
     lean = max(-1.0, min(1.0, turn / 90.0))
-    hind = phases['back_l']
+    # 体の上下・ねじれの基準にする脚（四足は左後ろ足と左前足、二足は左足）
+    hind = phases.get('back_l', phases.get('left', 0.0))
+    front = phases.get('front_l', hind + 0.5)
 
     def sample(t: float) -> Pose:
         c = t / period
@@ -93,7 +130,7 @@ def locomotion(rig: RigModel, cfg: Config, name: str, *, period: float, stride: 
         p.rot('hips', Z, -roll * 0.7 * math.cos(2 * math.pi * (c - hind - 0.68)) + lean * 3)
         p.rot('spine_1', X, spine_flex * math.sin(2 * math.pi * (c - hind)))
         p.rot('spine_2', X, -spine_flex * 0.6 * math.sin(2 * math.pi * (c - hind)))
-        p.rot('spine_2', Y, -roll * 0.8 * math.cos(2 * math.pi * (c - phases['front_l'] - 0.5)))
+        p.rot('spine_2', Y, -roll * 0.8 * math.cos(2 * math.pi * (c - front - 0.5)))
         p.rot('spine_2', Z, lean * 4)
         pump = math.sin(2 * math.pi * bob_freq * (c - hind) + 0.6)
         p.rot_chain(cfg.neck, X, neck_pitch + neck_pump * pump)

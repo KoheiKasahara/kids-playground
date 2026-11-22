@@ -175,7 +175,7 @@
 }
 
 .picker {
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
 }
 
 .action,

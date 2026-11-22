@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -40,7 +40,7 @@ describe('3Dどうぶつえんの画面', () => {
     const user = userEvent.setup()
     renderZoo()
     act(() => engine.options?.onStatus('ready'))
-    await user.click(screen.getByRole('button', { name: 'ゾウの おかあさんを みる' }))
+    await user.click(screen.getByRole('button', { name: 'ゾウを みる' }))
     expect(engine.select).toHaveBeenCalledWith('elephant-mom')
     expect(engine.setFollow).toHaveBeenCalledWith(true)
     act(() => { engine.options?.onSelect('elephant-mom'); engine.options?.onFollow(true) })
@@ -71,7 +71,13 @@ describe('3Dどうぶつえんの画面', () => {
     expect(screen.getByRole('button', { name: 'がおーを みる' })).toBeEnabled()
     act(() => engine.options?.onSelect('giraffe-dad'))
     expect(screen.getByRole('button', { name: 'はっぱを あげる' })).toBeEnabled()
+    act(() => engine.options?.onSelect('panda-baby'))
+    expect(screen.getByRole('button', { name: 'たけを あげる' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'てをふるを みる' })).toBeEnabled()
     act(() => engine.options?.onSelect(null))
-    expect(screen.getByRole('group', { name: 'どうぶつを えらぶ' })).toBeInTheDocument()
+    // どうぶつの種類ごとに1つずつ、選ぶボタンが並ぶ
+    const picker = screen.getByRole('group', { name: 'どうぶつを えらぶ' })
+    expect(within(picker).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(
+      ['ゾウを みる', 'キリンを みる', 'ライオンを みる', 'パンダを みる'])
   })
 })

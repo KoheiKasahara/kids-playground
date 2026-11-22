@@ -4,9 +4,11 @@
 import elephantManifest from './models/elephant.json'
 import giraffeManifest from './models/giraffe.json'
 import lionManifest from './models/lion.json'
+import pandaManifest from './models/panda.json'
+import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda'
 
 export type SpecialAction = {
   clip: string
@@ -22,7 +24,7 @@ export type Species = {
   emoji: string
   color: string
   manifest: AnimalManifest
-  food: { id: 'apple' | 'leaves' | 'meat'; label: string; emoji: string }
+  food: { id: FoodKind; label: string; emoji: string }
   specials: SpecialAction[]
   facts: string[]
   /** エサを食べるとき、エサから体の中心までの距離（m, 大人の大きさ）。 */
@@ -111,9 +113,34 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2.5, 5], wander: 4, run: 0.8, special: 1.0, graze: 0.6, sleep: 0.9 },
   },
+  panda: {
+    id: 'panda',
+    name: 'パンダ',
+    emoji: '🐼',
+    color: '#9aa3b5',
+    manifest: pandaManifest as AnimalManifest,
+    food: { id: 'bamboo', label: 'たけ', emoji: '🎋' },
+    specials: [
+      { clip: 'Wave', label: 'てをふる', emoji: '👋' },
+      { clip: 'Roll', label: 'ころりん', emoji: '🌀' },
+    ],
+    facts: [
+      'たけや ささの はっぱが だいすきだよ',
+      'すわって まえあしで じょうずに たべるよ',
+      'めの まわりと みみと あしが くろいよ',
+    ],
+    reach: (pandaManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.5,
+    hit: [{ y: 0.6, z: 0, r: 0.5 }, { y: 0.9, z: 0.6, r: 0.38 }],
+    follow: { height: 0.65, distance: 5.5 },
+    members: [
+      { id: 'panda-mom', scale: 1, label: 'おかあさん' },
+      { id: 'panda-baby', scale: 0.58, label: 'あかちゃん' },
+    ],
+    mood: { idle: [3, 6], wander: 3.5, run: 0.4, special: 1.2, graze: 1.6, sleep: 0.8 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

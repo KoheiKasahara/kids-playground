@@ -14,4 +14,5 @@
 | `horse-eating.glb` | `static/assets/horse/animations/eating.glb` | キリンの「首を下げて食べる」 |
 | `horse-sleep.glb` | `static/assets/horse/animations/sleep.glb` | キリンの伏せ・睡眠の姿勢 |
 | `fox-howl.glb` | `static/assets/fox/animations/howl.glb` | ライオンの「吠える」（座って頭を上げる） |
-| `fox-sleep.glb` | `static/assets/fox/animations/sleep.glb` | ライオンの丸まって眠る姿勢 |
+| `fox-sleep.glb` | `static/assets/fox/animations/sleep.glb` | 丸まって眠る姿勢（検証用。現在は手続き的な伏せを採用） |
+| `fox-sit.glb` | `static/assets/fox/animations/sit.glb` | パンダの「てをふる」の座り姿勢 |

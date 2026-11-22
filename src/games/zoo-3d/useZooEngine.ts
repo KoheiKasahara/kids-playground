@@ -11,7 +11,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { observeGameActivity } from '../../utils/gameActivity'
 import { AnimalAnimator } from './animator'
 import { command, createZoo, dropFood, type AnimalState, type ZooEvent, type ZooWorld, stepZoo } from './behavior'
-import { CAMERA_LIMITS, cameraPosition, follow, fovFor, overviewPose, pushOutOfSpheres } from './cameraRig'
+import { CAMERA_LIMITS, cameraPosition, follow, followAzimuth, fovFor, overviewPose, pushOutOfSpheres } from './cameraRig'
 import { createEffects, createFood, disposeObject } from './effects'
 import { createScenery } from './scenery'
 import { playZooSound, type ZooSound } from './sounds'
@@ -40,7 +40,10 @@ type Instance = {
   state: AnimalState
   root: THREE.Group
   animator: AnimalAnimator
+  /** ゾウの鼻先（水しぶき・音符の出どころ）。 */
   tip?: THREE.Object3D
+  /** 食べ物を持って運ぶ骨（モーション情報の food.bone）。 */
+  hold?: THREE.Object3D
   head?: THREE.Object3D
   skipped: number
 }
@@ -175,8 +178,8 @@ export function useZooEngine(options: ZooEngineOptions) {
         const info = SPECIES[inst.state.species].manifest.clips.Eat
         if (food) {
           const hold = info.food ? info.food.release - info.food.grab : 0.6
-          // ゾウは鼻先でつかんで口へ運ぶ。キリン・ライオンはその場で食べる
-          if (inst.tip && info.food?.bone === 'trunk_tip') food.heldBy = inst.state.id
+          // 鼻先（ゾウ）や前足（パンダ）でつかんで口へ運ぶ動物は、その骨に付けて動かす。ほかはその場で食べる
+          if (inst.hold && (info.food?.hold || info.food?.bone === 'trunk_tip')) food.heldBy = inst.state.id
           food.vanishAt = clock + hold
         }
       } else if (e.type === 'happy') {
@@ -230,9 +233,10 @@ export function useZooEngine(options: ZooEngineOptions) {
         food.age += dt
         if (food.heldBy) {
           const holder = instanceOf(food.heldBy)
-          if (holder?.tip) {
-            holder.tip.getWorldPosition(tmp)
-            food.group.position.set(tmp.x, tmp.y - 0.12, tmp.z)
+          if (holder?.hold) {
+            holder.hold.getWorldPosition(tmp)
+            food.group.position.set(tmp.x, tmp.y - 0.12 * holder.state.scale, tmp.z)
+            food.group.scale.setScalar(Math.min(food.group.scale.x, holder.state.scale))
           }
         } else if (food.y > 0 || food.vy !== 0) {
           food.vy -= 14 * dt
@@ -279,7 +283,8 @@ export function useZooEngine(options: ZooEngineOptions) {
             const r = offset.length()
             const polar = Math.acos(Math.max(-1, Math.min(1, offset.y / Math.max(r, 1e-6))))
             const az = Math.atan2(offset.x, offset.z)
-            const wantAz = inst.state.heading + 0.75
+            const wantAz = followAzimuth([controls.target.x, controls.target.y, controls.target.z], inst.state.heading, want, 1.0,
+              scenery.canopies)
             const dAz = Math.atan2(Math.sin(wantAz - az), Math.cos(wantAz - az))
             const nr = r + (want - r) * k
             const np = polar + (1.0 - polar) * k
@@ -542,6 +547,7 @@ export function useZooEngine(options: ZooEngineOptions) {
             instances.push({
               state, root, animator, skipped: 0,
               tip: model.getObjectByName('trunk_tip') ?? undefined,
+              hold: model.getObjectByName(SPECIES[state.species].manifest.clips.Eat?.food?.bone ?? '') ?? undefined,
               head: model.getObjectByName('head') ?? undefined,
             })
           }

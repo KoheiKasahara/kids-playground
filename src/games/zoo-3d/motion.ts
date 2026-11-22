@@ -14,7 +14,8 @@ export type ClipInfo = {
   turnSpeed?: number
   /** 重ねがけ用クリップ（まばたき）が動かす骨。 */
   bones?: string[]
-  food?: { bone: string; grab: number; release: number; reach?: number }
+  /** 食事: bone は食べ物を持つ骨、hold なら grab〜release の間その骨に付けて運ぶ。reach は体の中心から食べ物までの距離。 */
+  food?: { bone: string; grab: number; release: number; reach?: number; hold?: boolean }
   source?: string
   effect?: string
   bone?: string
@@ -24,6 +25,11 @@ export type ClipInfo = {
   callStart?: number
   callEnd?: number
 }
+
+/** すべての動物が持つ共通クリップ（docs/3d-zoo/animal-production.md の標準仕様）。 */
+export const STANDARD_CLIPS = [
+  'Idle', 'Walk', 'WalkLeft', 'WalkRight', 'Run', 'TurnLeft', 'TurnRight', 'Eat', 'LieDown', 'Sleep', 'GetUp', 'Happy', 'Blink',
+] as const
 
 export type AnimalManifest = {
   animal: string

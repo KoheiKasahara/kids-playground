@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { locomotionOf, playbackRate } from './motion'
+import { STANDARD_CLIPS, locomotionOf, playbackRate } from './motion'
 import { SPECIES, SPECIES_ORDER } from './species'
 
 type GltfJson = {
@@ -21,7 +21,7 @@ function readGltf(file: string): GltfJson {
   return JSON.parse(buf.subarray(20, 20 + jsonLength).toString('utf8')) as GltfJson
 }
 
-const REQUIRED = ['Idle', 'Walk', 'WalkLeft', 'WalkRight', 'Run', 'TurnLeft', 'TurnRight', 'Eat', 'LieDown', 'Sleep', 'GetUp', 'Happy', 'Blink']
+const REQUIRED: readonly string[] = STANDARD_CLIPS
 
 describe.each(SPECIES_ORDER)('%s のモデル', id => {
   const species = SPECIES[id]
