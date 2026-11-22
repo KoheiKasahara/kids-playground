@@ -5,7 +5,7 @@
 export type Vec2 = { x: number; z: number }
 export type Circle = Vec2 & { r: number }
 
-export type TreeKind = 'round' | 'acacia' | 'palm' | 'bush'
+export type TreeKind = 'round' | 'acacia' | 'palm' | 'bush' | 'bamboo'
 export type Tree = Vec2 & { kind: TreeKind; size: number }
 export type Rock = Vec2 & { r: number; h: number }
 
@@ -65,34 +65,48 @@ export const ZOO_MAP: ZooMap = {
     },
     {
       id: 'lion',
-      center: { x: 0, z: 7.9 },
+      center: { x: -5.6, z: 7.2 },
       radius: 5.4,
       fence: '#a4744a',
       ground: '#e2c27f',
       trees: [
-        { x: -3.5, z: 10.7, kind: 'acacia', size: 0.85 },
-        { x: 3.8, z: 10.8, kind: 'bush', size: 0.8 },
+        { x: -9.1, z: 10.0, kind: 'acacia', size: 0.85 },
+        { x: -1.8, z: 10.1, kind: 'bush', size: 0.8 },
       ],
       rocks: [
-        { x: 1.9, z: 9.5, r: 1.15, h: 0.85 },
-        { x: -2.3, z: 6.0, r: 0.55, h: 0.45 },
-        { x: 2.8, z: 5.7, r: 0.42, h: 0.35 },
+        { x: -3.7, z: 8.8, r: 1.15, h: 0.85 },
+        { x: -7.9, z: 5.3, r: 0.55, h: 0.45 },
+        { x: -2.8, z: 5.0, r: 0.42, h: 0.35 },
       ],
-      gate: Math.PI,
+      gate: Math.atan2(5.6, -6.8),
+    },
+    {
+      id: 'panda',
+      center: { x: 5.6, z: 7.2 },
+      radius: 5.2,
+      fence: '#9c7b55',
+      ground: '#c9dd8e',
+      trees: [
+        { x: 8.7, z: 9.3, kind: 'bamboo', size: 1.0 },
+        { x: 2.9, z: 10.2, kind: 'bamboo', size: 0.85 },
+        { x: 9.6, z: 5.4, kind: 'bush', size: 0.75 },
+      ],
+      rocks: [{ x: 3.6, z: 5.0, r: 0.45, h: 0.35 }],
+      gate: Math.atan2(-5.6, -6.8),
     },
   ],
   outerTrees: [
     { x: -13.4, z: 2.4, kind: 'round', size: 1.2 },
-    { x: -11.5, z: 8.5, kind: 'round', size: 1.05 },
+    { x: -12.6, z: 10.4, kind: 'round', size: 1.05 },
     { x: 13.2, z: 2.6, kind: 'round', size: 1.15 },
-    { x: 11.4, z: 9.2, kind: 'palm', size: 1.05 },
+    { x: 12.6, z: 10.4, kind: 'palm', size: 1.05 },
     { x: -14.2, z: -9.5, kind: 'palm', size: 1.1 },
     { x: 14.5, z: -10.5, kind: 'round', size: 1.1 },
     { x: 0, z: -13.4, kind: 'round', size: 1.25 },
     { x: -5.5, z: -14.4, kind: 'bush', size: 1 },
     { x: 6, z: -14.2, kind: 'bush', size: 1 },
-    { x: -7.2, z: 13.6, kind: 'bush', size: 0.95 },
-    { x: 7.4, z: 13.8, kind: 'round', size: 1.0 },
+    { x: -2.0, z: 14.4, kind: 'bush', size: 0.95 },
+    { x: 2.4, z: 14.6, kind: 'round', size: 1.0 },
     { x: -15.5, z: -2.4, kind: 'bush', size: 1.1 },
     { x: 15.8, z: -2.8, kind: 'bush', size: 1.1 },
   ],
@@ -106,7 +120,7 @@ export function enclosureById(id: string, map: ZooMap = ZOO_MAP): Enclosure {
 
 /** 木の幹・岩・池を、動物がよける円として返す。 */
 export function obstaclesOf(enclosure: Enclosure): Circle[] {
-  const trees = enclosure.trees.map(t => ({ x: t.x, z: t.z, r: t.kind === 'bush' ? 0.75 * t.size : 0.45 * t.size }))
+  const trees = enclosure.trees.map(t => ({ x: t.x, z: t.z, r: t.kind === 'bush' ? 0.75 * t.size : t.kind === 'bamboo' ? 0.55 * t.size : 0.45 * t.size }))
   const rocks = enclosure.rocks.map(r => ({ x: r.x, z: r.z, r: r.r }))
   return enclosure.pond ? [...trees, ...rocks, enclosure.pond] : [...trees, ...rocks]
 }

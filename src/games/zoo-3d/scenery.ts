@@ -162,6 +162,22 @@ function addTree(batch: Batch, t: Tree, canopies: THREE.Sphere[], seed: number):
     batch.add(new THREE.IcosahedronGeometry(1.5 * s, 1), '#6aa84f', m4(t.x, 3.95 * s, t.z, 1.25, 0.32, 1.1, seed), 0.2, seed)
     batch.add(new THREE.IcosahedronGeometry(1.0 * s, 1), '#79b85a', m4(t.x + 0.5 * s, 4.25 * s, t.z - 0.3 * s, 1.2, 0.35, 1), 0.2)
     canopies.push(new THREE.Sphere(new THREE.Vector3(t.x, 4.0 * s, t.z), 1.9 * s))
+  } else if (t.kind === 'bamboo') {
+    // 竹やぶ: 節のある細い茎を何本も立て、先に葉を付ける
+    for (let i = 0; i < 7; i++) {
+      const a = i * 2.4 + seed
+      const r = (0.15 + 0.12 * (i % 3)) * s
+      const h = (2.4 + 0.5 * ((i * 7) % 3)) * s
+      const x = t.x + Math.sin(a) * r
+      const z = t.z + Math.cos(a) * r
+      batch.add(new THREE.CylinderGeometry(0.045 * s, 0.055 * s, h, 6), i % 2 ? '#7cc35a' : '#68b04a', m4(x, h / 2, z), 0.08, i)
+      for (let j = 1; j < 4; j++) {
+        batch.add(new THREE.CylinderGeometry(0.06 * s, 0.06 * s, 0.04 * s, 6), '#4e9a3c', m4(x, (h * j) / 4, z), 0.05)
+      }
+      batch.add(new THREE.IcosahedronGeometry(0.32 * s, 0), '#5cb84d', m4(x, h, z, 1.3, 0.45, 1.3, a), 0.2, i)
+    }
+    // 茎の林は上から下まで視界をさえぎるので、高さごとに球を置いてカメラの回り込みで避ける
+    for (const y of [0.7, 1.5, 2.4]) canopies.push(new THREE.Sphere(new THREE.Vector3(t.x, y * s, t.z), 0.75 * s))
   } else if (t.kind === 'palm') {
     for (let i = 0; i < 5; i++) {
       const y = (0.35 + i * 0.62) * s

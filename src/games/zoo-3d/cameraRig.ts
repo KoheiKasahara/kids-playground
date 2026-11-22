@@ -61,3 +61,30 @@ export function pushOutOfSpheres(position: [number, number, number],
   }
   return [x, Math.max(CAMERA_LIMITS.minHeight, y), z]
 }
+
+type SphereLike = { center: { x: number; y: number; z: number }; radius: number }
+
+/** 線分 a→b が球を横切るか。 */
+export function segmentHitsSphere(a: [number, number, number], b: [number, number, number], s: SphereLike): boolean {
+  const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+  const len2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
+  const f = [a[0] - s.center.x, a[1] - s.center.y, a[2] - s.center.z]
+  const t = len2 > 0 ? Math.max(0, Math.min(1, -(f[0] * d[0] + f[1] * d[1] + f[2] * d[2]) / len2)) : 0
+  const p = [f[0] + d[0] * t, f[1] + d[1] * t, f[2] + d[2] * t]
+  return p[0] * p[0] + p[1] * p[1] + p[2] * p[2] < s.radius * s.radius
+}
+
+/**
+ * 追いかけるときに回り込む方向（方位角）。動物の斜め前を優先し、木や竹が間に入る方向は避ける。
+ * どの方向もさえぎられるときは、最初の候補（斜め前）を返す。
+ */
+export function followAzimuth(target: [number, number, number], heading: number, distance: number, polar: number,
+  occluders: readonly SphereLike[]): number {
+  const offsets = [0.75, -0.75, 1.4, -1.4, 0.2, 2.2, -2.2, Math.PI]
+  for (const o of offsets) {
+    const az = heading + o
+    const cam = cameraPosition({ target, distance, polar, azimuth: az })
+    if (!occluders.some(s => segmentHitsSphere(cam, target, s))) return az
+  }
+  return heading + offsets[0]
+}

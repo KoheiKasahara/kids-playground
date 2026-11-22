@@ -207,7 +207,9 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export function createFood(kind: 'apple' | 'leaves' | 'meat'): THREE.Group {
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo'
+
+export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
   group.name = `zoo-food-${kind}`
   const mat = (color: string) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, flatShading: true })
@@ -227,6 +229,24 @@ export function createFood(kind: 'apple' | 'leaves' | 'meat'): THREE.Group {
       leaf.scale.set(1.3, 0.25, 0.7)
       leaf.position.set(Math.sin(i * 1.3) * 0.1, 0.06 + i * 0.03, Math.cos(i * 1.3) * 0.1)
       leaf.rotation.y = i * 1.3
+      group.add(leaf)
+    }
+  } else if (kind === 'bamboo') {
+    // 竹: 節のある緑の茎と、先の葉っぱ
+    for (let i = 0; i < 3; i++) {
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.033, 0.16, 7), mat(i % 2 ? '#7cc35a' : '#6bb44c'))
+      seg.position.set(0, 0.04, -0.17 + i * 0.17)
+      seg.rotation.x = Math.PI / 2
+      const node = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.02, 7), mat('#4e9a3c'))
+      node.position.set(0, 0.04, -0.09 + i * 0.17)
+      node.rotation.x = Math.PI / 2
+      group.add(seg, node)
+    }
+    for (let i = 0; i < 3; i++) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), mat('#5cb84d'))
+      leaf.scale.set(0.4, 0.15, 1.3)
+      leaf.position.set((i - 1) * 0.05, 0.06, 0.32)
+      leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
     }
   } else {

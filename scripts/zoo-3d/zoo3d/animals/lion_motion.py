@@ -15,7 +15,7 @@ import os
 from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
 from .. import anim as A
-from .. import quad as Q
+from .. import bodyplan as Q
 from .. import retarget as RT
 from ..anim import X, Y, Z, Clip, Pose, RigModel, keys, window
 

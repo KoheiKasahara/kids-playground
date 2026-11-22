@@ -90,6 +90,8 @@ class Part:
     fn: Callable[[np.ndarray], np.ndarray]
     blend: float = 0.08
     subtract: bool = False
+    intersect: bool = False
+    """それまでの形との共通部分だけを残す（帯模様などを切り出す）。"""
 
 
 @dataclass
@@ -102,9 +104,9 @@ class Body:
         return self
 
     def ellipsoid(self, name: str, region: str, center: Vec3, radii: Vec3, rot_deg: Vec3 | None = None,
-                  blend: float = 0.08, subtract: bool = False) -> 'Body':
+                  blend: float = 0.08, subtract: bool = False, intersect: bool = False) -> 'Body':
         rot = rotation_matrix(rot_deg) if rot_deg is not None else None
-        return self.add(Part(name, region, lambda p: sd_ellipsoid(p, center, radii, rot), blend, subtract))
+        return self.add(Part(name, region, lambda p: sd_ellipsoid(p, center, radii, rot), blend, subtract, intersect))
 
     def cone(self, name: str, region: str, a: Vec3, b: Vec3, r1: float, r2: float, blend: float = 0.08,
              subtract: bool = False) -> 'Body':
@@ -125,15 +127,21 @@ class Body:
         for part in self.parts:
             di = part.fn(p)
             raw.append(di)
-            d = smax(d, -di, part.blend) if part.subtract else smin(d, di, part.blend)
+            if part.subtract:
+                d = smax(d, -di, part.blend)
+            elif part.intersect:
+                d = smax(d, di, part.blend)
+            else:
+                d = smin(d, di, part.blend)
         if self.floor is not None:
             d = smax(d, self.floor - p[:, 2], 0.03)
         return d, raw
 
     def region_of(self, p: np.ndarray) -> np.ndarray:
         """各点に最も近い（減算でない）部位の region 名を返す。"""
-        names = [pt.region for pt in self.parts if not pt.subtract]
-        dists = np.stack([pt.fn(p) for pt in self.parts if not pt.subtract], axis=1)
+        solid = [pt for pt in self.parts if not pt.subtract and not pt.intersect]
+        names = [pt.region for pt in solid]
+        dists = np.stack([pt.fn(p) for pt in solid], axis=1)
         return np.asarray(names, dtype=object)[np.argmin(dists, axis=1)]
 
 
