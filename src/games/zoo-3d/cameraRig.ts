@@ -7,7 +7,7 @@ export const CAMERA_LIMITS = {
   minPolar: 0.42,
   maxPolar: 1.18,
   minDistance: 4.5,
-  maxDistance: 60,
+  maxDistance: 70,
   minHeight: 1.2,
 }
 
@@ -23,14 +23,14 @@ export function overviewDistance(aspect: number, radius: number): number {
   const vfov = (fovFor(aspect) * Math.PI) / 180
   const half = Math.atan(Math.tan(vfov / 2) * aspect)
   const fit = radius / Math.sin(half)
-  return Math.max(18, Math.min(48, fit))
+  return Math.max(18, Math.min(56, fit))
 }
 
 export type Pose = { target: [number, number, number]; distance: number; polar: number; azimuth: number }
 
 export function overviewPose(aspect: number): Pose {
   // 園の中心と、まわりの輪の手前側が収まる広さ（奥の輪は回して見る）
-  return { target: [0, 0.4, 2.5], distance: overviewDistance(aspect, 19), polar: 0.78, azimuth: 0 }
+  return { target: [0, 0.4, 3], distance: overviewDistance(aspect, 22), polar: 0.8, azimuth: 0 }
 }
 
 export function cameraPosition(pose: Pose): [number, number, number] {

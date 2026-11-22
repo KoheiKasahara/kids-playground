@@ -39,7 +39,7 @@ export type ZooMap = {
 }
 
 /** 外側の輪に並ぶエリアの中心（angle は度で、+z が 0・+x が 90）。 */
-const OUTER_RING = 21.8
+const OUTER_RING = 27
 function outer(angleDeg: number, ring = OUTER_RING): Vec2 {
   const a = angleDeg * Math.PI / 180
   return { x: round(Math.sin(a) * ring), z: round(Math.cos(a) * ring) }
@@ -56,25 +56,25 @@ function facingCenter(c: Vec2): number {
   return Math.atan2(-c.x, -c.z)
 }
 
-// 外側の輪は 30 度ずつ 12 か所。0 度が手前（俯瞰のカメラ側）
-const RABBIT = outer(0, 21.2)
-const PENGUIN = outer(30)
-const TIGER = outer(-30)
-const HIPPO = outer(60)
-const ZEBRA = outer(-60)
-const KANGAROO = outer(-90)
-const FLAMINGO = outer(90)
-const POLAR_BEAR = outer(120)
-const CAMEL = outer(-120)
+// 外側の輪は 22.5 度ずつ 16 か所。0 度が手前（俯瞰のカメラ側）
+const RABBIT = outer(0, 26.4)
+const PENGUIN = outer(22.5)
+const TIGER = outer(-22.5)
+const HIPPO = outer(45)
+const ZEBRA = outer(-45)
+const FLAMINGO = outer(67.5)
+const KANGAROO = outer(-67.5)
+const POLAR_BEAR = outer(90)
+const CAMEL = outer(-90)
+const CAPYBARA = outer(135)
+const CROCODILE = outer(-135)
 const MONKEY = outer(180)
-const CAPYBARA = outer(150)
-const CROCODILE = outer(-150)
 
 export const ZOO_MAP: ZooMap = {
-  radius: 28,
+  radius: 34,
   plaza: { x: 0, z: 0.4, r: 2.6 },
-  ringRoad: 15.7,
-  spokes: [[{ x: -2.4, z: 0.8 }, { x: -15.7, z: 0.8 }], [{ x: 2.4, z: 0.8 }, { x: 15.7, z: 0.8 }]],
+  ringRoad: 18.6,
+  spokes: [[{ x: -2.4, z: 0.8 }, { x: -18.6, z: 0.8 }], [{ x: 2.4, z: 0.8 }, { x: 18.6, z: 0.8 }]],
   enclosures: [
     {
       id: 'elephant',
@@ -321,12 +321,16 @@ export const ZOO_MAP: ZooMap = {
     { x: 0.1, z: 14.6, kind: 'bush', size: 0.9 },
     { x: -14.0, z: -1.9, kind: 'bush', size: 0.8 },
     { x: 14.2, z: -1.7, kind: 'bush', size: 0.8 },
-    // 外側のエリアのすきまの奥（15度ずつずらした方向）と、園の外周
-    ...Array.from({ length: 12 }, (_, i) => ({
-      ...outer(15 + i * 30, 25.6 + (i % 2) * 0.8), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 0.95 + (i % 3) * 0.1,
+    // 環状の園路と外側のエリアのあいだ
+    ...Array.from({ length: 8 }, (_, i) => ({
+      ...outer(11.25 + i * 45, 21.2), kind: (['bush', 'round'] as const)[i % 2], size: 0.8,
     })),
-    ...Array.from({ length: 12 }, (_, i) => ({
-      ...outer(i * 30, 29.8), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.15,
+    // 外側のエリアのすきまの奥と、園の外周
+    ...Array.from({ length: 16 }, (_, i) => ({
+      ...outer(11.25 + i * 22.5, 31.2 + (i % 2) * 0.8), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 0.95 + (i % 3) * 0.1,
+    })),
+    ...Array.from({ length: 16 }, (_, i) => ({
+      ...outer(i * 22.5, 36.5), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.15,
     })),
   ],
 }

@@ -75,14 +75,14 @@ export function useZooEngine(options: ZooEngineOptions) {
     const host = container
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#bfe7fb')
-    scene.fog = new THREE.Fog('#cdeefb', 62, 130)
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 220)
+    scene.fog = new THREE.Fog('#cdeefb', 78, 160)
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 260)
     const hemi = new THREE.HemisphereLight('#e8f6ff', '#9fc46d', 1.55)
     const sun = new THREE.DirectionalLight('#fff3dc', 2.3)
-    sun.position.set(13, 25, 16)
+    sun.position.set(16, 30, 19)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
-    Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 2, far: 80 })
+    Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 2, far: 100 })
     sun.shadow.normalBias = 0.04
     sun.shadow.bias = -0.0004
     sun.shadow.radius = 4
