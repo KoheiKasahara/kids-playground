@@ -34,16 +34,17 @@ def main() -> int:
     if not re.fullmatch(r'[a-z][a-z0-9_]*', animal):
         print('動物IDは英小文字・数字・_ で書いてください（例: panda, red_panda）', file=sys.stderr)
         return 2
-    created = []
-    for suffix in ('', '_motion'):
-        src = os.path.join(ANIMALS, f'{args.like}{suffix}.py')
-        dst = os.path.join(ANIMALS, f'{animal}{suffix}.py')
+    pairs = [(os.path.join(ANIMALS, f'{args.like}{s}.py'), os.path.join(ANIMALS, f'{animal}{s}.py')) for s in ('', '_motion')]
+    # 書き始める前にすべて確かめる（途中で止まって片方だけ残らないように）
+    for src, dst in pairs:
         if not os.path.exists(src):
             print(f'コピー元がありません: {src}', file=sys.stderr)
             return 2
         if os.path.exists(dst) and not args.force:
             print(f'すでにあります（上書きは --force）: {dst}', file=sys.stderr)
             return 2
+    created = []
+    for src, dst in pairs:
         text = open(src, encoding='utf-8').read()
         text = re.sub(r"^NAME = '[a-z0-9_]+'", f"NAME = '{animal}'", text, flags=re.M)
         header = f'# {args.like} から作成した {animal} の土台。形・色・骨・動きを個別仕様に合わせて書き換える。\n'

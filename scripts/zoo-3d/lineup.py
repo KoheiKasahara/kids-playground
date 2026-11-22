@@ -25,11 +25,13 @@ from zoo3d import qa  # noqa: E402
 ORDER = ['elephant', 'giraffe', 'lion', 'panda']
 
 
-def load(path: str, offset_x: float, clip: str | None, phase: float) -> tuple[float, float]:
+def load(path: str, offset_x: float) -> tuple[bpy.types.Object, float, float, set]:
+    """動物の .blend から骨格とメッシュを読み込む。返り値は (骨格, 本体の幅, 高さ, 読み込んだアクション)。"""
+    before = set(bpy.data.actions)
     with bpy.data.libraries.load(path, link=False) as (src, dst):
         dst.objects = [n for n in src.objects]
     arm = None
-    mesh = None
+    meshes = []
     for o in dst.objects:
         if o is None:
             continue
@@ -37,18 +39,26 @@ def load(path: str, offset_x: float, clip: str | None, phase: float) -> tuple[fl
         if o.type == 'ARMATURE':
             arm = o
         elif o.type == 'MESH':
-            mesh = o
+            meshes.append(o)
     arm.location.x = offset_x
     arm.rotation_euler = (0, 0, 0.6)  # 少し斜めを向けて顔と横顔の両方が見えるようにする
     if arm.animation_data:
         for t in arm.animation_data.nla_tracks:
             t.mute = True
-    if clip and clip in bpy.data.actions:
-        action = bpy.data.actions[clip]
-        arm.animation_data_create()
-        arm.animation_data.action = action
-    dims = mesh.dimensions
-    return dims.x, dims.z
+    body = max(meshes, key=lambda m: len(m.data.vertices))
+    return arm, body.dimensions.x, body.dimensions.z, set(bpy.data.actions) - before
+
+
+SHOW_AT = 2000
+
+
+def pose_at_phase(arm: bpy.types.Object, action: bpy.types.Action, phase: float) -> None:
+    """場面のフレーム SHOW_AT で、この動物のアクションがちょうど phase（周期の割合）の位置に来るよう NLA に置く。"""
+    start, end = action.frame_range
+    track = arm.animation_data.nla_tracks.new()
+    strip = track.strips.new(action.name, int(SHOW_AT - (start + (end - start) * phase)), action)
+    strip.extrapolation = 'HOLD'
+    track.mute = False
 
 
 def main() -> None:
@@ -65,19 +75,17 @@ def main() -> None:
     x = 0.0
     tallest = 0.0
     for name in names:
-        before = set(bpy.data.actions)
-        w, h = load(found[name], x, None, args.frame)
-        arm = [o for o in bpy.context.scene.objects if o.type == 'ARMATURE'][-1]
+        arm, w, h, actions = load(found[name], x)
         if args.clip:
-            # 同じ名前のアクションが動物ごとに別名（.001 など）で読み込まれるので、新しく増えたものから選ぶ
-            mine = [a for a in bpy.data.actions if a not in before and a.name.split('.')[0] == args.clip]
+            # 同じ名前のアクションは動物ごとに別名（.001 など）で読み込まれるので、この動物の分から選ぶ
+            mine = [a for a in actions if a.name.split('.')[0] == args.clip]
             if mine:
                 arm.animation_data_create()
-                arm.animation_data.action = mine[0]
-                end = mine[0].frame_range[1]
-                bpy.context.scene.frame_set(int(end * args.frame))
+                pose_at_phase(arm, mine[0], args.frame)
         x += max(w, 1.6) + 1.2
         tallest = max(tallest, h)
+    if args.clip:
+        bpy.context.scene.frame_set(SHOW_AT)
     width = x - 1.2
     center = (width / 2 - 0.8, 0, tallest * 0.4)
     os.makedirs(args.out, exist_ok=True)

@@ -79,6 +79,15 @@ export default function Zoo3dPlay() {
               <small>{member.label}</small>
               <button type="button" className={styles.close} aria-label="えらぶのを やめる" onClick={() => select(null)}>✕</button>
             </div>
+            {member.species.members.length > 1 && <div className={styles.members} role="group" aria-label="どの こと あそぶ？">
+              {/* 親子を切り替える。画面をタップしなくても（キーボードでも）子どもを選べる */}
+              {member.species.members.map(m => (
+                <button type="button" key={m.id} aria-pressed={m.id === member.id} onClick={() => { primeAudio(); select(m.id) }}
+                  aria-label={`${member.species.name}の ${m.label}`}>
+                  <span aria-hidden="true" style={{ fontSize: `${0.9 + 0.5 * m.scale}rem` }}>{member.species.emoji}</span>{m.label}
+                </button>
+              ))}
+            </div>}
             <div className={styles.actions}>
               <button type="button" className={styles.action} disabled={!ready} onClick={feed} aria-label={`${member.species.food.label}を あげる`}>
                 <span aria-hidden="true">{member.species.food.emoji}</span><b>えさ</b>

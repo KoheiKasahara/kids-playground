@@ -73,6 +73,11 @@ describe('3Dどうぶつえんの画面', () => {
     expect(screen.getByRole('button', { name: 'はっぱを あげる' })).toBeEnabled()
     act(() => engine.options?.onSelect('panda-baby'))
     expect(screen.getByRole('button', { name: 'たけを あげる' })).toBeEnabled()
+    // 親子はボタンで切り替えられる（画面をタップできなくても子どもを選べる）
+    const who = screen.getByRole('group', { name: 'どの こと あそぶ？' })
+    expect(within(who).getByRole('button', { name: 'パンダの あかちゃん' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.setup().click(within(who).getByRole('button', { name: 'パンダの おかあさん' }))
+    expect(engine.select).toHaveBeenLastCalledWith('panda-mom')
     expect(screen.getByRole('button', { name: 'てをふるを みる' })).toBeEnabled()
     act(() => engine.options?.onSelect(null))
     // どうぶつの種類ごとに1つずつ、選ぶボタンが並ぶ

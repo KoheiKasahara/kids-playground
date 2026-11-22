@@ -85,6 +85,7 @@
         "hold": true,
         "grab": 0.7,
         "release": 3.0,
+        "holdOffset": 0.03,
         "reach": 0.517
       }
     },

@@ -156,6 +156,33 @@
   color: #6e6a55;
 }
 
+.members {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  max-width: 640px;
+  margin: 0 auto 8px;
+}
+
+.members button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid #e3d4a8;
+  border-radius: 22px;
+  background: #fff;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.members button[aria-pressed='true'] {
+  border-color: #7cb342;
+  background: #eef8dc;
+}
+
 .close {
   min-width: 48px;
   min-height: 48px;

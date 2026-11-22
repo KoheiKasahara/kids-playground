@@ -115,7 +115,7 @@ def eat(rig: RigModel) -> Clip:
     p = sample(grab)
     paw = p.posed()['hold_r'].translation
     return Clip('Eat', period, False, sample, {'kind': 'eat', 'food': {'bone': 'hold_r', 'hold': True, 'grab': grab,
-                                                                       'release': release,
+                                                                       'release': release, 'holdOffset': 0.03,
                                                                        'reach': round(-paw.y, 3)}})
 
 

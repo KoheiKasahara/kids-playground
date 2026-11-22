@@ -15,7 +15,7 @@ export type ClipInfo = {
   /** 重ねがけ用クリップ（まばたき）が動かす骨。 */
   bones?: string[]
   /** 食事: bone は食べ物を持つ骨、hold なら grab〜release の間その骨に付けて運ぶ。reach は体の中心から食べ物までの距離。 */
-  food?: { bone: string; grab: number; release: number; reach?: number; hold?: boolean }
+  food?: { bone: string; grab: number; release: number; reach?: number; hold?: boolean; holdOffset?: number }
   source?: string
   effect?: string
   bone?: string

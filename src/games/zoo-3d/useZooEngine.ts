@@ -11,7 +11,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { observeGameActivity } from '../../utils/gameActivity'
 import { AnimalAnimator } from './animator'
 import { command, createZoo, dropFood, type AnimalState, type ZooEvent, type ZooWorld, stepZoo } from './behavior'
-import { CAMERA_LIMITS, cameraPosition, follow, followAzimuth, fovFor, overviewPose, pushOutOfSpheres } from './cameraRig'
+import { CAMERA_LIMITS, cameraPosition, follow, followAzimuth, fovFor, overviewPose, pushOutOfSpheres, segmentHitsSphere } from './cameraRig'
 import { createEffects, createFood, disposeObject } from './effects'
 import { createScenery } from './scenery'
 import { playZooSound, type ZooSound } from './sounds'
@@ -103,6 +103,8 @@ export function useZooEngine(options: ZooEngineOptions) {
     let following = false
     let returning = 0
     let zoomIn = 0
+    /** 追いかけるときに回り込む方位角。追いかけ始めに一度決め、さえぎられたときだけ選び直す（毎フレーム選ぶと揺れる）。 */
+    let followAz: number | null = null
     let released = false
     let lost = false
     let active = true
@@ -153,12 +155,18 @@ export function useZooEngine(options: ZooEngineOptions) {
       selected = id
       optionsRef.current.onSelect(id)
       if (!id && following) setFollowing(false)
+      else if (following) {
+        // 追いかけている途中で別の動物を選んだら、その動物へ回り込み直す
+        zoomIn = 1.4
+        followAz = null
+      }
     }
 
     function setFollowing(next: boolean) {
       if (following === next) return
       following = next && !!selected
       zoomIn = following ? 1.4 : 0
+      followAz = null
       if (!following) applyOverview(false)
       optionsRef.current.onFollow(following)
     }
@@ -234,9 +242,11 @@ export function useZooEngine(options: ZooEngineOptions) {
         if (food.heldBy) {
           const holder = instanceOf(food.heldBy)
           if (holder?.hold) {
+            // 持つ骨からのずらし量は動物ごとにモーション情報で決める（ゾウは鼻先の下へぶら下げる）
+            const info = SPECIES[holder.state.species].manifest.clips.Eat.food
+            const offset = info?.holdOffset ?? (info?.bone === 'trunk_tip' ? -0.12 : 0)
             holder.hold.getWorldPosition(tmp)
-            food.group.position.set(tmp.x, tmp.y - 0.12 * holder.state.scale, tmp.z)
-            food.group.scale.setScalar(Math.min(food.group.scale.x, holder.state.scale))
+            food.group.position.set(tmp.x, tmp.y + offset * holder.state.scale, tmp.z)
           }
         } else if (food.y > 0 || food.vy !== 0) {
           food.vy -= 14 * dt
@@ -283,8 +293,11 @@ export function useZooEngine(options: ZooEngineOptions) {
             const r = offset.length()
             const polar = Math.acos(Math.max(-1, Math.min(1, offset.y / Math.max(r, 1e-6))))
             const az = Math.atan2(offset.x, offset.z)
-            const wantAz = followAzimuth([controls.target.x, controls.target.y, controls.target.z], inst.state.heading, want, 1.0,
-              scenery.canopies)
+            const target: [number, number, number] = [controls.target.x, controls.target.y, controls.target.z]
+            const blocked = followAz !== null && scenery.canopies.some(s =>
+              segmentHitsSphere(cameraPosition({ target, distance: want, polar: 1.0, azimuth: followAz! }), target, s))
+            if (followAz === null || blocked) followAz = followAzimuth(target, inst.state.heading, want, 1.0, scenery.canopies)
+            const wantAz = followAz
             const dAz = Math.atan2(Math.sin(wantAz - az), Math.cos(wantAz - az))
             const nr = r + (want - r) * k
             const np = polar + (1.0 - polar) * k
@@ -494,6 +507,8 @@ export function useZooEngine(options: ZooEngineOptions) {
         const food = dropFood(world, selected, Math.random)
         if (!food) return
         const group = createFood(SPECIES[food.species].food.id)
+        // えさの大きさは、置くときに食べる動物の大きさへ合わせる（持ち上げた瞬間に縮まない）
+        group.scale.setScalar(Math.max(0.6, world.animals.find(a => a.id === selected)?.scale ?? 1))
         group.position.set(food.x, 3.2, food.z)
         scene.add(group)
         foods.set(food.id, { group, y: 3.2, vy: 0, age: 0 })
