@@ -69,6 +69,7 @@ const CAMEL = outer(-90)
 const CAPYBARA = outer(135)
 const CROCODILE = outer(-135)
 const MONKEY = outer(180)
+const SHEEP = outer(112.5)
 
 export const ZOO_MAP: ZooMap = {
   radius: 34,
@@ -313,6 +314,20 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(CROCODILE, 2.9, 1.6), r: 0.45, h: 0.3 }],
       gate: facingCenter(CROCODILE),
+    },
+    {
+      id: 'sheep',
+      center: SHEEP,
+      radius: 4.8,
+      fence: '#d2b48a',
+      ground: '#b5dc7f',
+      trees: [
+        { ...near(SHEEP, -2.5, 2.0), kind: 'round', size: 0.8 },
+        { ...near(SHEEP, 2.6, -1.8), kind: 'bush', size: 0.7 },
+        { ...near(SHEEP, -1.0, -3.0), kind: 'bush', size: 0.6 },
+      ],
+      rocks: [],
+      gate: facingCenter(SHEEP),
     },
   ],
   outerTrees: [
