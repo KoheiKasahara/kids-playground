@@ -55,6 +55,8 @@ class Config:
     jaw: str | None = None
     plan: str = 'quadruped'
     """'quadruped'（四足）または 'biped'（二足・鳥）。"""
+    pole_mirror: bool = False
+    """右の脚では pole の X を反転する（ワニのように、ひじ・ひざを体の外へ張り出す脚）。"""
 
 
 def leg_keys(cfg: Config) -> tuple[str, ...]:
@@ -76,8 +78,11 @@ def legs(cfg: Config, phases: dict[str, float], lift: tuple[float, float], pitch
     out = {}
     for key in leg_keys(cfg):
         upper, lower, foot, front = leg_bones(cfg, key)
+        pole = cfg.front_pole if front else cfg.hind_pole
+        if cfg.pole_mirror and upper.endswith('_r'):
+            pole = Vector((-pole.x, pole.y, pole.z))
         out[key] = LegSpec(upper, lower, foot, phases[key],
-                           lift[0] if front else lift[1], cfg.front_pole if front else cfg.hind_pole,
+                           lift[0] if front else lift[1], pole,
                            toe=cfg.toe[0] if front else cfg.toe[2], toe_drop=cfg.toe[1] if front else cfg.toe[3],
                            swing_pitch=pitch[0] if front else pitch[1])
     return out
