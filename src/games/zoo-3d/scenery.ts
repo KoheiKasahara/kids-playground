@@ -60,7 +60,7 @@ const m4 = (x: number, y: number, z: number, sx = 1, sy = 1, sz = 1, ry = 0, rx 
 
 function groundGeometry(map: ZooMap): THREE.BufferGeometry {
   const size = map.radius * 2 + 16
-  const seg = 96
+  const seg = 116
   const g = new THREE.PlaneGeometry(size, size, seg, seg).rotateX(-Math.PI / 2).toNonIndexed()
   const pos = g.attributes.position as THREE.BufferAttribute
   const colors = new Float32Array(pos.count * 3)

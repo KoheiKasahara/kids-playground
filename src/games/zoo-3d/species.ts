@@ -4,6 +4,7 @@
 import camelManifest from './models/camel.json'
 import capybaraManifest from './models/capybara.json'
 import crocodileManifest from './models/crocodile.json'
+import deerManifest from './models/deer.json'
 import elephantManifest from './models/elephant.json'
 import flamingoManifest from './models/flamingo.json'
 import giraffeManifest from './models/giraffe.json'
@@ -24,7 +25,7 @@ import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer'
 
 export type SpecialAction = {
   clip: string
@@ -559,9 +560,34 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [3, 6], wander: 3.5, run: 0.5, special: 1.2, graze: 1.6, sleep: 0.7 },
   },
+  deer: {
+    id: 'deer',
+    name: 'シカ',
+    emoji: '🦌',
+    color: '#b97a48',
+    manifest: deerManifest as AnimalManifest,
+    food: { id: 'cracker', label: 'せんべい', emoji: '🍘' },
+    specials: [
+      { clip: 'Bow', label: 'おじぎ', emoji: '🙇' },
+      { clip: 'Leap', label: 'ジャンプ', emoji: '⬆️' },
+    ],
+    facts: [
+      'オスの あたまには えだのような つのが あるよ',
+      'せんべいが ほしいと、ぺこりと おじぎを するよ',
+      'からだに しろい てんてんの もようが あるよ',
+    ],
+    reach: (deerManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.6,
+    hit: [{ y: 0.85, z: 0, r: 0.42 }, { y: 1.25, z: 0.6, r: 0.28 }],
+    follow: { height: 0.9, distance: 6 },
+    members: [
+      { id: 'deer-dad', scale: 1, label: 'おとうさん' },
+      { id: 'deer-fawn', scale: 0.6, label: 'こども' },
+    ],
+    mood: { idle: [2.5, 5], wander: 4.5, run: 0.9, special: 1.4, graze: 1.6, sleep: 0.5 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

@@ -40,6 +40,10 @@ export type ZooMap = {
 
 /** 外側の輪に並ぶエリアの中心（angle は度で、+z が 0・+x が 90）。 */
 const OUTER_RING = 27
+/** 外側の輪のすきまの奥に、さらに並べる3つ目の輪（外側のエリアと交互）。 */
+const THIRD_RING = 37.5
+/** 3つ目の輪で使う方向（ここには、すきまの木を植えない）。 */
+const THIRD_SLOTS = [-11.25, 11.25, -33.75, 33.75]
 function outer(angleDeg: number, ring = OUTER_RING): Vec2 {
   const a = angleDeg * Math.PI / 180
   return { x: round(Math.sin(a) * ring), z: round(Math.cos(a) * ring) }
@@ -73,9 +77,10 @@ const SHEEP = outer(112.5)
 const GORILLA = outer(-112.5)
 const RED_PANDA = outer(157.5)
 const RHINO = outer(-157.5)
+const DEER = outer(-11.25, THIRD_RING)
 
 export const ZOO_MAP: ZooMap = {
-  radius: 34,
+  radius: 44,
   plaza: { x: 0, z: 0.4, r: 2.6 },
   ringRoad: 18.6,
   spokes: [[{ x: -2.4, z: 0.8 }, { x: -18.6, z: 0.8 }], [{ x: 2.4, z: 0.8 }, { x: 18.6, z: 0.8 }]],
@@ -374,6 +379,19 @@ export const ZOO_MAP: ZooMap = {
       rocks: [{ ...near(RHINO, -2.8, 2.0), r: 0.5, h: 0.4 }],
       gate: facingCenter(RHINO),
     },
+    {
+      id: 'deer',
+      center: DEER,
+      radius: 4.8,
+      fence: '#9b7a4f',
+      ground: '#c0d98a',
+      trees: [
+        { ...near(DEER, -2.4, 1.8), kind: 'round', size: 0.95 },
+        { ...near(DEER, 2.5, 1.6), kind: 'round', size: 0.8 },
+      ],
+      rocks: [{ ...near(DEER, 1.8, -2.4), r: 0.4, h: 0.3 }],
+      gate: facingCenter(DEER),
+    },
   ],
   outerTrees: [
     // 環状の園路の内側（内側のエリアのすきま）
@@ -386,11 +404,14 @@ export const ZOO_MAP: ZooMap = {
       ...outer(11.25 + i * 45, 21.2), kind: (['bush', 'round'] as const)[i % 2], size: 0.8,
     })),
     // 外側のエリアのすきまの奥と、園の外周
-    ...Array.from({ length: 16 }, (_, i) => ({
-      ...outer(11.25 + i * 22.5, 31.2 + (i % 2) * 0.8), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 0.95 + (i % 3) * 0.1,
-    })),
+    ...Array.from({ length: 16 }, (_, i) => 11.25 + i * 22.5 - (i >= 8 ? 360 : 0))
+      .filter(deg => !THIRD_SLOTS.includes(deg))
+      .map((deg, i) => ({ ...outer(deg, 31.2 + (i % 2) * 0.8), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 0.95 + (i % 3) * 0.1 })),
     ...Array.from({ length: 16 }, (_, i) => ({
       ...outer(i * 22.5, 36.5), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.15,
+    })),
+    ...Array.from({ length: 16 }, (_, i) => ({
+      ...outer(11.25 + i * 22.5, 45), kind: (['bush', 'round', 'palm'] as const)[i % 3], size: 1.2,
     })),
   ],
 }

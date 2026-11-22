@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana' | 'cracker'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -248,6 +248,14 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.position.set((i - 1) * 0.05, 0.06, 0.32)
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
+    }
+  } else if (kind === 'cracker') {
+    // しかせんべい: 平たいまるいせんべいを2枚重ねる
+    for (let i = 0; i < 2; i++) {
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.025, 14), mat(i ? '#e6b873' : '#d9a55e'))
+      disc.position.set(i * 0.05, 0.015 + i * 0.028, i * 0.03)
+      disc.rotation.set(i * 0.15, 0, i * 0.1)
+      group.add(disc)
     }
   } else if (kind === 'banana') {
     // バナナ: 曲がった黄色い実を3本、根元をまとめる
