@@ -71,6 +71,7 @@ const CROCODILE = outer(-135)
 const MONKEY = outer(180)
 const SHEEP = outer(112.5)
 const GORILLA = outer(-112.5)
+const RED_PANDA = outer(157.5)
 
 export const ZOO_MAP: ZooMap = {
   radius: 34,
@@ -343,6 +344,19 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(GORILLA, 2.6, -1.6), r: 0.6, h: 0.5 }],
       gate: facingCenter(GORILLA),
+    },
+    {
+      id: 'red_panda',
+      center: RED_PANDA,
+      radius: 4.6,
+      fence: '#a0663f',
+      ground: '#bcd88a',
+      trees: [
+        { ...near(RED_PANDA, -2.2, -1.8), kind: 'round', size: 0.9 },
+        { ...near(RED_PANDA, 2.2, 1.9), kind: 'bamboo', size: 0.75 },
+      ],
+      rocks: [{ ...near(RED_PANDA, 1.6, -2.6), r: 0.45, h: 0.35 }],
+      gate: facingCenter(RED_PANDA),
     },
   ],
   outerTrees: [
