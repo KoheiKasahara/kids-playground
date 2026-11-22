@@ -26,14 +26,43 @@ export type Enclosure = {
 export type ZooMap = {
   radius: number
   plaza: Circle
+  /**
+   * 内側のエリアを囲む環状の園路の半径。外側のエリアの入口はこの園路へつながり、
+   * 園路は spokes で広場とつながる。
+   */
+  ringRoad: number
+  /** 広場と環状の園路を結ぶ道（内側のエリアのすきまを通す）。 */
+  spokes: [Vec2, Vec2][]
   enclosures: Enclosure[]
   /** 柵の外（園路のまわり）に置く木。 */
   outerTrees: Tree[]
 }
 
+/** 外側の輪に並ぶエリアの中心（angle は度で、+z が 0・+x が 90）。 */
+const OUTER_RING = 21.8
+function outer(angleDeg: number, ring = OUTER_RING): Vec2 {
+  const a = angleDeg * Math.PI / 180
+  return { x: round(Math.sin(a) * ring), z: round(Math.cos(a) * ring) }
+}
+function round(v: number): number {
+  return Math.round(v * 100) / 100
+}
+/** エリアの中心から dx, dz だけずらした位置。 */
+function near(c: Vec2, dx: number, dz: number): Vec2 {
+  return { x: round(c.x + dx), z: round(c.z + dz) }
+}
+/** 入口を広場（原点）へ向ける。 */
+function facingCenter(c: Vec2): number {
+  return Math.atan2(-c.x, -c.z)
+}
+
+const TIGER = outer(-36)
+
 export const ZOO_MAP: ZooMap = {
-  radius: 17,
+  radius: 28,
   plaza: { x: 0, z: 0.4, r: 2.6 },
+  ringRoad: 15.7,
+  spokes: [[{ x: -2.4, z: 0.8 }, { x: -15.7, z: 0.8 }], [{ x: 2.4, z: 0.8 }, { x: 15.7, z: 0.8 }]],
   enclosures: [
     {
       id: 'elephant',
@@ -94,21 +123,34 @@ export const ZOO_MAP: ZooMap = {
       rocks: [{ x: 3.6, z: 5.0, r: 0.45, h: 0.35 }],
       gate: Math.atan2(-5.6, -6.8),
     },
+    {
+      id: 'tiger',
+      center: TIGER,
+      radius: 4.9,
+      fence: '#8f6a45',
+      ground: '#c4d887',
+      pond: { ...near(TIGER, -1.9, 1.2), r: 1.3 },
+      trees: [
+        { ...near(TIGER, 2.4, 1.6), kind: 'round', size: 0.9 },
+        { ...near(TIGER, 1.2, -3.2), kind: 'bush', size: 0.8 },
+      ],
+      rocks: [{ ...near(TIGER, -2.0, -2.2), r: 0.75, h: 0.6 }],
+      gate: facingCenter(TIGER),
+    },
   ],
   outerTrees: [
-    { x: -13.4, z: 2.4, kind: 'round', size: 1.2 },
-    { x: -12.6, z: 10.4, kind: 'round', size: 1.05 },
-    { x: 13.2, z: 2.6, kind: 'round', size: 1.15 },
-    { x: 12.6, z: 10.4, kind: 'palm', size: 1.05 },
-    { x: -14.2, z: -9.5, kind: 'palm', size: 1.1 },
-    { x: 14.5, z: -10.5, kind: 'round', size: 1.1 },
-    { x: 0, z: -13.4, kind: 'round', size: 1.25 },
-    { x: -5.5, z: -14.4, kind: 'bush', size: 1 },
-    { x: 6, z: -14.2, kind: 'bush', size: 1 },
-    { x: -2.0, z: 14.4, kind: 'bush', size: 0.95 },
-    { x: 2.4, z: 14.6, kind: 'round', size: 1.0 },
-    { x: -15.5, z: -2.4, kind: 'bush', size: 1.1 },
-    { x: 15.8, z: -2.8, kind: 'bush', size: 1.1 },
+    // 環状の園路の内側（内側のエリアのすきま）
+    { x: -0.2, z: -14.2, kind: 'round', size: 1.1 },
+    { x: 0.1, z: 14.6, kind: 'bush', size: 0.9 },
+    { x: -14.0, z: -1.9, kind: 'bush', size: 0.8 },
+    { x: 14.2, z: -1.7, kind: 'bush', size: 0.8 },
+    // 外側のエリアのすきま（18度ずつずらした方向）と、園の外周
+    ...[18, 54, 90, 126, 162, 198, 234, 270, 306, 342].map((deg, i) => ({
+      ...outer(deg, 21.4 + (i % 2) * 1.2), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 1.0 + (i % 3) * 0.1,
+    })),
+    ...[0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((deg, i) => ({
+      ...outer(deg + 9, 29.5), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.2,
+    })),
   ],
 }
 
