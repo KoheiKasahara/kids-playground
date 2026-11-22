@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -163,6 +163,15 @@ export function playZooSound(sound: ZooSound): void {
       case 'baa':
         // ヒツジの「メェー」: ふるえる声をのばす
         voice(ctx, now, [[0, 340], [0.1, 470], [0.75, 420], [0.95, 360]], 0.17, 'sawtooth', 1500, 34)
+        return
+      case 'drum':
+        // ゴリラのドラミング「ドンドコ」: 低い太鼓の音を速く6回
+        for (let i = 0; i < 6; i++) {
+          const tone = createToneNodes(ctx, 150 - (i % 2) * 25, now + i * 0.14, 0.12, 0.26, 'sine')
+          tone.oscillator.frequency.exponentialRampToValueAtTime(70, now + i * 0.14 + 0.12)
+          tone.oscillator.start(now + i * 0.14)
+          tone.oscillator.stop(now + i * 0.14 + 0.12)
+        }
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)
