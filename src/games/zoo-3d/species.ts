@@ -1,6 +1,7 @@
 // 動物の種類ごとの定義（見た目のモデル・エサ・固有アクション・説明・ふるまいの傾向）。
 // モデルとモーションの実体は public/models/zoo-3d/*.glb、長さや移動量は models/*.json を正とする。
 
+import camelManifest from './models/camel.json'
 import elephantManifest from './models/elephant.json'
 import flamingoManifest from './models/flamingo.json'
 import giraffeManifest from './models/giraffe.json'
@@ -16,7 +17,7 @@ import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel'
 
 export type SpecialAction = {
   clip: string
@@ -349,9 +350,34 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2.5, 5], wander: 4.5, run: 0.6, special: 1.3, graze: 1.0, sleep: 0.8 },
   },
+  camel: {
+    id: 'camel',
+    name: 'ラクダ',
+    emoji: '🐫',
+    color: '#d9ae72',
+    manifest: camelManifest as AnimalManifest,
+    food: { id: 'carrot', label: 'にんじん', emoji: '🥕' },
+    specials: [
+      { clip: 'Chew', label: 'もぐもぐ', emoji: '😋' },
+      { clip: 'Bellow', label: 'ぶおー', emoji: '📣' },
+    ],
+    facts: [
+      'せなかに こぶが 2つ あるよ',
+      'あつい さばくでも げんきに あるけるよ',
+      'おなじ がわの まえあしと うしろあしを いっしょに だして あるくよ',
+    ],
+    reach: (camelManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.8,
+    hit: [{ y: 1.15, z: 0, r: 0.6 }, { y: 1.55, z: 1.1, r: 0.35 }, { y: 1.2, z: 0.7, r: 0.3 }],
+    follow: { height: 1.15, distance: 7.5 },
+    members: [
+      { id: 'camel-mom', scale: 1, label: 'おかあさん' },
+      { id: 'camel-calf', scale: 0.62, label: 'こども' },
+    ],
+    mood: { idle: [3, 6], wander: 4, run: 0.4, special: 1.2, graze: 1.3, sleep: 0.5 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

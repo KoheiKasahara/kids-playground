@@ -570,6 +570,12 @@ function separate(world: ZooWorld): void {
       a.z += nz * share * wa
       b.x -= nx * share * wb
       b.z -= nz * share * wb
+      // 押し離した先が池・岩・木にかからないよう、もう一度外へ出す
+      for (const c of [a, b]) {
+        const free = pushOutOfObstacles(c, areaOf(c).obstacles, c.radius * 0.85)
+        c.x = free.x
+        c.z = free.z
+      }
     }
   }
 }
