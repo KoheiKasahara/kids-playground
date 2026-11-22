@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'info' | 'snore'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -110,6 +110,10 @@ export function playZooSound(sound: ZooSound): void {
       case 'neigh':
         // シマウマの「ヒヒーン」: 高く上がってふるえながら下がる声
         voice(ctx, now, [[0, 420], [0.15, 900], [0.55, 780], [0.9, 520]], 0.15, 'sawtooth', 2200, 40)
+        return
+      case 'yawn':
+        // カバの大あくび「ふわぁ〜」: 低い声がゆっくり上がって下がる
+        voice(ctx, now, [[0, 130], [0.35, 210], [0.9, 170], [1.3, 110]], 0.24, 'sawtooth', 700, 6)
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)

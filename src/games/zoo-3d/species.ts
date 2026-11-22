@@ -3,6 +3,7 @@
 
 import elephantManifest from './models/elephant.json'
 import giraffeManifest from './models/giraffe.json'
+import hippoManifest from './models/hippo.json'
 import lionManifest from './models/lion.json'
 import pandaManifest from './models/panda.json'
 import penguinManifest from './models/penguin.json'
@@ -11,7 +12,7 @@ import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo'
 
 export type SpecialAction = {
   clip: string
@@ -217,9 +218,34 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2.5, 5], wander: 5, run: 1.0, special: 1.0, graze: 1.4, sleep: 0.35 },
   },
+  hippo: {
+    id: 'hippo',
+    name: 'カバ',
+    emoji: '🦛',
+    color: '#a898bf',
+    manifest: hippoManifest as AnimalManifest,
+    food: { id: 'watermelon', label: 'スイカ', emoji: '🍉' },
+    specials: [
+      { clip: 'Yawn', label: 'おおあくび', emoji: '😮' },
+      { clip: 'Splash', label: 'みずあび', emoji: '💦', atPond: true },
+    ],
+    facts: [
+      'くちを とっても おおきく あけられるよ',
+      'ひるまは みずの なかで すごすのが すきだよ',
+      'めと はなと みみが あたまの うえに あるよ',
+    ],
+    reach: (hippoManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.9,
+    hit: [{ y: 0.65, z: 0, r: 0.65 }, { y: 0.85, z: 0.85, r: 0.45 }],
+    follow: { height: 0.75, distance: 7 },
+    members: [
+      { id: 'hippo-mom', scale: 1, label: 'おかあさん' },
+      { id: 'hippo-baby', scale: 0.58, label: 'あかちゃん' },
+    ],
+    mood: { idle: [3, 6], wander: 3.5, run: 0.4, special: 1.3, graze: 1.4, sleep: 0.9 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

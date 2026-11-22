@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -248,6 +248,18 @@ export function createFood(kind: FoodKind): THREE.Group {
       leaf.position.set((i - 1) * 0.05, 0.06, 0.32)
       leaf.rotation.y = (i - 1) * 0.6
       group.add(leaf)
+    }
+  } else if (kind === 'watermelon') {
+    // スイカ: 緑の玉に濃い緑のしま
+    const melon = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 9), mat('#4caf50'))
+    melon.scale.set(1, 0.9, 1.05)
+    melon.position.y = 0.16
+    group.add(melon)
+    for (let i = 0; i < 6; i++) {
+      const stripe = new THREE.Mesh(new THREE.SphereGeometry(0.183, 3, 9, (i / 6) * Math.PI * 2, 0.22), mat('#1f6e34'))
+      stripe.scale.copy(melon.scale)
+      stripe.position.y = 0.16
+      group.add(stripe)
     }
   } else if (kind === 'grass') {
     // ほし草のたば: 細い葉を放射状に立て、根元をひもで結ぶ

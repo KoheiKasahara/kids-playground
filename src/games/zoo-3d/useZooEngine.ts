@@ -15,6 +15,7 @@ import { CAMERA_LIMITS, cameraPosition, follow, followAzimuth, fovFor, overviewP
 import { createEffects, createFood, disposeObject } from './effects'
 import { createScenery } from './scenery'
 import { playZooSound, type ZooSound } from './sounds'
+import type { AnimalManifest } from './motion'
 import { modelUrl, SPECIES, SPECIES_ORDER, type SpeciesId } from './species'
 
 export type ZooStatus = 'loading' | 'ready' | 'error'
@@ -40,12 +41,17 @@ type Instance = {
   state: AnimalState
   root: THREE.Group
   animator: AnimalAnimator
-  /** ゾウの鼻先（水しぶき・音符の出どころ）。 */
+  /** 効果の出どころ（ゾウの鼻先・カバの口先。水しぶき・音符を出す）。 */
   tip?: THREE.Object3D
   /** 食べ物を持って運ぶ骨（モーション情報の food.bone）。 */
   hold?: THREE.Object3D
   head?: THREE.Object3D
   skipped: number
+}
+
+/** 効果（水しぶき）を出すクリップが指定する骨。指定がなければゾウの鼻先。 */
+function effectBone(manifest: AnimalManifest): string {
+  return Object.values(manifest.clips).find(c => c.effect && c.bone)?.bone ?? 'trunk_tip'
 }
 
 type FoodView = { group: THREE.Group; y: number; vy: number; heldBy?: string; vanishAt?: number; age: number }
@@ -561,7 +567,8 @@ export function useZooEngine(options: ZooEngineOptions) {
             const animator = new AnimalAnimator(mixer, gltf.animations, SPECIES[state.species].manifest, state.scale)
             instances.push({
               state, root, animator, skipped: 0,
-              tip: model.getObjectByName('trunk_tip') ?? undefined,
+              // 水しぶきなどの効果の出どころ（モーション情報の bone。ゾウは鼻先）
+              tip: model.getObjectByName(effectBone(SPECIES[state.species].manifest)) ?? undefined,
               hold: model.getObjectByName(SPECIES[state.species].manifest.clips.Eat?.food?.bone ?? '') ?? undefined,
               head: model.getObjectByName('head') ?? undefined,
             })
