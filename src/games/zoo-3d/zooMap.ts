@@ -64,6 +64,7 @@ const HIPPO = outer(60)
 const ZEBRA = outer(-60)
 const KANGAROO = outer(-90)
 const FLAMINGO = outer(90)
+const POLAR_BEAR = outer(120)
 
 export const ZOO_MAP: ZooMap = {
   radius: 28,
@@ -229,6 +230,22 @@ export const ZOO_MAP: ZooMap = {
       ],
       rocks: [{ ...near(FLAMINGO, 3.1, -2.2), r: 0.35, h: 0.25 }],
       gate: facingCenter(FLAMINGO),
+    },
+    {
+      id: 'polar_bear',
+      center: POLAR_BEAR,
+      radius: 5.1,
+      fence: '#7d9bb0',
+      ground: '#e6eef0',
+      pond: { ...near(POLAR_BEAR, -1.4, 1.6), r: 1.7 },
+      trees: [],
+      rocks: [
+        // 池のほとり（水浴びで立つ場所）をふさがないよう、池から離して置く
+        { ...near(POLAR_BEAR, 2.6, -1.0), r: 0.8, h: 0.65, color: '#eef6fa' },
+        { ...near(POLAR_BEAR, 1.3, -3.0), r: 0.5, h: 0.4, color: '#e2eff6' },
+        { ...near(POLAR_BEAR, -3.0, -2.0), r: 0.45, h: 0.35, color: '#f2f8fb' },
+      ],
+      gate: facingCenter(POLAR_BEAR),
     },
   ],
   outerTrees: [

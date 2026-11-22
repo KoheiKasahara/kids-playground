@@ -542,6 +542,8 @@ function steer(world: ZooWorld, a: AnimalState, lc: Locomotion, dt: number, rand
   if (a.blocked > 2.5) {
     a.blocked = 0
     if (goal.plan.kind === 'wander') begin(world, a, { kind: 'wander' }, random)
+    // 仲間とゆずり合ったまま動けないときは、固有アクションをその場で見せる（ずっと待たせない）
+    else if (goal.plan.kind === 'special') perform(a, goal.plan)
   }
 }
 
