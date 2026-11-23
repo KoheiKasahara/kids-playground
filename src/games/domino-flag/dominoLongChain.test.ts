@@ -235,11 +235,11 @@ describe('long domino chain headless physics', () => {
     expect(result.sleepingCountAtCompletion).toBe(result.dominoCount)
   })
 
-  it('10シードの微小揺らぎをshepherdなしで自然完走する', { timeout: 120_000 }, () => {
-    const seeds = [101, 202, 303, 404, 505, 606, 707, 808, 909, 1001]
-    let completedCount = 0
-
-    for (const seed of seeds) {
+  // 独立した物理ワールドを seed ごとのテストにし、全シードを一つの timeout に合算しない。
+  it.each([101, 202, 303, 404, 505, 606, 707, 808, 909, 1001])(
+    '微小揺らぎをshepherdなしで自然完走する (seed=%i)',
+    { timeout: 60_000 },
+    (seed) => {
       const result = runLongChainSimulation(false, createPerturbedPlacements(seed))
       logResult(`shepherdなし perturbation seed=${seed}`, result)
       if (result.flagFallenCount !== FLAG_COUNT) {
@@ -251,15 +251,11 @@ describe('long domino chain headless physics', () => {
           }).filter((id) => !result.flagFallenIds.includes(id)).join(',')}`,
         )
       }
-      if (result.stepsToCompletion !== null) completedCount += 1
 
       expect(result.approachFallenCount, `seed=${seed}`).toBe(result.approachCount)
       expect(result.flagFallenCount, `seed=${seed}`).toBe(FLAG_COUNT)
       expect(result.stepsToCompletion, `seed=${seed}`).not.toBeNull()
       expect(result.sleepingCountAtCompletion, `seed=${seed}`).toBe(result.dominoCount)
-    }
-
-    console.log(`[domino-long-chain] shepherdなし自然完走率=${completedCount}/${seeds.length}`)
-    expect(completedCount).toBe(seeds.length)
-  })
+    },
+  )
 })
