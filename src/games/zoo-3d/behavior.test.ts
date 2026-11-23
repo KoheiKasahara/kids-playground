@@ -23,6 +23,10 @@ function run(world: ZooWorld, seconds: number, random: () => number, dt = 1 / 30
   return { events, trace }
 }
 
+const pondActions = SPECIES_ORDER.flatMap(id =>
+  SPECIES[id].specials.filter(s => s.atPond).map(({ clip }) => ({ id, clip })),
+)
+
 describe('どうぶつの ふるまい', () => {
   test('すべての動物が自分のエリアの中に生まれ、障害物の中にいない', () => {
     const world = createZoo(seeded(1))
@@ -146,18 +150,22 @@ describe('どうぶつの ふるまい', () => {
     }
   })
 
-  test('池で見せるアクションは、仲間が行く手をふさいでいても、しばらく待てば始まる', () => {
-    for (const id of SPECIES_ORDER) {
-      for (const spec of SPECIES[id].specials.filter(s => s.atPond)) {
-        for (let seed = 1; seed <= 20; seed++) {
-          const random = seeded(seed)
-          const world = createZoo(random)
-          for (const a of world.animals.filter(x => x.species === id)) {
-            command(world, a.id, { kind: 'special', clip: spec.clip }, random)
-            const { events } = run(world, 30, random)
-            expect(events, `${a.id} の ${spec.clip}（seed ${seed}）`).toContainEqual({ type: 'special', animal: a.id, clip: spec.clip })
-          }
+  test.each(pondActions)('池で見せるアクションは、仲間が行く手をふさいでいても始まる（$id / $clip）', ({ id, clip }) => {
+    const dt = 1 / 30
+    for (let seed = 1; seed <= 20; seed++) {
+      const random = seeded(seed)
+      const world = createZoo(random)
+      const animals = world.animals.filter(a => a.species === id)
+      for (const [index, a] of animals.entries()) {
+        command(world, a.id, { kind: 'special', clip }, random)
+        let started = false
+        for (let t = 0; t < 30; t += dt) {
+          const events = stepZoo(world, dt, random)
+          started ||= events.some(e => e.type === 'special' && e.animal === a.id && e.clip === clip)
+          // 次の個体がいる場合は、従来どおり30秒進めてワールドと乱数の状態を引き継ぐ。
+          if (started && index === animals.length - 1) break
         }
+        expect(started, `${a.id} の ${clip}（seed ${seed}）`).toBe(true)
       }
     }
   })
