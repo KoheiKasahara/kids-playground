@@ -53,10 +53,10 @@ BLENDER=$(scripts/zoo-3d/setup-blender.sh)
    - `scripts/zoo-3d/build.sh <id>` — GLB・モーション情報 JSON・`.blend` を生成し、glTF Transform で圧縮する。
    - 全歩容の `max slide` と `IK reach error` が **1mm 未満**になるまで直す（超えたら `crouch` を増やす・歩幅を減らす）。
 8. **ゲームに動物を登録する**（ガイド 3.7）
-   - `src/games/zoo-3d/species.ts`（定義・`SPECIES_ORDER`）、`zooMap.ts`（重ならないエリア）、必要なら `effects.ts`（えさ）・`scenery.ts`（木）・`sounds.ts`（鳴き声）と `src/test/audio/gameSoundSamples.ts`。
+   - `src/games/zoo-3d/species.ts`（定義・`SPECIES_ORDER`）、`zooMap.ts`（暮らすエリアの展示場。近い動物の展示場に入れるか、柵の種類・獣舎を決めて重ならない位置に新しく置く）、必要なら `effects.ts`（えさ）・`scenery.ts`（木）・`sounds.ts`（鳴き声）と `src/test/audio/gameSoundSamples.ts`。
    - 食べ物を骨で運ぶなら `Eat` の `food` に `bone` と `hold: true`。
 9. **動物の行動 AI を設定する**
-   - `species.ts` の `mood`（待機時間と、歩く・走る・食べる・固有アクション・眠るの重み）、`members`（親子の大きさ）、`hit`（タップ判定）、`follow`（追従カメラ）をその動物らしく決める。AI 本体（`behavior.ts`）は共通のまま使う。
+   - `species.ts` の `mood`（待機時間と、歩く・走る・食べる・固有アクション・眠る・人を見に来る `curious` の重み。固有アクションは観察して見つけるとスタンプになるので、ほどよく見せる）、`members`（親子の大きさ）、`hit`（タップ判定）、`follow`（追従カメラ）をその動物らしく決める。AI 本体（`behavior.ts`）は共通のまま使う。
 10. **複数角度から見た目を検証する**
     - 6方向の静止画、既存の動物との並べた比較: `"$BLENDER" -b --factory-startup --python scripts/zoo-3d/lineup.py -- --out /tmp/zoo3d-lineup`（`--clip Walk --frame 0.3` で同じ位相の比較）。
 11. **アニメーションの自然さを確認する**
@@ -64,7 +64,7 @@ BLENDER=$(scripts/zoo-3d/setup-blender.sh)
     - 歩き・走りの動画（`QA_DIR=/tmp/zoo3d-qa scripts/zoo-3d/build.sh <id>`）で、足が地面の格子に対して止まっているか、体・首・尾が歩調と合っているか、関節が潰れていないかを見る。
 12. **モバイル性能・既存ゲームへの影響を検証する**
     - `npm run test:game -- src/games/zoo-3d`（モデルの整合・行動 AI・マップ・画面）。
-    - 開発サーバーを Playwright の縦 390×844・横 844×390 で開き、俯瞰・その動物の追従・情報パネルを撮る。追従カメラが木に隠れないこと。
+    - 開発サーバーを Playwright の縦 390×844・横 844×390 で開き、そのエリアの俯瞰・その動物の追従・歩くモードで柵の前から見た画面・ずかんを撮る。追従カメラが木に隠れないこと。
     - 三角形数・GLB の容量がガイド 3.10 の目標内か。`npm run verify`、`npm run test:e2e`、`npx playwright test e2e/all-games.smoke.spec.ts --grep zoo-3d`。プレビューでオフライン表示。
     - iPhone 実機で確認できない環境では、その旨を未実施として報告する。
 

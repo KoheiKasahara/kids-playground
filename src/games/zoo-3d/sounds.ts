@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore' | 'stamp' | 'gate' | 'howl' | 'yip' | 'chirp' | 'mee' | 'bonk' | 'peep'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -59,6 +59,17 @@ export function playZooSound(sound: ZooSound): void {
         return
       case 'info':
         ;[523, 659, 784].forEach((f, i) => playTone(ctx, f, now + i * 0.07, 0.14, 0.12, 'sine'))
+        return
+      case 'stamp':
+        // スタンプ「ぽんっ」と、きらきらの上がる音
+        playTone(ctx, 330, now, 0.08, 0.22, 'triangle')
+        playNoiseBurst(ctx, now, 0.05, 0.14, 'lowpass', 1400)
+        ;[1047, 1319, 1568, 2093].forEach((f, i) => playTone(ctx, f, now + 0.1 + i * 0.07, 0.18, 0.1, 'sine'))
+        return
+      case 'gate':
+        // となりのエリアへ: 足音2つと、上がる音
+        for (let i = 0; i < 2; i++) playNoiseBurst(ctx, now + i * 0.16, 0.06, 0.16, 'lowpass', 700)
+        ;[392, 523, 659].forEach((f, i) => playTone(ctx, f, now + 0.32 + i * 0.09, 0.16, 0.12, 'triangle'))
         return
       case 'drop':
         // ひゅーっと落ちて、ぽとん
@@ -183,6 +194,33 @@ export function playZooSound(sound: ZooSound): void {
       case 'kon':
         // キツネの「コーン」: 高く澄んだ声を長くのばす
         voice(ctx, now, [[0, 620], [0.15, 900], [0.8, 820], [1.1, 640]], 0.15, 'triangle', 2600, 10)
+        return
+      case 'howl':
+        // オオカミの遠ぼえ「アオーーン」: ゆっくり上がって、長くのばしてから下がる（こわくない高さ）
+        voice(ctx, now, [[0, 330], [0.35, 560], [1.1, 600], [1.6, 470], [1.9, 380]], 0.15, 'triangle', 1800, 9)
+        voice(ctx, now, [[0, 660], [0.35, 1120], [1.1, 1200], [1.6, 940], [1.9, 760]], 0.04, 'sine', 2600, 9)
+        return
+      case 'yip':
+        // あそぼう！の「きゃんきゃん」: 短く高い声を2回
+        voice(ctx, now, [[0, 700], [0.06, 1050], [0.14, 820]], 0.14, 'triangle', 2800, 0)
+        voice(ctx, now + 0.22, [[0, 760], [0.06, 1120], [0.15, 860]], 0.14, 'triangle', 2800, 0)
+        return
+      case 'chirp':
+        // チーターの「チュルル」: 小鳥のような高い声を3回
+        for (let i = 0; i < 3; i++) voice(ctx, now + i * 0.18, [[0, 1400], [0.05, 1900], [0.12, 1600]], 0.12, 'sine', 4000, 30)
+        return
+      case 'mee':
+        // ヤギの「メェ〜」: ヒツジより高く、ふるえる声
+        voice(ctx, now, [[0, 520], [0.08, 700], [0.55, 640], [0.8, 560]], 0.15, 'sawtooth', 2200, 40)
+        return
+      case 'bonk':
+        // ごっつん: やわらかい打音（こわくない）
+        playTone(ctx, 190, now, 0.12, 0.26, 'triangle')
+        playNoiseBurst(ctx, now, 0.07, 0.16, 'lowpass', 900)
+        return
+      case 'peep':
+        // ミーアキャットの見はりの合図「ピッ ピッ」
+        for (let i = 0; i < 2; i++) voice(ctx, now + i * 0.22, [[0, 1300], [0.05, 1600], [0.1, 1350]], 0.12, 'triangle', 3600, 0)
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)

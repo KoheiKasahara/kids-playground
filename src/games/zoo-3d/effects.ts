@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana' | 'cracker'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana' | 'cracker' | 'insect'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -257,6 +257,21 @@ export function createFood(kind: FoodKind): THREE.Group {
       disc.rotation.set(i * 0.15, 0, i * 0.1)
       group.add(disc)
     }
+  } else if (kind === 'insect') {
+    // いもむし: みどりの玉を少しずつ小さく並べ、黒い目と黄色いせなかの点をつける
+    for (let i = 0; i < 5; i++) {
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(0.05 - i * 0.005, 8, 6), mat(i % 2 ? '#8fd14f' : '#7cc142'))
+      seg.position.set(Math.sin(i * 0.9) * 0.02, 0.045, -0.08 + i * 0.045)
+      group.add(seg)
+    }
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), mat('#222222'))
+      eye.position.set(s * 0.022, 0.07, -0.115)
+      group.add(eye)
+    }
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 4), mat('#ffd84d'))
+    dot.position.set(0, 0.09, -0.02)
+    group.add(dot)
   } else if (kind === 'banana') {
     // バナナ: 曲がった黄色い実を3本、根元をまとめる
     for (let i = 0; i < 3; i++) {

@@ -322,7 +322,7 @@ SEはWeb Audioで合成（外部音源なし）。
 
 ## 3Dどうぶつえん (public/models/zoo-3d/*.glb)
 
-「3Dどうぶつえん」（`src/games/zoo-3d/`）のゾウ・キリン・ライオン・パンダは、本プロジェクトの生成スクリプト（`scripts/zoo-3d/`）が Blender で作ったオリジナルのモデルです。形は符号付き距離関数で定義してメッシュ化し、骨格・ウェイト・モーションもスクリプトで生成しています。外部の3Dモデル・テクスチャは使用していません。生成元の `.blend` は `assets-src/zoo-3d/` に置いています。
+「3Dどうぶつえん」（`src/games/zoo-3d/`）の動物（ゾウ・キリン・ライオンなど、すべての動物）は、本プロジェクトの生成スクリプト（`scripts/zoo-3d/`）が Blender で作ったオリジナルのモデルです。形は符号付き距離関数で定義してメッシュ化し、骨格・ウェイト・モーションもスクリプトで生成しています。外部の3Dモデル・テクスチャは使用していません。生成元の `.blend` は `assets-src/zoo-3d/` に置いています。
 
 モーションの一部は [Mesh2Motion](https://github.com/Mesh2Motion/mesh2motion-app) が配布する CC0 1.0 のアニメーション（馬の Eating / Sleep、キツネの Howl / Sit / Sleep）を、骨格の違う動物へリターゲットして使っています。CC0 のため表示義務はありませんが、出所確認のために記録します。取得したコミット・ファイル・加工内容は `scripts/zoo-3d/vendor/mesh2motion/SOURCE.md` を正とします。Mesh2Motion のアプリ本体（MIT）はゲームに組み込んでいません。
 
