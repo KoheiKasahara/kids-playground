@@ -9,7 +9,7 @@ import { biome, BIOMES } from './biomes'
 import { MAX_WHEAT, newGame, readCrafted, readGame, readWool, writeCrafted, writeGame, writeWool, type Game } from './save'
 import {
   arriveAt, blockAt, brushCells, eatCake, editWorld, explode, growTree, isCrop, key, materialCode, materialDef, netMaterialChange, nextPortal, PALETTE, pickAs,
-  settleWalker, startWalker, tendCrops, toggleDoor, topBlock, undoChanges, walk, wheatAt, woolMaterial,
+  settleWalker, stairsToward, startWalker, tendCrops, toggleDoor, topBlock, undoChanges, walk, wheatAt, woolMaterial,
   type Changes, type EditMode, type Material, type Position, type WoolColor, type World,
 } from './world'
 import { useCraftScene, type SceneApi } from './useCraftScene'
@@ -195,7 +195,7 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     playCraftSound('warp')
     vibrate('success')
   }, [world])
-  const pick = useCallback((position: Position, normal: Position) => {
+  const pick = useCallback((position: Position, normal: Position, direction?: Position) => {
     setCursor({ ...position, y: 0 })
     const touched = blockAt(world, position)?.material
     if (mode === 'place' && touched === 'sapling') {
@@ -257,7 +257,9 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     const target = mode === 'place' ? { x: position.x + normal.x, y: position.y + normal.y, z: position.z + normal.z } : position
     const cells = brushCells(target, normal, wide)
     const harvested = mode === 'remove' ? wheatAt(world, cells) : 0
-    const changes = editWorld(world, cells, material, mode)
+    // かいだんは みている ほうへ のぼれる むきに おく
+    const placing = material === 'stairs' && direction ? stairsToward(direction) : material
+    const changes = editWorld(world, cells, placing, mode)
     if (!changes.length) return
     // ようがんが みずに ふれて くろいしに なった
     const cooled = !(mode === 'place' && material === 'obsidian') && netMaterialChange(changes, OBSIDIAN) > 0

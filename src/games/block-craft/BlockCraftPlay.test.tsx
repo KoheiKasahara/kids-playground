@@ -40,7 +40,7 @@ async function startNew(name = 'くさはら') {
   return { user, view }
 }
 const api = (): SceneApi => ({ heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter: vi.fn(), focus: vi.fn(), burst: vi.fn(), fireworks: vi.fn() })
-const tap = (position: Position, normal: Position = { x: 0, y: 1, z: 0 }) => act(() => scene.options.onPick(position, normal))
+const tap = (position: Position, normal: Position = { x: 0, y: 1, z: 0 }, direction: Position = { x: 0, y: -1, z: 1 }) => act(() => scene.options.onPick(position, normal, direction))
 
 it('shows only the essential controls', async () => {
   await start()
@@ -725,6 +725,19 @@ it('eats a cake in two bites', async () => {
   tap(cake)
   expect(blockAt(world(), cake)).toBeUndefined()
   expect(screen.getByRole('status')).toHaveTextContent('ぜんぶ たべた')
+})
+
+it('places stairs that climb the way the player looks, and copies them by a long press in any direction', async () => {
+  const placed = createWorld()
+  editWorld(placed, { x: 9, y: 3, z: 8 }, 'stairs_2', 'place')
+  await start(placed)
+  // どの むきの かいだんを ながおししても「かいだん」を えらぶ
+  act(() => scene.options.onHold?.({ x: 9, y: 3, z: 8 }))
+  expect(screen.getByRole('button', { name: 'かいだん' })).toHaveAttribute('aria-pressed', 'true')
+  tap({ x: 10, y: 2, z: 10 }, { x: 0, y: 1, z: 0 }, { x: 0.8, y: -0.5, z: 0.2 })
+  expect(blockAt(world(), { x: 10, y: 3, z: 10 })?.material).toBe('stairs_1')
+  tap({ x: 6, y: 2, z: 10 }, { x: 0, y: 1, z: 0 }, { x: 0.1, y: -0.5, z: -0.9 })
+  expect(blockAt(world(), { x: 6, y: 3, z: 10 })?.material).toBe('stairs_2')
 })
 
 it('crafts a dragon egg from lava, fire (a torch) and lava, and hatches a baby dragon that breathes fire', async () => {

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { blockShape, plantCenterY } from './raycast'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { BLOCK_WIDTH, blockShape, plantCenterY } from './raycast'
 import { definitionAt, materialCode, MATERIAL_DEFS, type Changes, type World } from './world'
 
 export const CHUNK_SIZE = 16
@@ -17,8 +18,50 @@ const lights = (['lamp', 'torch', 'jack'] as const).map(id => materialCode(id) -
 
 /** まわりを すきまなく かくす ブロック（くさばな・すける ブロック・すきまの ある ブロック・ちいさな ブロックは かくさない）。 */
 const SOLID = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!m.plant && !m.passable && !m.cutout
-  && m.opacity === undefined && m.width === undefined && m.height === undefined))])
-const SHAPES = MATERIAL_DEFS.map(blockShape)
+  && m.opacity === undefined && m.width === undefined && m.height === undefined && m.stairs === undefined))])
+const SHAPES = MATERIAL_DEFS.map(def => {
+  const { width, height } = blockShape(def)
+  // おおきさと かいだんの むき（いちは あとで きめる）
+  const local = new THREE.Matrix4().compose(new THREE.Vector3(),
+    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (def.stairs ?? 0) * Math.PI / 2),
+    new THREE.Vector3(width, height, width))
+  return { height, local }
+})
+/** ばってんの いたは ブロックの かどに とどくくらいの はば。 */
+const CROSS_PLANE = 1.2
+
+/** めんの むきに あわせて、ブロック 1つぶんの えの うち その ばしょの ぶぶんを はる。 */
+function projectUv(geometry: THREE.BufferGeometry) {
+  const position = geometry.getAttribute('position'), normal = geometry.getAttribute('normal'), uv = geometry.getAttribute('uv')
+  const at = (value: number) => value / BLOCK_WIDTH + 0.5
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i), y = position.getY(i), z = position.getZ(i)
+    if (Math.abs(normal.getY(i)) > 0.5) uv.setXY(i, at(x), at(-z))
+    else if (Math.abs(normal.getX(i)) > 0.5) uv.setXY(i, at(normal.getX(i) > 0 ? -z : z), at(y))
+    else uv.setXY(i, at(normal.getZ(i) > 0 ? x : -x), at(y))
+  }
+  return geometry
+}
+
+/** ブロックの かたち：はこ・ばってんの くさばな・かいだん（ざいりょうの じゅんに ならべた forMaterial を つかう）。 */
+export function createBlockGeometries() {
+  const box = new THREE.BoxGeometry(BLOCK_WIDTH, BLOCK_WIDTH, BLOCK_WIDTH)
+  const planes = [Math.PI / 4, -Math.PI / 4].map(angle => new THREE.PlaneGeometry(BLOCK_WIDTH * CROSS_PLANE, BLOCK_WIDTH).rotateY(angle))
+  const cross = mergeGeometries(planes)
+  const half = BLOCK_WIDTH / 2
+  // したは まるごと、うえは おく（+z）の はんぶんだけ
+  const steps = [
+    new THREE.BoxGeometry(BLOCK_WIDTH, half, BLOCK_WIDTH).translate(0, -half / 2, 0),
+    new THREE.BoxGeometry(BLOCK_WIDTH, half, half).translate(0, half / 2, half / 2),
+  ].map(projectUv)
+  const stairs = mergeGeometries(steps)
+  for (const part of [...planes, ...steps]) part.dispose()
+  return {
+    box, cross, stairs,
+    forMaterial: MATERIAL_DEFS.map(m => m.cross ? cross : m.stairs !== undefined ? stairs : box) as readonly THREE.BufferGeometry[],
+    dispose() { box.dispose(); cross.dispose(); stairs.dispose() },
+  }
+}
 const SIDES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]] as const
 /** 6めんとも ブロックに かこまれて、どこからも みえない。せかいの そこは みえない ものと する。 */
 export function isBuried(world: World, x: number, y: number, z: number) {
@@ -33,7 +76,7 @@ type Chunk = {
 }
 
 /** Draws every cell with an exposed face. Buried cells get their geometry back when a neighbour is dug out. */
-export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeometry, materials: readonly THREE.Material[]) {
+export function createTerrainMeshes(scene: THREE.Scene, geometries: readonly THREE.BufferGeometry[], materials: readonly (THREE.Material | THREE.Material[])[]) {
   const chunks = new Map<number, Chunk>()
   const dirty = new Set<number>()
   const counts = new Uint32Array(materials.length)
@@ -97,7 +140,7 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
       if (!counts[i]) continue
       if (!meshes[i]) {
         const capacity = 2 ** Math.ceil(Math.log2(counts[i]))
-        const added = new THREE.InstancedMesh(geometry, materials[i], capacity)
+        const added = new THREE.InstancedMesh(geometries[i], materials[i], capacity)
         added.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
         if (definitionAt(i + 1).opacity !== undefined) added.renderOrder = 1
         meshes[i] = added
@@ -107,9 +150,8 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
     }
     visit((x, y, z, code) => {
       const mesh = meshes[code - 1]!
-      const { width, height } = SHAPES[code - 1]
-      if (width !== 1 || height !== 1) matrix.makeScale(width, height, width).setPosition(x, plantCenterY(y, height), z)
-      else matrix.makeTranslation(x, y, z)
+      const { height, local } = SHAPES[code - 1]
+      matrix.copy(local).setPosition(x, plantCenterY(y, height), z)
       mesh.setMatrixAt(mesh.count++, matrix)
     })
     for (const mesh of meshes) {

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { expect, it, vi } from 'vitest'
-import { hitBlock } from './raycast'
+import { blockShape, hitBlock } from './raycast'
 import { createWorld, materialDef, World, type Block, type Position } from './world'
 
 function legacyRaycast(blocks: readonly Block[]) {
@@ -9,9 +9,7 @@ function legacyRaycast(blocks: readonly Block[]) {
   const mesh = new THREE.InstancedMesh(geometry, material, blocks.length)
   const matrix = new THREE.Matrix4()
   blocks.forEach(({ x, y, z, material }, index) => {
-    const def = materialDef(material)
-    const width = def.width ?? (def.plant ? 0.45 : 1)
-    const height = def.height ?? (def.plant ? 0.6 : 1)
+    const { width, height } = blockShape(materialDef(material))
     if (width !== 1 || height !== 1) matrix.makeScale(width, height, width).setPosition(x, y - 0.485 * (1 - height), z)
     else matrix.makeTranslation(x, y, z)
     mesh.setMatrixAt(index, matrix)

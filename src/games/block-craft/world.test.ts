@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   arriveAt, blockAt, brushCells, createWorld, DEFAULT_WORLD, eatCake, editWorld as mutateWorld, explode, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key,
   materialCode, MAX_BLAST_CHAIN, netMaterialChange, nextPortal, PALETTE, pickAs, portalGates, SPONGE_LIMIT, tendCrops as mutateCrops, toggleDoor, undoChanges, wheatAt,
-  settleWalker, startWalker, surfaceOf, topBlock, TREASURES, walk, World, type Block, type Material, type Position,
+  settleWalker, stairsToward, startWalker, surfaceOf, topBlock, TREASURES, walk, World, type Block, type Material, type Position,
 } from './world'
 
 import { decodeLegacyWorld as decodeWorld } from './saveCodec'
@@ -375,6 +375,14 @@ describe('blocks made at the crafting table', () => {
     mutateWorld(world, { x: 8, y: 2, z: 8 }, 'wood', 'remove')
     expect(world.materialAt({ x: 8, y: 3, z: 8 })).toBeUndefined()
   })
+})
+
+it('turns stairs so the high step is ahead of the player', () => {
+  expect(stairsToward({ x: 0, z: 1 })).toBe('stairs')
+  expect(stairsToward({ x: 0.9, z: -0.3 })).toBe('stairs_1')
+  expect(stairsToward({ x: 0.2, z: -0.7 })).toBe('stairs_2')
+  expect(stairsToward({ x: -1, z: 0.5 })).toBe('stairs_3')
+  for (const id of ['stairs_1', 'stairs_2', 'stairs_3'] as const) expect(pickAs(id)).toBe('stairs')
 })
 
 describe('painting blocks', () => {

@@ -89,6 +89,12 @@ function pattern(material: Material, x: number, y: number, noise: number): numbe
     case 'bed': return y >= 11 ? 0.8 + n * 0.3 : y % 4 === 1 ? -0.2 : n
     case 'note': return x === 0 || y === 0 || x === TEXTURE_SIZE - 1 || y === TEXTURE_SIZE - 1 ? -0.4 : x % 4 === 2 && y % 4 === 2 ? 0.5 : n
     case 'bomb': return y >= 6 && y <= 9 ? (x % 3 === 1 ? -0.45 : 0.8) : x % 5 === 0 ? -0.2 : n
+    case 'carpet': return (x + y) % 4 === 0 ? -0.15 : x % 8 === 3 ? 0.18 : n * 0.5
+    // たての わらに あかい ひも
+    case 'hay': return y >= 5 && y <= 6 || y >= 11 && y <= 12 ? -0.45 : x % 3 === 0 ? -0.18 : noise > 0.85 ? 0.2 : n
+    // つるつるの いしに ふちどり
+    case 'slab': return y === 0 || y === TEXTURE_SIZE - 1 || x === 0 || x === TEXTURE_SIZE - 1 ? -0.25 : n * 0.6
+    case 'stairs': return y % 4 === 3 ? -0.3 : x === (Math.floor(y / 4) * 7 + 2) % TEXTURE_SIZE ? -0.25 : n
     case 'cake':
     case 'cake_half': return y >= 11 ? (noise > 0.92 ? -0.5 : 0.6) : y === 10 ? -0.2 : y % 3 === 0 ? -0.35 : n
     case 'jack': {
@@ -127,22 +133,120 @@ function hole(material: Material, x: number, y: number) {
   }
 }
 
-/** ざいりょうの いろに もようを つけた RGBA のドット（テクスチャ用）。すきまの ある ブロックは すきまを すきとおらせる。 */
-export function blockPixels(material: Material): Uint8Array {
-  const index = MATERIAL_DEFS.findIndex(m => m.id === material)
+const STEM = hex('#4f9a3c')
+const TRUNK = hex('#8a5a2b')
+const DIRT = hex('#ae7950')
+const PLANK = hex('#e0b46c')
+const PUMPKIN = hex('#ef8a1f')
+const MUSHROOM_STEM = hex('#f2e6d0')
+
+/**
+ * ばってんに えがく くさばなの え（y が おおきい ほうが うえ）。
+ * えの そとは null（すきとおる）。くさばなで なければ undefined。
+ */
+function sprite(material: Material, x: number, y: number, noise: number, base: Rgb): Rgb | null | undefined {
+  const n = (noise - 0.5) * 0.2
+  switch (material) {
+    case 'flower': {
+      if (Math.hypot(x - 7.5, y - 11.5) < 3.4) return shade(base, Math.hypot(x - 7.5, y - 11.5) < 1.3 ? 0.55 : n)
+      const stem = (x === 7 || x === 8) && y <= 9
+      const leaf = ((y === 4 || y === 5) && (x === 5 || x === 6)) || ((y === 6 || y === 7) && (x === 9 || x === 10))
+      return stem || leaf ? shade(STEM, n) : null
+    }
+    case 'sapling': {
+      if ((x === 7 || x === 8) && y <= 6) return shade(TRUNK, n)
+      return Math.hypot(x - 7.5, y - 10.5) < 4.8 && noise > 0.12 ? shade(base, noise > 0.8 ? 0.2 : n) : null
+    }
+    case 'tallgrass':
+    case 'seed':
+    case 'sprout':
+    case 'wheat': {
+      // ななめに のびる ほそい は
+      const blade = (x + Math.floor(y / 5)) % 4 === 1
+      if (material === 'wheat' && y >= 10 && x % 4 !== 3) return shade(base, 0.25 + n)
+      return blade ? shade(base, y < 4 ? -0.25 : n) : null
+    }
+    case 'mushroom': {
+      if (x >= 6 && x <= 9 && y <= 6) return shade(MUSHROOM_STEM, n)
+      const half = 7 - Math.max(0, y - 10) * 1.4
+      if (y >= 7 && y <= 13 && Math.abs(x - 7.5) <= half) return shade(base, (x + y) % 5 === 0 && noise > 0.3 ? 0.85 : n)
+      return null
+    }
+    default: return undefined
+  }
+}
+
+/** うえと よこで もようが ちがう ブロック（くさは うえが みどりで よこが つち、きは うえに ねんりん）。 */
+export const FACED: readonly Material[] = ['grass', 'wood', 'pumpkin', 'jack', 'cactus', 'workbench', 'bomb', 'melon', 'sandstone', 'bookshelf', 'hay']
+export type Face = 'side' | 'top' | 'bottom'
+const FACE_SEEDS: Record<Face, number> = { side: 0, top: 101, bottom: 211 }
+
+/** うえ・したの めんの もよう。 */
+function cap(material: Material, face: Face, x: number, y: number, noise: number, base: Rgb): Rgb {
+  const n = (noise - 0.5) * 0.16
+  const ring = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5))
+  switch (material) {
+    case 'grass': return face === 'top' ? shade(base, pattern('grass', x, y, noise)) : shade(DIRT, pattern('dirt', x, y, noise))
+    case 'wood': return ring > 6.5 ? shade(base, -0.3 + n) : shade(PLANK, Math.floor(ring) % 2 ? -0.2 : 0.05 + n)
+    case 'pumpkin':
+    case 'jack': return ring < 1.5 ? shade(STEM, -0.2 + n) : shade(PUMPKIN, Math.floor(ring) % 3 === 0 ? -0.22 : n)
+    case 'cactus': return ring > 6.5 ? shade(base, -0.3) : x % 4 === 1 && y % 4 === 1 ? shade(base, -0.4) : shade(base, 0.15 + n)
+    case 'workbench': return x % 5 === 0 || y % 5 === 0 ? shade(base, -0.38) : shade(base, (x + y) % 9 === 0 ? 0.2 : n)
+    case 'bomb': return ring < 1.5 ? shade(base, -0.75) : shade(base, ring > 6.5 ? -0.2 : 0.15 + n)
+    case 'melon': return ring < 1.5 ? shade(STEM, -0.35) : shade(base, (x + y) % 4 === 0 ? -0.25 : n)
+    case 'sandstone': return shade(base, n * 0.4 + (ring > 6.5 ? -0.12 : 0))
+    case 'bookshelf': return shade(PLANK, y % 4 === 3 ? -0.3 : n)
+    // たばねた わらの きりくち
+    case 'hay': return shade(base, ring > 6.5 ? -0.25 : (x * 3 + y * 5) % 7 === 0 ? -0.3 : 0.1 + n)
+    default: return shade(base, pattern(material, x, y, noise))
+  }
+}
+const BOOKS = ['#c8473c', '#3f6fc4', '#3f9a55', '#e0b23a', '#8a4fb5'].map(hex)
+
+/** よこの めんの もよう。 */
+function side(material: Material, x: number, y: number, noise: number, base: Rgb): Rgb {
+  switch (material) {
+    // うえの ふちだけ くさが たれる
+    case 'grass': return y >= 12 + (x * 5 + 3) % 3 ? shade(base, pattern('grass', x, y, noise)) : shade(DIRT, pattern('dirt', x, y, noise))
+    // いたの うえに のこぎりと かなづち
+    case 'workbench': {
+      const tool = (x >= 3 && x <= 4 && y >= 3 && y <= 11) || (x >= 2 && x <= 5 && y >= 10 && y <= 12) || (x >= 9 && x <= 13 && y >= 5 && y <= 9 && x - 9 <= y - 5)
+      return tool ? shade(base, -0.55) : shade(PLANK, y % 4 === 3 ? -0.3 : (noise - 0.5) * 0.16)
+    }
+    // にじは だんごとに いろを かえる
+    case 'rainbow': return shade(RAINBOW[Math.floor((TEXTURE_SIZE - 1 - y) * RAINBOW.length / TEXTURE_SIZE)], (noise - 0.5) * 0.1)
+    // たなに いろとりどりの ほんが 2だん
+    case 'bookshelf': {
+      if (y === 0 || y === 7 || y === 8 || y === TEXTURE_SIZE - 1 || x === 0 || x === TEXTURE_SIZE - 1) return shade(PLANK, -0.2)
+      const book = BOOKS[(Math.floor(x / 2) + (y > 7 ? 3 : 0)) % BOOKS.length]
+      return x % 2 === 1 && noise > 0.7 ? shade(book, -0.45) : shade(book, (y === 2 || y === 11) ? 0.3 : (noise - 0.5) * 0.16)
+    }
+    default: return shade(base, pattern(material, x, y, noise))
+  }
+}
+
+/**
+ * ざいりょうの いろに もようを つけた RGBA のドット（テクスチャ用）。face で うえ・よこ・したの めんを えらぶ。
+ * すきまの ある ブロックと くさばなは、すきまを すきとおらせる。むきだけ ちがう かいだんは おなじ もよう。
+ */
+export function blockPixels(material: Material, face: Face = 'side'): Uint8Array {
+  const look = (MATERIAL_DEFS.find(m => m.id === material)?.stairs !== undefined ? 'stairs' : material) as Material
+  const index = MATERIAL_DEFS.findIndex(m => m.id === look)
   const base = hex(MATERIAL_DEFS[index].color)
-  const random = seeded(index * 977 + 13)
+  const random = seeded(index * 977 + 13 + FACE_SEEDS[face])
   const data = new Uint8Array(TEXTURE_SIZE * TEXTURE_SIZE * 4)
   for (let y = 0; y < TEXTURE_SIZE; y++) for (let x = 0; x < TEXTURE_SIZE; x++) {
     const noise = random()
-    // にじは だんごとに いろを かえる
-    const color = material === 'rainbow' ? RAINBOW[Math.floor((TEXTURE_SIZE - 1 - y) * RAINBOW.length / TEXTURE_SIZE)] : base
-    const [r, g, b] = shade(color, material === 'rainbow' ? (noise - 0.5) * 0.1 : pattern(material, x, y, noise))
+    const plant = sprite(look, x, y, noise, base)
+    const color = plant !== undefined ? plant
+      : hole(look, x, y) ? null
+        : face === 'side' ? side(look, x, y, noise, base) : cap(look, face, x, y, noise, base)
     const i = (y * TEXTURE_SIZE + x) * 4
-    data[i] = r
-    data[i + 1] = g
-    data[i + 2] = b
-    data[i + 3] = hole(material, x, y) ? 0 : 255
+    if (!color) continue
+    data[i] = color[0]
+    data[i + 1] = color[1]
+    data[i + 2] = color[2]
+    data[i + 3] = 255
   }
   return data
 }
