@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { clampTarget, DEBRIS_PER_BLAST, headingFromYaw, MAX_DEBRIS, MAX_LIT, useCraftScene, type CraftSceneOptions } from './useCraftScene'
 import { ANIMAL_SPAWNS, herdFrom } from './animals'
+import { FACED } from './textures'
 import { createWorld, DEFAULT_WORLD, editWorld, MATERIALS, startWalker } from './world'
 
 const resources = vi.hoisted(() => ({
@@ -72,11 +73,12 @@ it('disposes GPU resources, observer, timers and input handlers on exit and can 
     expect(resources.disconnect).toHaveBeenCalledTimes(entry)
     expect(removeListener.mock.calls.map(call => call[0])).toEqual(expect.arrayContaining(['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'webglcontextlost']))
   }
-  // ブロック・どうぶつ・わく（わくの もとの はこは つくる ときに すてる）。ばくだんの ひかりと かけらは どうぶつの はこを つかう
-  expect(geometryDispose).toHaveBeenCalledTimes(4 * 2)
-  // ブロック・どうぶつ・わく・ばくだんの ひかり・かけら
-  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + 4) * 2)
-  expect(textureDispose).toHaveBeenCalledTimes(MATERIALS.length * 2)
+  // はこ・ばってん・かいだん・どうぶつ・わく。わくの もとの はこと、ばってんの いた 2まい・かいだんの だん 2つは つくる ときに すてる。
+  // ばくだんの ひかりと かけらは どうぶつの はこを つかう
+  expect(geometryDispose).toHaveBeenCalledTimes((5 + 1 + 4) * 2)
+  // ブロック（うえと したの もようが ちがう ブロックは 2つ ふえる）・どうぶつ・わく・ばくだんの ひかり・かけら
+  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + FACED.length * 2 + 4) * 2)
+  expect(textureDispose).toHaveBeenCalledTimes((MATERIALS.length + FACED.length * 2) * 2)
   expect(meshesCreated).toBeGreaterThan(2)
   expect(meshDispose).toHaveBeenCalledTimes(meshesCreated)
 })
@@ -243,7 +245,7 @@ it('selects the animal when it is in front of terrain and shows its tap hop', ()
   for (let y = 3; y <= 6; y++) editWorld(props.world, { x: herd[0].x, y, z: herd[0].z }, 'brick', 'place')
   act(() => view.result.current.api.current?.actAtCenter('pick'))
   expect(onAnimal).not.toHaveBeenCalled()
-  expect(props.onPick).toHaveBeenCalledWith({ x: herd[0].x, y: 6, z: herd[0].z }, { x: 0, y: 1, z: 0 })
+  expect(props.onPick).toHaveBeenCalledWith({ x: herd[0].x, y: 6, z: herd[0].z }, { x: 0, y: 1, z: 0 }, expect.objectContaining({ y: expect.any(Number) }))
   view.unmount()
 })
 

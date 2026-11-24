@@ -23,6 +23,10 @@ export type MaterialDef = {
   pickAs?: string
   /** ひつじの けを とると つかえる けいと。 */
   wool?: WoolColor
+  /** はなや なえぎのように、2まいの えを ばってんに くみあわせて えがく。 */
+  cross?: boolean
+  /** かいだんの むき（たかい ほうが 0:+z・1:+x・2:-z・3:-x）。 */
+  stairs?: 0 | 1 | 2 | 3
 }
 export const MATERIALS = [
   { id: 'grass', label: 'くさ', color: '#78ba50', emoji: '🌱' },
@@ -41,14 +45,14 @@ export const MATERIALS = [
   { id: 'lamp', label: 'ひかり', color: '#ffd84d', emoji: '💡', glow: true },
   { id: 'gold', label: 'きん', color: '#f4c430', emoji: '🪙' },
   { id: 'diamond', label: 'ダイヤ', color: '#5ee3e0', emoji: '💎' },
-  { id: 'sapling', label: 'なえぎ', color: '#5fae3e', emoji: '🌿', plant: true },
-  { id: 'flower', label: 'はな', color: '#f06fa4', emoji: '🌷', plant: true },
+  { id: 'sapling', label: 'なえぎ', color: '#5fae3e', emoji: '🌿', plant: true, cross: true },
+  { id: 'flower', label: 'はな', color: '#f06fa4', emoji: '🌷', plant: true, cross: true },
   { id: 'lava', label: 'ようがん', color: '#ff6a1a', emoji: '🌋', glow: true },
   { id: 'obsidian', label: 'くろいし', color: '#3d3150', emoji: '⬛' },
   { id: 'ice', label: 'こおり', color: '#a9dcf6', emoji: '🧊', opacity: 0.8 },
   { id: 'sandstone', label: 'さばくいし', color: '#e2c07e', emoji: '🏜️' },
-  { id: 'seed', label: 'たね', color: '#9cc25a', emoji: '🌾', plant: true, height: 0.25 },
-  { id: 'mushroom', label: 'きのこ', color: '#dc4a3c', emoji: '🍄', plant: true, height: 0.45 },
+  { id: 'seed', label: 'たね', color: '#9cc25a', emoji: '🌾', plant: true, cross: true, height: 0.25 },
+  { id: 'mushroom', label: 'きのこ', color: '#dc4a3c', emoji: '🍄', plant: true, cross: true, height: 0.45 },
   { id: 'coral', label: 'さんご', color: '#ff7f8f', emoji: '🪸' },
   { id: 'shell', label: 'かいがら', color: '#fbe0cc', emoji: '🐚', plant: true, height: 0.3 },
   { id: 'cloud', label: 'くも', color: '#f3f8ff', emoji: '☁️' },
@@ -61,8 +65,8 @@ export const MATERIALS = [
   { id: 'wool_pink', label: 'ピンク', color: '#f5a8c8', emoji: '🧶', wool: 'pink' },
   { id: 'wool_yellow', label: 'きいろ', color: '#f3d75e', emoji: '🧶', wool: 'yellow' },
   { id: 'wool_blue', label: 'みずいろ', color: '#8fcdf2', emoji: '🧶', wool: 'blue' },
-  { id: 'sprout', label: 'め', color: '#79c94c', emoji: '🌱', plant: true, height: 0.5, hidden: true, pickAs: 'seed' },
-  { id: 'wheat', label: 'こむぎ', color: '#e8c25a', emoji: '🌾', plant: true, height: 0.85, hidden: true, pickAs: 'seed' },
+  { id: 'sprout', label: 'め', color: '#79c94c', emoji: '🌱', plant: true, cross: true, height: 0.5, hidden: true, pickAs: 'seed' },
+  { id: 'wheat', label: 'こむぎ', color: '#e8c25a', emoji: '🌾', plant: true, cross: true, height: 0.85, hidden: true, pickAs: 'seed' },
   { id: 'farmland', label: 'はたけ', color: '#7b5233', emoji: '🟫', hidden: true, pickAs: 'dirt' },
   { id: 'workbench', label: 'クラフト', color: '#b07a43', emoji: '🛠️' },
   { id: 'sakura', label: 'さくら', color: '#f6b6d2', emoji: '🌸' },
@@ -78,6 +82,15 @@ export const MATERIALS = [
   { id: 'jack', label: 'ランタン', color: '#f39a2b', emoji: '🏮', glow: true },
   { id: 'door_open', label: 'ひらいた ドア', color: '#9a6534', emoji: '🚪', cutout: true, passable: true, hidden: true, pickAs: 'door' },
   { id: 'cake_half', label: 'たべかけの ケーキ', color: '#f6e3cf', emoji: '🍰', width: 0.6, height: 0.5, hidden: true, pickAs: 'cake' },
+  { id: 'slab', label: 'はんぶん', color: '#aab3bd', emoji: '➖', height: 0.5 },
+  { id: 'stairs', label: 'かいだん', color: '#d6a862', emoji: '📶', stairs: 0 },
+  { id: 'stairs_1', label: 'かいだん', color: '#d6a862', emoji: '📶', stairs: 1, hidden: true, pickAs: 'stairs' },
+  { id: 'stairs_2', label: 'かいだん', color: '#d6a862', emoji: '📶', stairs: 2, hidden: true, pickAs: 'stairs' },
+  { id: 'stairs_3', label: 'かいだん', color: '#d6a862', emoji: '📶', stairs: 3, hidden: true, pickAs: 'stairs' },
+  { id: 'tallgrass', label: 'くさむら', color: '#6dbb45', emoji: '☘️', plant: true, cross: true, height: 0.7 },
+  { id: 'carpet', label: 'じゅうたん', color: '#c94f6d', emoji: '🟥', height: 0.07, passable: true },
+  { id: 'bookshelf', label: 'ほんだな', color: '#a8743f', emoji: '📚' },
+  { id: 'hay', label: 'ほしくさ', color: '#d9b83a', emoji: '🟨' },
 ] as const satisfies readonly MaterialDef[]
 export const MATERIAL_DEFS: readonly MaterialDef[] = MATERIALS
 export type Material = typeof MATERIALS[number]['id']
@@ -111,6 +124,11 @@ export function inside({ size, height }: Dimensions, { x, y, z }: Position) {
 export const PALETTE = MATERIALS.filter(m => !('hidden' in m)).sort((a, b) => Number(b.id === 'workbench') - Number(a.id === 'workbench'))
 /** ながおしで えらぶ ざいりょう（そだつ とちゅうの さくもつは たね、はたけは つち）。 */
 export const pickAs = (id: Material): Material => (materialDef(id).pickAs ?? id) as Material
+/** みている ほうへ のぼる かいだん（てまえが ひくく、おくが たかい）。 */
+export function stairsToward(direction: { x: number; z: number }): Material {
+  const facing = Math.abs(direction.x) > Math.abs(direction.z) ? (direction.x > 0 ? 1 : 3) : direction.z >= 0 ? 0 : 2
+  return MATERIALS.find(m => 'stairs' in m && m.stairs === facing)!.id
+}
 export const woolMaterial = (color: WoolColor): Material => MATERIALS.find(m => 'wool' in m && m.wool === color)!.id
 /** たね → め → こむぎ。タッチするたびに そだち、こむぎは とれて また たねに なる。 */
 export const CROP_STAGES = ['seed', 'sprout', 'wheat'] as const satisfies readonly Material[]

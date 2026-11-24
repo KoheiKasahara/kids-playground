@@ -11,6 +11,8 @@ export const RECIPES = [
   { result: 'note', ingredients: ['plank', 'plank', 'crystal'] },
   { result: 'bomb', ingredients: ['sand', 'sand', 'lava'] },
   { result: 'cake', ingredients: ['honey', 'snow', 'melon'] },
+  { result: 'slab', ingredients: ['stone', 'stone'] },
+  { result: 'stairs', ingredients: ['plank', 'plank', 'wood'] },
   // つくった たいまつも ざいりょうに なる
   { result: 'jack', ingredients: ['pumpkin', 'torch'] },
 ] as const satisfies readonly Recipe[]

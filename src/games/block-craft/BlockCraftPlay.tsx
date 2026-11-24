@@ -8,7 +8,7 @@ import { feedAnimal, shearSheep, type Animal, type Cell, type FeedResult, type H
 import { biome, BIOMES } from './biomes'
 import { MAX_WHEAT, newGame, readCrafted, readGame, readWool, writeCrafted, writeGame, writeWool, type Game } from './save'
 import {
-  blockAt, brushCells, eatCake, editWorld, explode, growTree, isCrop, key, materialCode, materialDef, netMaterialChange, PALETTE, pickAs, settleWalker,
+  blockAt, brushCells, eatCake, editWorld, explode, growTree, isCrop, key, materialCode, materialDef, netMaterialChange, PALETTE, pickAs, settleWalker, stairsToward,
   startWalker, tendCrops, toggleDoor, topBlock, undoChanges, walk, wheatAt, woolMaterial, type Changes, type Material, type Position, type WoolColor, type World,
 } from './world'
 import { useCraftScene } from './useCraftScene'
@@ -175,7 +175,7 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     setCrafted(next)
     writeCrafted(next)
   }, [crafted])
-  const pick = useCallback((position: Position, normal: Position) => {
+  const pick = useCallback((position: Position, normal: Position, direction?: Position) => {
     setCursor({ ...position, y: 0 })
     const touched = blockAt(world, position)?.material
     if (mode === 'place' && touched === 'sapling') {
@@ -217,7 +217,9 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     const target = mode === 'remove' ? position : { x: position.x + normal.x, y: position.y + normal.y, z: position.z + normal.z }
     const cells = brushCells(target, normal, wide)
     const harvested = mode === 'remove' ? wheatAt(world, cells) : 0
-    const changes = editWorld(world, cells, material, mode)
+    // かいだんは みている ほうへ のぼれる むきに おく
+    const placing = material === 'stairs' && direction ? stairsToward(direction) : material
+    const changes = editWorld(world, cells, placing, mode)
     if (!changes.length) return
     // ようがんが みずに ふれて くろいしに なった
     const cooled = !(mode === 'place' && material === 'obsidian') && netMaterialChange(changes, OBSIDIAN) > 0

@@ -2,10 +2,12 @@ import { definitionAt, type MaterialDef, type Position, type World } from './wor
 
 export const BLOCK_WIDTH = 0.97
 export const PLANT_WIDTH_SCALE = 0.45
+/** ばってんに えがく くさばなは、さわりやすいよう ひろめに する。 */
+export const CROSS_WIDTH_SCALE = 0.8
 export const plantCenterY = (y: number, height: number) => y - BLOCK_WIDTH / 2 * (1 - height)
 /** えがく はこの よこはばと たかさ（ブロック 1つぶんが 1）。ひくい ものは じめんに つける。 */
 export function blockShape(def: MaterialDef) {
-  return { width: def.width ?? (def.plant ? PLANT_WIDTH_SCALE : 1), height: def.height ?? (def.plant ? 0.6 : 1) }
+  return { width: def.width ?? (def.cross ? CROSS_WIDTH_SCALE : def.plant ? PLANT_WIDTH_SCALE : 1), height: def.height ?? (def.plant ? 0.6 : 1) }
 }
 const HALF = Math.fround(BLOCK_WIDTH / 2)
 const AXES = ['x', 'y', 'z'] as const

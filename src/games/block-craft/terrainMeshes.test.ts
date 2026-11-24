@@ -1,15 +1,15 @@
 import * as THREE from 'three'
 import { expect, it, vi } from 'vitest'
 import { BLOCK_WIDTH } from './raycast'
-import { createTerrainMeshes, isBuried } from './terrainMeshes'
-import { createWorld, editWorld, MATERIALS, undoChanges, World, type Material } from './world'
+import { createBlockGeometries, createTerrainMeshes, isBuried } from './terrainMeshes'
+import { createWorld, editWorld, materialCode, MATERIALS, undoChanges, World, type Material } from './world'
 
 it('keeps one instance per visible cell, allocates for the used meshes and updates only dirty chunks', () => {
   const grid = createWorld({ size: 64, height: 12 })
   const scene = new THREE.Scene()
   const geo = new THREE.BoxGeometry(BLOCK_WIDTH, BLOCK_WIDTH, BLOCK_WIDTH)
   const materials = MATERIALS.map(() => new THREE.MeshBasicMaterial())
-  const terrain = createTerrainMeshes(scene, geo, materials)
+  const terrain = createTerrainMeshes(scene, MATERIALS.map(() => geo), materials)
   terrain.update(grid)
   const chunks = scene.children.map(group => group.children as THREE.InstancedMesh[])
   expect(chunks).toHaveLength(16)
@@ -73,6 +73,48 @@ it('keeps a block visible next to see-through, passable or small blocks', () => 
     return new World({ size: 16, height: 12 }, blocks)
   }
   expect(isBuried(around('stone'), center.x, center.y, center.z)).toBe(true)
-  for (const material of ['fence', 'door_open', 'bed', 'cake', 'torch'] as const) expect(isBuried(around(material), center.x, center.y, center.z)).toBe(false)
+  for (const material of ['fence', 'door_open', 'bed', 'cake', 'torch', 'slab', 'stairs_2', 'carpet', 'flower'] as const) expect(isBuried(around(material), center.x, center.y, center.z)).toBe(false)
   expect(isBuried(around('door'), center.x, center.y, center.z)).toBe(true)
+})
+
+it('draws flowers as two crossed planes, stairs as two steps turned to face their way, and slabs half high', () => {
+  const geometries = createBlockGeometries()
+  const shape = (id: Material) => geometries.forMaterial[materialCode(id) - 1]
+  expect(shape('flower')).toBe(geometries.cross)
+  expect(shape('wheat')).toBe(geometries.cross)
+  expect(shape('torch')).toBe(geometries.box)
+  for (const id of ['stairs', 'stairs_1', 'stairs_2', 'stairs_3'] as const) expect(shape(id)).toBe(geometries.stairs)
+  // ばってんの いたは 2まいで、どちらも たて
+  const normals = geometries.cross.getAttribute('normal')
+  expect(normals.count).toBe(8)
+  for (let i = 0; i < normals.count; i++) expect(normals.getY(i)).toBeCloseTo(0)
+  geometries.stairs.computeBoundingBox()
+  expect(geometries.stairs.boundingBox!.min.toArray().map(v => v * 2 / BLOCK_WIDTH)).toEqual([-1, -1, -1].map(v => expect.closeTo(v)))
+  expect(geometries.stairs.boundingBox!.max.toArray().map(v => v * 2 / BLOCK_WIDTH)).toEqual([1, 1, 1].map(v => expect.closeTo(v)))
+
+  const scene = new THREE.Scene()
+  const materials = MATERIALS.map(() => new THREE.MeshBasicMaterial())
+  const terrain = createTerrainMeshes(scene, geometries.forMaterial, materials)
+  terrain.update(new World({ size: 16, height: 12 }, [
+    { x: 4, y: 1, z: 4, material: 'stairs' }, { x: 6, y: 1, z: 4, material: 'stairs_1' }, { x: 8, y: 1, z: 4, material: 'slab' },
+  ]))
+  const matrixOf = (id: Material) => {
+    const mesh = scene.children[0].children.find(m => (m as THREE.InstancedMesh).material === materials[materialCode(id) - 1]) as THREE.InstancedMesh
+    expect(mesh.geometry).toBe(shape(id))
+    const matrix = new THREE.Matrix4()
+    mesh.getMatrixAt(0, matrix)
+    return matrix
+  }
+  // たかい ほう（+z）が むきに あわせて まわる
+  const back = (id: Material) => new THREE.Vector3(0, 0, 1).transformDirection(matrixOf(id)).toArray().map(Math.round)
+  expect(back('stairs')).toEqual([0, 0, 1])
+  expect(back('stairs_1')).toEqual([1, 0, 0])
+  // はんぶんの たかさで、じめんに つく
+  const slab = new THREE.Vector3(), scale = new THREE.Vector3()
+  matrixOf('slab').decompose(slab, new THREE.Quaternion(), scale)
+  expect(scale.y).toBeCloseTo(0.5)
+  expect(slab.y - BLOCK_WIDTH / 4).toBeCloseTo(1 - BLOCK_WIDTH / 2)
+  terrain.dispose()
+  geometries.dispose()
+  for (const material of materials) material.dispose()
 })

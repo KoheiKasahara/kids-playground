@@ -3,12 +3,13 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { observeGameActivity } from '../../utils/gameActivity'
 import { chooseAnimalStep, MAX_HERD, type Animal, type AnimalKind, type Cell, type Herd } from './animals'
-import { BLOCK_WIDTH, hitBlock } from './raycast'
-import { createTerrainMeshes, viewDepth, WALK_DRAW_DISTANCE } from './terrainMeshes'
-import { blockPixels, TEXTURE_SIZE } from './textures'
+import { hitBlock } from './raycast'
+import { createBlockGeometries, createTerrainMeshes, viewDepth, WALK_DRAW_DISTANCE } from './terrainMeshes'
+import { blockPixels, FACED, TEXTURE_SIZE, type Face } from './textures'
 import { materialCode, MATERIAL_DEFS, topBlock, type Dimensions, type Material, type Position, type WoolColor, type World } from './world'
 
-type Pick = (position: Position, normal: Position) => void
+/** direction は みている むき（かいだんの むきを きめる）。 */
+type Pick = (position: Position, normal: Position, direction: Position) => void
 export type Heading = { x: number; z: number }
 export type SceneApi = {
   /** あるく ときに むいている ほうこう（まえ・うしろ・ひだり・みぎの どれか）。 */
@@ -164,9 +165,9 @@ export function useCraftScene(options: CraftSceneOptions) {
     sun.position.set(6, 18, 12)
     scene.add(sun)
 
-    const geometry = new THREE.BoxGeometry(BLOCK_WIDTH, BLOCK_WIDTH, BLOCK_WIDTH)
-    const textures = MATERIAL_DEFS.map(m => {
-      const texture = new THREE.DataTexture(blockPixels(m.id as Material), TEXTURE_SIZE, TEXTURE_SIZE)
+    const geometries = createBlockGeometries()
+    const texture = (material: Material, face: Face) => {
+      const texture = new THREE.DataTexture(blockPixels(material, face), TEXTURE_SIZE, TEXTURE_SIZE)
       texture.colorSpace = THREE.SRGBColorSpace
       texture.magFilter = THREE.NearestFilter
       texture.minFilter = THREE.NearestFilter
@@ -174,22 +175,33 @@ export function useCraftScene(options: CraftSceneOptions) {
       texture.wrapT = THREE.RepeatWrapping
       texture.needsUpdate = true
       return texture
-    })
+    }
+    const textures = MATERIAL_DEFS.map(m => texture(m.id as Material, 'side'))
+    /** うえと したの もよう（FACED の じゅん）。 */
+    const capTextures = FACED.map(id => [texture(id, 'top'), texture(id, 'bottom')] as const)
     const waterTexture = textures[materialCode('water') - 1]
     const lavaTexture = textures[materialCode('lava') - 1]
-    const materials = MATERIAL_DEFS.map((m, i) => new THREE.MeshLambertMaterial({
-      map: textures[i],
+    const surfaces = MATERIAL_DEFS.map((m, i) => {
+      const material = (map: THREE.Texture) => new THREE.MeshLambertMaterial({
+        map,
       transparent: m.opacity !== undefined,
       opacity: m.opacity ?? 1,
       depthWrite: m.opacity === undefined,
-      // さくの すきまからは うらがわの めんも みえる
-      alphaTest: m.cutout ? 0.5 : 0,
-      side: m.cutout ? THREE.DoubleSide : THREE.FrontSide,
-      emissive: m.glow ? m.color : '#000000',
-      emissiveIntensity: m.glow ? DAY.glow : 0,
-    }))
-    const glowing = materials.filter((_, i) => MATERIAL_DEFS[i].glow)
-    const terrain = createTerrainMeshes(scene, geometry, materials)
+        // さくの すきまや くさばなの いたは うらがわも みえる
+        alphaTest: m.cutout || m.cross ? 0.5 : 0,
+        side: m.cutout || m.cross ? THREE.DoubleSide : THREE.FrontSide,
+        emissive: m.glow ? m.color : '#000000',
+        emissiveIntensity: m.glow ? DAY.glow : 0,
+      })
+      const faced = FACED.indexOf(m.id as Material)
+      if (faced < 0) return material(textures[i])
+      // BoxGeometry の めんの じゅん：+x・-x・+y・-y・+z・-z
+      const [sideFace, top, bottom] = [textures[i], ...capTextures[faced]].map(material)
+      return [sideFace, sideFace, top, bottom, sideFace, sideFace]
+    })
+    const materials = [...new Set(surfaces.flat())]
+    const glowing = [...new Set(surfaces.filter((_, i) => MATERIAL_DEFS[i].glow).flat())]
+    const terrain = createTerrainMeshes(scene, geometries.forMaterial, surfaces)
     const fog = new THREE.Fog(sky, WALK_DRAW_DISTANCE * 0.55, WALK_DRAW_DISTANCE)
     const outlineBox = new THREE.BoxGeometry(1.04, 1.04, 1.04)
     const outlineGeometry = new THREE.EdgesGeometry(outlineBox)
@@ -579,7 +591,10 @@ export function useCraftScene(options: CraftSceneOptions) {
         return
       }
       if (kind === 'hold') latest.current.onHold?.(hit.position)
-      else latest.current.onPick(hit.position, hit.normal)
+      else {
+        const { x, y, z } = raycaster.ray.direction
+        latest.current.onPick(hit.position, hit.normal, { x, y, z })
+      }
     }
 
     let down: { x: number; y: number; lastX: number; lastY: number; id: number } | null = null
@@ -683,9 +698,10 @@ export function useCraftScene(options: CraftSceneOptions) {
       canvas.removeEventListener('pointercancel', cancel)
       canvas.removeEventListener('lostpointercapture', cancel)
       canvas.removeEventListener('webglcontextlost', contextLost)
-      geometry.dispose()
+      geometries.dispose()
       unit.dispose()
       textures.forEach(texture => texture.dispose())
+      capTextures.flat().forEach(texture => texture.dispose())
       materials.forEach(material => material.dispose())
       animalMesh.dispose()
       animalMaterial.dispose()
