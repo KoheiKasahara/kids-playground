@@ -1,0 +1,140 @@
+{
+  "animal": "goat",
+  "model": "goat.glb",
+  "fps": 30,
+  "triangles": 4768,
+  "bounds": {
+    "width": 0.385,
+    "length": 1.215,
+    "height": 1.082,
+    "front": 0.779,
+    "back": 0.436
+  },
+  "clips": {
+    "Idle": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "idle"
+    },
+    "Walk": {
+      "duration": 0.7333,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.4,
+      "turnPerCycle": 0.0,
+      "duty": 0.62,
+      "speed": 0.5455,
+      "turnSpeed": 0.0
+    },
+    "WalkLeft": {
+      "duration": 0.7333,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.4,
+      "turnPerCycle": 28,
+      "duty": 0.62,
+      "speed": 0.5455,
+      "turnSpeed": 38.182
+    },
+    "WalkRight": {
+      "duration": 0.7333,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.4,
+      "turnPerCycle": -28,
+      "duty": 0.62,
+      "speed": 0.5455,
+      "turnSpeed": -38.182
+    },
+    "Run": {
+      "duration": 0.4667,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.8,
+      "turnPerCycle": 0,
+      "duty": 0.34,
+      "speed": 1.7143,
+      "turnSpeed": 0.0
+    },
+    "TurnLeft": {
+      "duration": 0.9,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": 75,
+      "duty": 0.68,
+      "speed": 0.0,
+      "turnSpeed": 83.333
+    },
+    "TurnRight": {
+      "duration": 0.9,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": -75,
+      "duty": 0.68,
+      "speed": 0.0,
+      "turnSpeed": -83.333
+    },
+    "Eat": {
+      "duration": 4.2,
+      "loop": false,
+      "kind": "eat",
+      "source": "Mesh2Motion horse/Eating (CC0)",
+      "food": {
+        "bone": "head",
+        "grab": 1.2,
+        "release": 2.9,
+        "reach": 0.752
+      }
+    },
+    "LieDown": {
+      "duration": 2.6,
+      "loop": false,
+      "kind": "sleep",
+      "source": "Mesh2Motion horse/Sleep (CC0)"
+    },
+    "Sleep": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "sleep",
+      "source": "Mesh2Motion horse/Sleep (CC0)"
+    },
+    "GetUp": {
+      "duration": 2.6,
+      "loop": false,
+      "kind": "sleep",
+      "source": "Mesh2Motion horse/Sleep (CC0)"
+    },
+    "Bleat": {
+      "duration": 2.4,
+      "loop": false,
+      "kind": "special",
+      "sound": "mee",
+      "callStart": 0.6,
+      "callEnd": 1.7
+    },
+    "Butt": {
+      "duration": 3.0,
+      "loop": false,
+      "kind": "special",
+      "sound": "bonk",
+      "callStart": 1.72,
+      "callEnd": 1.9
+    },
+    "Happy": {
+      "duration": 1.6,
+      "loop": false,
+      "kind": "react"
+    },
+    "Blink": {
+      "duration": 0.2,
+      "loop": false,
+      "kind": "overlay",
+      "bones": [
+        "eye_l",
+        "eye_r"
+      ]
+    }
+  }
+}

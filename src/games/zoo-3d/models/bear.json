@@ -1,0 +1,137 @@
+{
+  "animal": "bear",
+  "model": "bear.glb",
+  "fps": 30,
+  "triangles": 5032,
+  "bounds": {
+    "width": 0.766,
+    "length": 1.724,
+    "height": 1.254,
+    "front": 1.063,
+    "back": 0.661
+  },
+  "clips": {
+    "Idle": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "idle"
+    },
+    "Walk": {
+      "duration": 1.3,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.64,
+      "turnPerCycle": 0.0,
+      "duty": 0.64,
+      "speed": 0.4923,
+      "turnSpeed": 0.0
+    },
+    "WalkLeft": {
+      "duration": 1.3,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.64,
+      "turnPerCycle": 26,
+      "duty": 0.64,
+      "speed": 0.4923,
+      "turnSpeed": 20.0
+    },
+    "WalkRight": {
+      "duration": 1.3,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.64,
+      "turnPerCycle": -26,
+      "duty": 0.64,
+      "speed": 0.4923,
+      "turnSpeed": -20.0
+    },
+    "Run": {
+      "duration": 0.6,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 1.15,
+      "turnPerCycle": 0,
+      "duty": 0.38,
+      "speed": 1.9167,
+      "turnSpeed": 0.0
+    },
+    "TurnLeft": {
+      "duration": 1.3,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": 70,
+      "duty": 0.68,
+      "speed": 0.0,
+      "turnSpeed": 53.846
+    },
+    "TurnRight": {
+      "duration": 1.3,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": -70,
+      "duty": 0.68,
+      "speed": 0.0,
+      "turnSpeed": -53.846
+    },
+    "Eat": {
+      "duration": 3.6,
+      "loop": false,
+      "kind": "eat",
+      "food": {
+        "bone": "head",
+        "grab": 0.9,
+        "release": 2.6,
+        "reach": 0.89
+      }
+    },
+    "LieDown": {
+      "duration": 1.8,
+      "loop": false,
+      "kind": "sleep"
+    },
+    "Sleep": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "sleep"
+    },
+    "GetUp": {
+      "duration": 1.8,
+      "loop": false,
+      "kind": "sleep"
+    },
+    "Stand": {
+      "duration": 3.6,
+      "loop": false,
+      "kind": "special",
+      "sound": "growl",
+      "callStart": 1.1,
+      "callEnd": 2.2
+    },
+    "Beg": {
+      "duration": 3.6,
+      "loop": false,
+      "kind": "special",
+      "sound": "growl",
+      "callStart": 1.0,
+      "callEnd": 2.4,
+      "source": "Mesh2Motion fox/Sit (CC0)"
+    },
+    "Happy": {
+      "duration": 1.6,
+      "loop": false,
+      "kind": "react"
+    },
+    "Blink": {
+      "duration": 0.2,
+      "loop": false,
+      "kind": "overlay",
+      "bones": [
+        "eye_l",
+        "eye_r"
+      ]
+    }
+  }
+}
