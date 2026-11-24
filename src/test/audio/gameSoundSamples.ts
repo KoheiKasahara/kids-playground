@@ -47,6 +47,10 @@ import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as flagPuzzle from '../../games/flag-roll-puzzle/sounds'
 import * as hanabi from '../../games/hanabi-don/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
+import * as starParade from '../../games/star-parade/sounds'
+import { fleetSound } from '../../games/sea-breeze-fleet/sounds'
+import { raceChime } from '../../games/stripe-rally/sounds'
+import { playZooSound } from '../../games/zoo-3d/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
 import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
 import * as kabukuwa from '../../games/kabukuwa-battle/sounds'
@@ -114,6 +118,8 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('クラフト', () => playCraftSound('craft')), sample('ドア', () => playCraftSound('door')), sample('ばくだんの ひ', () => playCraftSound('fuse')),
     sample('ドカーン', () => playCraftSound('boom')), sample('おやすみ', () => playCraftSound('sleep')), sample('おはよう', () => playCraftSound('morning')),
     sample('たべる', () => playCraftSound('eat')), sample('おんぷ ド', () => playNote(0)), sample('おんぷ たかい ド', () => playNote(7)),
+    sample('ぬる', () => playCraftSound('paint')), sample('ドラゴンが うまれる', () => playCraftSound('hatch')),
+    sample('ドラゴンの ひ', () => playCraftSound('flame')), sample('ワープ', () => playCraftSound('warp')), sample('はなび', () => playCraftSound('firework')),
   ],
   'town-builder': [sample('おく', () => playTownSound('build')), sample('みち', () => playTownSound('road')), sample('けす', () => playTownSound('erase')), sample('そだつ', () => playTownSound('grow')), sample('3Dで みる', () => playTownSound('view')), sample('のる', () => playTownSound('ride'))],
   'iro-no-yuka': [
@@ -417,6 +423,59 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
   'water-wheel-maze': [sample('みず', waterWheel.playDropSound), sample('のせる', () => waterWheel.playRiderSound(1, 3)), sample('クリア', waterWheel.playWheelClearSound)],
   'pyoko-touch': [sample('タッチ', pyoko.playCatchSound), sample('おっと', pyoko.playOopsSound), sample('おしまい', pyoko.playFinishSound)],
   'hoshi-tsunagi': [sample('つなぐ', () => hoshi.playConnectSound(2)), sample('ちがう', hoshi.playWrongSound), sample('できた', hoshi.playCompleteSound)],
+  'sea-breeze-fleet': [
+    sample('しゅっぱつ', () => fleetSound('start')), sample('みずでっぽう', () => fleetSound('water')),
+    sample('しぶき', () => fleetSound('splash')), sample('おいかえす', () => fleetSound('retreat')),
+    sample('ぶつかる', () => fleetSound('bump')), sample('クリア', () => fleetSound('clear')),
+    sample('きこう', () => fleetSound('return')),
+  ],
+  'zoo-3d': [
+    sample('えらぶ', () => playZooSound('select')),
+    sample('えさを なげる', () => playZooSound('drop')),
+    sample('もぐもぐ', () => playZooSound('munch')),
+    sample('よろこぶ', () => playZooSound('happy')),
+    sample('パオーン', () => playZooSound('trumpet')),
+    sample('がおー', () => playZooSound('roar')),
+    sample('みずあび', () => playZooSound('splash')),
+    sample('ハミング', () => playZooSound('hum')),
+    sample('めぇー', () => playZooSound('squeak')),
+    sample('クワッ', () => playZooSound('honk')),
+    sample('ヒヒーン', () => playZooSound('neigh')),
+    sample('おおあくび', () => playZooSound('yawn')),
+    sample('ひくひく', () => playZooSound('sniff')),
+    sample('ぽこぽこ', () => playZooSound('punch')),
+    sample('びよーん', () => playZooSound('boing')),
+    sample('ぐるる', () => playZooSound('growl')),
+    sample('ぱちぱち', () => playZooSound('clap')),
+    sample('キッキッ', () => playZooSound('kiki')),
+    sample('キュルル', () => playZooSound('purr')),
+    sample('パクッ', () => playZooSound('chomp')),
+    sample('メェー', () => playZooSound('baa')),
+    sample('ドンドコ', () => playZooSound('drum')),
+    sample('ふんっ', () => playZooSound('snort')),
+    sample('コーン', () => playZooSound('kon')),
+    sample('スタンプ', () => playZooSound('stamp')),
+    sample('となりのエリアへ', () => playZooSound('gate')),
+    sample('アオーン', () => playZooSound('howl')),
+    sample('きゃんきゃん', () => playZooSound('yip')),
+    sample('チュルル', () => playZooSound('chirp')),
+    sample('メェ〜', () => playZooSound('mee')),
+    sample('ごっつん', () => playZooSound('bonk')),
+    sample('ピッピッ', () => playZooSound('peep')),
+  ],
+  'stripe-rally': [
+    sample('スタート', () => raceChime('start')),
+    sample('ダッシュ', () => raceChime('boost')),
+    sample('ゴール', () => raceChime('finish')),
+  ],
+  'star-parade': [
+    sample('しゅっぱつ', starParade.playStart),
+    sample('ほしが ふえる', starParade.playGrow),
+    sample('ほしが へる', starParade.playShrink),
+    sample('ジャンプ', starParade.playJump),
+    sample('いんせきに あたる', starParade.playHit),
+    sample('うちあげ', starParade.playFinish),
+  ],
   'robo-kuzushi': [
     sample('とばす', robo.playLaunchSound),
     sample('あたる', () => robo.playHitSound('wood', 0.7)),

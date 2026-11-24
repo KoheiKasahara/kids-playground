@@ -937,6 +937,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'zoo-3d',
+    slug: 'zoo-3d',
+    title: '3Dどうぶつえん',
+    emoji: '🐘',
+    category: 'threeD',
+    seo: {
+      headline: '3Dどうぶつえん｜あるいて まわって どうぶつを かんさつする 3Dの どうぶつえん',
+      description:
+        'サバンナや もうじゅうの もり、ふれあい ひろばを、うえから ながめたり あるいて まわったり できる 3Dの どうぶつえん。じぶんで うごく どうぶつを よく みて、スタンプを あつめよう。',
+    },
+    intro: {
+      howToPlay: [
+        'ちずで エリアを えらんで、うえから みたり あるいたり しよう',
+        'どうぶつを よく みていると、ずかんに スタンプが たまるよ',
+        'さくの まえで えさを あげると、とくいわざを みせて くれるかも',
+      ],
+    },
+  },
+  {
     id: 'dot-aquarium',
     slug: 'dot-aquarium',
     title: 'ドットの すいぞくかん',
@@ -1446,6 +1465,44 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
         'はなびの わに はいった ほしに あかりが つくよ',
         'すくない はなびで ぜんぶ ともすと ★が ふえるよ',
       ],
+    },
+  },
+  {
+    id: 'sea-breeze-fleet',
+    slug: 'sea-breeze-fleet',
+    title: 'しおかぜせんたい',
+    emoji: '🚢',
+    category: 'threeD',
+    seo: {
+      headline: 'しおかぜせんたい｜積層ドット絵の船で海を守るゲーム',
+      description: '灯台の港からドット絵の船で出発。島をめぐり、水でっぽうで海賊船を追いかえそう。郵便船を守る珊瑚礁と、親分船の待つ夕焼けの海峡も探検できます。',
+    },
+    intro: { howToPlay: ['うみを タッチすると そこへ すすむよ', 'かいぞくせんを タッチして みずでっぽう！', 'オレンジの わから はなれると よけられるよ'] },
+  },
+  {
+    id: 'stripe-rally',
+    slug: 'stripe-rally',
+    title: 'しましまラリー',
+    emoji: '🏁',
+    category: 'learning',
+    seo: {
+      headline: 'しましまラリー｜青いドット絵の車で自動走行レース',
+      description: '白いしまの青い車で、芝生のサーキットを2周するレースです。車は自分でカーブを曲がります。ダッシュでライバルを追いぬこう。',
+    },
+    intro: { howToPlay: ['スタートで あおい くるまが はしるよ', 'ダッシュが たまったら おしてみよう'] },
+  },
+  {
+    id: 'star-parade',
+    slug: 'star-parade',
+    title: 'ほしぞらパレード',
+    emoji: '🌠',
+    category: 'learning',
+    seo: {
+      headline: 'ほしぞらパレード｜数字のゲートで星をふやすランゲーム',
+      description: '星たちが宇宙の道をかけぬける数あそびです。左右のゲートをえらんで、星をふやそう。星をたくさん集めるほど高く飛べます。ポイントで出発時の星をふやして、月をめざそう。',
+    },
+    intro: {
+      howToPlay: ['タッチした ところに ほしが うごくよ', '「＋」や「×2」で なかまを ふやそう', 'いんせきは よけるか ジャンプで とびこえよう'],
     },
   },
 ]

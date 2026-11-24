@@ -1,0 +1,133 @@
+{
+  "animal": "crocodile",
+  "model": "crocodile.glb",
+  "fps": 30,
+  "triangles": 5316,
+  "bounds": {
+    "width": 0.73,
+    "length": 2.948,
+    "height": 0.42,
+    "front": 1.201,
+    "back": 1.747
+  },
+  "clips": {
+    "Idle": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "idle"
+    },
+    "Walk": {
+      "duration": 0.9333,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.36,
+      "turnPerCycle": 0.0,
+      "duty": 0.66,
+      "speed": 0.3857,
+      "turnSpeed": 0.0
+    },
+    "WalkLeft": {
+      "duration": 0.9333,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.36,
+      "turnPerCycle": 14,
+      "duty": 0.66,
+      "speed": 0.3857,
+      "turnSpeed": 15.0
+    },
+    "WalkRight": {
+      "duration": 0.9333,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.36,
+      "turnPerCycle": -14,
+      "duty": 0.66,
+      "speed": 0.3857,
+      "turnSpeed": -15.0
+    },
+    "Run": {
+      "duration": 0.4667,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.4,
+      "turnPerCycle": 0,
+      "duty": 0.52,
+      "speed": 0.8571,
+      "turnSpeed": 0.0
+    },
+    "TurnLeft": {
+      "duration": 0.8,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": 34,
+      "duty": 0.62,
+      "speed": 0.0,
+      "turnSpeed": 42.5
+    },
+    "TurnRight": {
+      "duration": 0.8,
+      "loop": true,
+      "kind": "locomotion",
+      "distancePerCycle": 0.0,
+      "turnPerCycle": -34,
+      "duty": 0.62,
+      "speed": 0.0,
+      "turnSpeed": -42.5
+    },
+    "Eat": {
+      "duration": 3.2,
+      "loop": false,
+      "kind": "eat",
+      "food": {
+        "bone": "head",
+        "grab": 0.8,
+        "release": 2.5,
+        "reach": 0.957
+      }
+    },
+    "LieDown": {
+      "duration": 1.2,
+      "loop": false,
+      "kind": "sleep"
+    },
+    "Sleep": {
+      "duration": 4.0,
+      "loop": true,
+      "kind": "sleep"
+    },
+    "GetUp": {
+      "duration": 1.2,
+      "loop": false,
+      "kind": "sleep"
+    },
+    "Chomp": {
+      "duration": 2.6,
+      "loop": false,
+      "kind": "special",
+      "sound": "chomp",
+      "callStart": 0.95,
+      "callEnd": 2.1
+    },
+    "Bask": {
+      "duration": 4.6,
+      "loop": false,
+      "kind": "special"
+    },
+    "Happy": {
+      "duration": 1.6,
+      "loop": false,
+      "kind": "react"
+    },
+    "Blink": {
+      "duration": 0.2,
+      "loop": false,
+      "kind": "overlay",
+      "bones": [
+        "eye_l",
+        "eye_r"
+      ]
+    }
+  }
+}

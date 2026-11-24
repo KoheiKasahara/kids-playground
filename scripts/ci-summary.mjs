@@ -1,4 +1,4 @@
-import { slowestTestFiles } from './project-health/lib/slowTestFiles.mjs'
+import { slowestTestCases, slowestTestFiles } from './project-health/lib/slowTestFiles.mjs'
 import { appendFileSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -94,7 +94,7 @@ const countSlowTests = () => {
 const slow = countSlowTests()
 const isFull = (env.CI_TEST_MODE ?? '').startsWith('FULL')
 const slowLabel = isFull ? 'included' : 'excluded'
-const slowValue = `${slow.files ?? '—'} files / ${slow.tests ?? '—'} tests ${slowLabel}`
+const slowValue = `${slow.files ?? '—'} files / ${slow.tests ?? '—'} test declarations ${slowLabel}`
 
 const coverageReport = readJson(env.CI_COVERAGE_FILE ?? 'coverage/coverage-summary.json')
 const coverageTotal = coverageReport?.total
@@ -149,6 +149,21 @@ if (slowest.length) {
 }
 
 if (isFull) {
+  const advisoryThresholdMs = 15_000
+  const cases = slowestTestCases(testReport)
+  const slowCases = cases.filter((testCase) => testCase.milliseconds >= advisoryThresholdMs)
+  const markdownTableCell = (value) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;').replaceAll('|', '&#124;').replace(/[\r\n]+/g, ' ')
+  lines.push('## Slow test cases (advisory)', '',
+    '_Up to 10 individual cases taking 15s or more, including failures. This is not a timeout or CI gate; case timeouts can vary._', '')
+  if (slowCases.length) {
+    lines.push('| File | Test case | Status | Seconds |', '| --- | --- | --- | ---: |',
+      ...slowCases.map((testCase) =>
+        `| ${markdownTableCell(testCase.name)} | ${markdownTableCell(testCase.title)} | ${testCase.status} | ${(testCase.milliseconds / 1000).toFixed(2)} |`), '')
+  } else {
+    lines.push(cases.length ? 'No measured case reached 15s.' : 'Not available (missing or invalid case timings).', '')
+  }
+
   lines.push(
     '## Coverage',
     '',

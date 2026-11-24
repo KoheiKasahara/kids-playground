@@ -1,0 +1,240 @@
+# deer_motion から作成した alpaca の土台を、アルパカの個別仕様に書き換えたもの。
+"""アルパカのモーション。
+
+- 歩き: 後ろ足→同じ側の前足の順に着く4拍子。長い首を立てたまま、ゆったり歩く。
+- 走り: 後ろ足2本→前足2本の順に着く、小さめのギャロップ。
+- 食べる: Mesh2Motion の馬「Eating」（CC0）をリターゲットし、首を下げて地面の草を食べる。
+- 伏せ・睡眠: Mesh2Motion の馬「Sleep」の姿勢をリターゲットし、脚をたたんで座りこむ（ラクダの なかまの すわり方）。
+- ハミング: 首をゆらしながら「ふんふん」と小さく鳴く。
+- のぞきこみ: 長い首を前へのばし、頭をかしげて、耳を立ててじっと見る。
+"""
+
+from __future__ import annotations
+
+import math
+import os
+
+from mathutils import Matrix, Vector  # type: ignore[import-not-found]
+
+from .. import anim as A
+from .. import bodyplan as Q
+from .. import retarget as RT
+from ..anim import X, Y, Z, Clip, Pose, RigModel, keys, window
+
+VENDOR = os.path.join(os.path.dirname(__file__), '..', '..', 'vendor', 'mesh2motion')
+NECK = ['neck_1', 'neck_2']
+CFG = Q.Config(neck=NECK, tail=['tail_1'], front_pole=Vector((0, -1, 0.1)),
+               hind_pole=Vector((0, 1, 0.1)), toe=(0.08, 0.075, 0.08, 0.075), ear_axis=Vector((0, 1, 0)))
+
+# 馬（Mesh2Motion horse）→ シカの骨の対応（首は2本どうし）。
+BODY_MAP: RT.Mapping = {
+    'hips': ('bone', 'hips'), 'spine_1': ('bone', 'spine_1'), 'spine_2': ('blend', 'spine_2', 'spine_3', 0.5),
+    'neck_1': ('bone', 'spine_5'), 'neck_2': ('bone', 'spine_6'),
+    'head': ('bone', 'head'), 'tail_1': ('bone', 'tail_1'),
+    'ear_l': ('bone', 'ear_1_l'), 'ear_r': ('bone', 'ear_1_r'),
+}
+LEG_MAP: RT.Mapping = {}
+for s in ('l', 'r'):
+    LEG_MAP.update({
+        f'front_leg_upper_{s}': ('bone', f'front_leg_upper_{s}'), f'front_leg_lower_{s}': ('bone', f'front_leg_lower_{s}'),
+        f'front_leg_foot_{s}': ('bone', f'front_leg_ankle_{s}'), f'back_leg_upper_{s}': ('bone', f'back_leg_lower_{s}'),
+        f'back_leg_lower_{s}': ('bone', f'back_leg_ankle_{s}'), f'back_leg_foot_{s}': ('bone', f'back_leg_foot_{s}'),
+    })
+NECK_BONES = ['neck_1', 'neck_2', 'head']
+
+_cache: dict = {}
+
+
+def source(name: str) -> RT.SourceClip:
+    if name not in _cache:
+        _cache[name] = RT.load_source(os.path.abspath(os.path.join(VENDOR, name)))
+    return _cache[name]
+
+
+def phases_pace():
+    return {'back_l': 0.0, 'front_l': 0.1, 'back_r': 0.5, 'front_r': 0.6}
+
+
+def walk(rig: RigModel, turn_deg: float = 0.0, name: str = 'Walk') -> Clip:
+    return Q.locomotion(rig, CFG, name, period=1.05, stride=0.6, duty=0.62, turn=turn_deg,
+                        phases=Q.GAITS['lateral_walk'], lift=(0.1, 0.09), pitch=(35, 28),
+                        crouch=0.05 + abs(turn_deg) / 30 * 0.02, bob=0.01, roll=2.5, sway=0.012, neck_pump=3,
+                        neck_pitch=0, head_level=0.8, tail_amp=8, tail_lift=0)
+
+
+def run(rig: RigModel) -> Clip:
+    return Q.locomotion(rig, CFG, 'Run', period=0.55, stride=1.1, duty=0.32, turn=0, phases=Q.GAITS['gallop'],
+                        lift=(0.15, 0.13), pitch=(50, 40), crouch=0.07, bob=0.022, roll=1.5, sway=0.008, neck_pump=5,
+                        neck_pitch=4, head_level=0.8, tail_amp=6, tail_lift=20, spine_flex=5, bob_freq=1)
+
+
+def turn(rig: RigModel, direction: int) -> Clip:
+    return Q.locomotion(rig, CFG, 'TurnLeft' if direction > 0 else 'TurnRight', period=1.0, stride=0.0, duty=0.68,
+                        turn=75 * direction, phases=Q.GAITS['lateral_walk'], lift=(0.09, 0.08), pitch=(25, 20),
+                        crouch=0.05, bob=0.006, roll=1.5, sway=0.008, neck_pump=2, neck_pitch=0, head_level=0.7,
+                        tail_amp=8, tail_lift=0)
+
+
+def _splay(t: float, steps: list[tuple[str, float, float, float]]) -> tuple[dict, dict]:
+    """前脚を一歩ずつ左右へ開く（足を持ち上げてから置くので、接地中は滑らない）。"""
+    offsets, rots = {}, {}
+    for key, t0, t1, sign in steps:
+        k = keys(t, [(t0, 0), (t1, 1)]) if sign > 0 else 1 - keys(t, [(t0, 0), (t1, 1)])
+        lift = math.sin(math.pi * min(1, max(0, (t - t0) / (t1 - t0)))) * 0.12
+        side = 1 if key.endswith('_l') else -1
+        offsets[key] = offsets.get(key, Vector()) + Vector((0.26 * side * k, -0.05 * k, lift))
+    return offsets, rots
+
+
+def eat(rig: RigModel) -> Clip:
+    """長い首の付け根から前へ倒して、地面の草を食べる（体は傾けず、首だけで届かせる）。
+
+    馬の Eating を写すと、まっすぐ立った長い首では体ごと前へ倒れてしまうため、手続きの動きにした。
+    """
+    lg, ra = Q.standing(rig, CFG)
+    period = 4.2
+    down, up = 1.0, 3.3
+
+    def pose_at(t: float, bend: float) -> Pose:
+        k = keys(t, [(0.2, 0), (down, 1), (up, 1), (period - 0.1, 0)])
+        chew = window(t, 1.3, 3.0, 0.15) * math.sin(2 * math.pi * 3 * t)
+        p = Pose(rig)
+        # 胸を少し下げ（前足のひじを曲げる）、首はまっすぐのまま付け根から前へ倒す
+        p.move('hips', (0, 0, -0.06 * k))
+        p.rot('hips', X, 5 * k)
+        p.rot('spine_2', X, 6 * k)
+        p.rot('neck_1', X, bend * k)
+        p.rot('neck_2', X, -0.08 * bend * k)
+        p.rot('head', X, 30 * k + 4 * chew)
+        Q.ears(p, CFG, -10 * k)
+        Q.tail_wave(p, CFG, t, 1.1, 8, 0)
+        Q.eyes(p, 1 - 0.5 * window(t, 1.3, 3.0, 0.15))
+        return p
+
+    def mouth_height(bend: float) -> float:
+        p = pose_at(2.0, bend)
+        posed = p.posed()
+        A.plant_feet(p, posed, lg, ra)
+        tip = p.posed()['head'] @ Vector((0, rig.length['head'], 0))
+        return tip.z
+
+    # 口の先が地面すれすれ（0.1m）に来るよう、首を倒す角度を二分探索で決める
+    lo, hi = 0.0, 130.0
+    for _ in range(18):
+        mid = (lo + hi) / 2
+        if mouth_height(mid) > 0.1:
+            lo = mid
+        else:
+            hi = mid
+    bend = (lo + hi) / 2
+
+    def sample(t: float) -> Pose:
+        p = pose_at(t, bend)
+        posed = p.posed()
+        A.plant_feet(p, posed, lg, ra)
+        return p
+
+    p = sample(2.0)
+    tip = p.posed()['head'] @ Vector((0, rig.length['head'], 0))
+    reach = round(-tip.y, 3)
+    return Clip('Eat', period, False, sample, {'kind': 'eat', 'food': {'bone': 'head', 'grab': 1.2, 'release': 2.9,
+                                                                       'reach': reach}})
+
+
+def _sleep_pose(rig: RigModel) -> Pose:
+    src = source('horse-sleep.glb')
+    mapping = dict(BODY_MAP)
+    mapping.update(LEG_MAP)
+    p = Q.retargeted(rig, src, mapping, 0.0, hips_scale=rig.head('hips').z / 1.305)
+    # 体のいちばん低い骨が地面すれすれになるよう、腰の高さをそろえる
+    leg_bones = [b for b in rig.order if '_leg_' in b]
+    clearance = Q.ground_clearance(p, leg_bones + ['spine_1', 'spine_2'])
+    p.move('hips', (0, 0, 0.05 - clearance))
+    return p
+
+
+def lie_down(rig: RigModel, reverse: bool = False) -> Clip:
+    lying = _sleep_pose(rig)
+    period = 2.6
+
+    def sample(t: float) -> Pose:
+        if reverse:
+            t = period - t
+        k = keys(t, [(0.1, 0), (period - 0.2, 1)])
+        p = Q.blend(Pose(rig), lying, k)
+        Q.eyes(p, 1 - 0.4 * k)
+        return p
+
+    return Clip('GetUp' if reverse else 'LieDown', period, False, sample,
+                {'kind': 'sleep', 'source': 'Mesh2Motion horse/Sleep (CC0)'})
+
+
+def sleep(rig: RigModel) -> Clip:
+    lying = _sleep_pose(rig)
+    period = 4.0
+
+    def sample(t: float) -> Pose:
+        c = t / period
+        p = Q.blend(lying, lying, 0)
+        breath = math.sin(2 * math.pi * c)
+        p.move('hips', (0, 0, 0.012 * breath))
+        p.rot('spine_1', X, -1.2 * breath)
+        p.rot('head', X, 2 * breath)
+        twitch = window(t, 2.4, 2.8, 0.1) * math.sin(2 * math.pi * 5 * t)
+        Q.ears(p, CFG, 20 * twitch)
+        Q.eyes(p, 0.06)
+        return p
+
+    return Clip('Sleep', period, True, sample, {'kind': 'sleep', 'source': 'Mesh2Motion horse/Sleep (CC0)'})
+
+
+def hum(rig: RigModel) -> Clip:
+    """首をゆらしながら「ふんふん」と小さくハミングする。"""
+    lg, ra = Q.standing(rig, CFG)
+    period = 3.0
+    call0, call1 = 0.6, 2.4
+
+    def sample(t: float) -> Pose:
+        p = Pose(rig)
+        k = keys(t, [(0, 0), (0.4, 1), (2.6, 1), (3.0, 0)])
+        sway = math.sin(2 * math.pi * 1.0 * t)
+        p.rot('neck_1', Y, 6 * k * sway)
+        p.rot('neck_2', Z, 8 * k * sway)
+        p.rot('head', X, -6 * k + 4 * k * math.sin(2 * math.pi * 2 * t))
+        Q.ears(p, CFG, 10 * k * math.sin(2 * math.pi * 1.5 * t))
+        Q.eyes(p, 1 - 0.6 * window(t, call0, call1, 0.2))
+        Q.tail_wave(p, CFG, t, 0.5, 10 * k, 0)
+        posed = p.posed()
+        A.plant_feet(p, posed, lg, ra)
+        return p
+
+    return Clip('Hum', period, False, sample, {'kind': 'special', 'sound': 'hum', 'callStart': call0,
+                                               'callEnd': call1})
+
+
+def peek(rig: RigModel) -> Clip:
+    """長い首を前へのばし、頭をかしげて、耳を立ててじっと見る（あいさつのような のぞきこみ）。"""
+    lg, ra = Q.standing(rig, CFG)
+    period = 3.4
+
+    def sample(t: float) -> Pose:
+        p = Pose(rig)
+        out = keys(t, [(0.2, 0), (0.9, 1), (2.6, 1), (3.2, 0)])
+        tilt = keys(t, [(0.9, 0), (1.3, 1), (1.9, 1), (2.2, -1), (2.6, 0)])
+        p.rot('spine_2', X, 6 * out)
+        p.rot('neck_1', X, 38 * out)
+        p.rot('neck_2', X, 6 * out)
+        p.rot('head', X, -34 * out)
+        p.rot('head', Y, 22 * tilt * out)
+        Q.ears(p, CFG, -14 * out)
+        posed = p.posed()
+        A.plant_feet(p, posed, lg, ra)
+        return p
+
+    return Clip('Peek', period, False, sample, {'kind': 'special'})
+
+
+def clips(rig: RigModel) -> list[Clip]:
+    return [Q.idle(rig, CFG), walk(rig), walk(rig, 28, 'WalkLeft'), walk(rig, -28, 'WalkRight'), run(rig),
+            turn(rig, 1), turn(rig, -1), eat(rig), lie_down(rig), sleep(rig), lie_down(rig, reverse=True),
+            hum(rig), peek(rig), Q.happy(rig, CFG), Q.blink_clip(rig)]

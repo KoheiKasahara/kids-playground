@@ -95,6 +95,7 @@ export const routes: RouteObject[] = [
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotAdventurePlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-adventure', element: lazyRoute(() => import('../games/dot-adventure/DotAdventurePlay')) },
+  { path: '/games/zoo-3d', element: lazyRoute(() => import('../games/zoo-3d/Zoo3dPlay')) },
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotZooPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-zoo', element: lazyRoute(() => import('../games/dot-zoo/DotZooPlay')) },
@@ -293,5 +294,8 @@ export const routes: RouteObject[] = [
   },
   { path: '/games/mini-4wd', element: lazyRoute(() => import('../games/mini-4wd/Mini4wdPlay')) },
   { path: '/games/hanabi-don', element: lazyRoute(() => import('../games/hanabi-don/HanabiDonPlay')) },
+  { path: '/games/sea-breeze-fleet', element: lazyRoute(() => import('../games/sea-breeze-fleet/FleetGame')) },
+  { path: '/games/star-parade', element: lazyRoute(() => import('../games/star-parade/StarParadeGame')) },
+  { path: '/games/stripe-rally', element: lazyRoute(() => import('../games/stripe-rally/StripeRally')) },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

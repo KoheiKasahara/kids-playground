@@ -1,7 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
-import { clampTarget, DEBRIS_PER_BLAST, headingFromYaw, MAX_DEBRIS, MAX_LIT, useCraftScene, type CraftSceneOptions } from './useCraftScene'
+import {
+  clampTarget, DEBRIS_PER_BLAST, FIREWORK_SPARKS, FLAME_SPARKS, headingFromYaw, MAX_DEBRIS, MAX_LIT, MAX_SPARKS, ROCKET_LIFE, useCraftScene, type CraftSceneOptions,
+} from './useCraftScene'
 import { ANIMAL_SPAWNS, herdFrom } from './animals'
 import { FACED } from './textures'
 import { createWorld, DEFAULT_WORLD, editWorld, MATERIALS, startWalker } from './world'
@@ -74,10 +76,10 @@ it('disposes GPU resources, observer, timers and input handlers on exit and can 
     expect(removeListener.mock.calls.map(call => call[0])).toEqual(expect.arrayContaining(['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'webglcontextlost']))
   }
   // はこ・ばってん・かいだん・どうぶつ・わく。わくの もとの はこと、ばってんの いた 2まい・かいだんの だん 2つは つくる ときに すてる。
-  // ばくだんの ひかりと かけらは どうぶつの はこを つかう
+  // ばくだんの ひかり・かけら・ひかる つぶは どうぶつの はこを つかう
   expect(geometryDispose).toHaveBeenCalledTimes((5 + 1 + 4) * 2)
-  // ブロック（うえと したの もようが ちがう ブロックは 2つ ふえる）・どうぶつ・わく・ばくだんの ひかり・かけら
-  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + FACED.length * 2 + 4) * 2)
+  // ブロック（うえと したの もようが ちがう ブロックは 2つ ふえる）・どうぶつ・わく・ばくだんの ひかり・かけら・ひかる つぶ
+  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + FACED.length * 2 + 5) * 2)
   expect(textureDispose).toHaveBeenCalledTimes((MATERIALS.length + FACED.length * 2) * 2)
   expect(meshesCreated).toBeGreaterThan(2)
   expect(meshDispose).toHaveBeenCalledTimes(meshesCreated)
@@ -315,5 +317,79 @@ it('flashes lit bombs and throws pieces from a blast until they fall away', () =
   act(() => view.result.current.api.current!.burst(Array.from({ length: 20 }, (_, x) => ({ ...bomb, x }))))
   act(() => { frames.run(2016) })
   expect(debris.count).toBe(MAX_DEBRIS)
+  view.unmount()
+})
+
+const hexes = (mesh: THREE.InstancedMesh) => {
+  const color = new THREE.Color()
+  return Array.from({ length: mesh.count }, (_, i) => { mesh.getColorAt(i, color); return color.getHexString() })
+}
+
+it('launches fireworks that rise, open into colored sparks and fade away', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  const view = renderHook(next => useCraftScene(next), { initialProps: options() })
+  act(() => view.result.current.setContainer(document.createElement('div')))
+  const [scene] = resources.render.mock.lastCall as [THREE.Scene]
+  const sparks = scene.getObjectByName('sparks') as THREE.InstancedMesh
+  // よるでも あかるく みえる
+  expect(sparks.material).toBeInstanceOf(THREE.MeshBasicMaterial)
+  const launch = { x: 5, y: 3, z: 5 }
+  act(() => view.result.current.api.current!.fireworks(launch))
+  act(() => { frames.run(16) })
+  expect(sparks.count).toBe(1)
+  const matrix = new THREE.Matrix4()
+  let time = 16
+  const height = () => { sparks.getMatrixAt(0, matrix); return matrix.elements[13] }
+  act(() => { for (; time < 16 + ROCKET_LIFE * 1000 - 50; time += 16) frames.run(time) })
+  // あがっていく たまの うしろに ひの こが のこる
+  expect(height()).toBeGreaterThan(launch.y + 6)
+  expect(sparks.count).toBeGreaterThan(1)
+  act(() => { for (const end = time + 200; time < end; time += 16) frames.run(time) })
+  expect(sparks.count).toBeGreaterThanOrEqual(FIREWORK_SPARKS)
+  expect(new Set(hexes(sparks)).size).toBeGreaterThan(1)
+  act(() => { for (const end = time + 3000; time < end; time += 16) frames.run(time) })
+  expect(sparks.count).toBe(0)
+  // たくさん うちあげても じょうげんを こえない
+  act(() => { for (let i = 0; i < 20; i++) view.result.current.api.current!.fireworks(launch) })
+  act(() => { for (const end = time + ROCKET_LIFE * 1000 + 200; time < end; time += 16) frames.run(time) })
+  expect(sparks.count).toBe(MAX_SPARKS)
+  view.unmount()
+})
+
+it('flies a dragon above the ground with its wings out, and breathes fire when it is touched', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+  const dragon = { id: 0, kind: 'dragon' as const, x: 8, z: 8 }
+  const onAnimal = vi.fn()
+  const props = options({ herd: [dragon], onAnimal })
+  const view = renderHook(next => useCraftScene(next), { initialProps: props })
+  act(() => view.result.current.setContainer(document.createElement('div')))
+  const [scene, camera] = resources.render.mock.lastCall as [THREE.Scene, THREE.PerspectiveCamera]
+  const [mesh] = scene.children.filter(o => o instanceof THREE.InstancedMesh)
+  const sparks = scene.getObjectByName('sparks') as THREE.InstancedMesh
+  expect(mesh.count).toBe(11)
+  const matrix = new THREE.Matrix4()
+  mesh.getMatrixAt(0, matrix)
+  const body = new THREE.Vector3().setFromMatrixPosition(matrix)
+  // くさの うえ（y=2）から うかんで いる
+  expect(body.y).toBeCloseTo(2.5 + 0.5 + 0.5)
+  expect(hexes(mesh).slice(0, 3)).toEqual(['e4572e', 'f7c948', 'e4572e'])
+  // はねは ななめに ひろげて いる
+  mesh.getMatrixAt(8, matrix)
+  expect(Math.abs(matrix.elements[1])).toBeGreaterThan(0.05)
+  camera.position.copy(body).add(new THREE.Vector3(0, 5, 0))
+  camera.lookAt(body)
+  act(() => view.result.current.api.current?.actAtCenter('pick'))
+  expect(onAnimal).toHaveBeenCalledWith(dragon, { x: 8, z: 8 })
+  act(() => { frames.run(16); frames.run(32); frames.run(200) })
+  expect(sparks.count).toBe(FLAME_SPARKS)
+  expect(hexes(sparks).every(hex => ['ff3b1f', 'ff7a1a', 'ffb020', 'ffe066'].includes(hex))).toBe(true)
+  // まえ（+z）へ ひを はく
+  sparks.getMatrixAt(0, matrix)
+  expect(matrix.elements[14]).toBeGreaterThan(dragon.z + 0.8)
+  act(() => { for (let time = 216; time < 1500; time += 16) frames.run(time) })
+  expect(sparks.count).toBe(0)
   view.unmount()
 })

@@ -102,9 +102,25 @@ function pattern(material: Material, x: number, y: number, noise: number): numbe
       const face = ((x === 4 || x === 5 || x === 10 || x === 11) && y >= 9 && y <= 11) || (y >= 3 && y <= 5 && x >= 3 && x <= 12 && (y !== 5 || x % 3))
       return face ? 0.75 : x % 5 === 0 ? -0.3 : n
     }
+    // いたチョコの みぞ
+    case 'chocolate': return x % 4 === 3 || y % 4 === 3 ? -0.35 : x % 4 === 0 || y % 4 === 0 ? 0.18 : n * 0.5
+    // たけの ふし
+    case 'bamboo': return y % 6 === 5 ? -0.4 : y % 6 === 4 ? 0.25 : x % 5 === 1 ? 0.15 : n
+    // ドラゴンの たまごの もよう
+    case 'dragon_egg': return (x * 7 + y * 3) % 11 === 0 || noise > 0.93 ? 0.7 : (x + y * 5) % 13 === 0 ? -0.35 : n
+    // うずまき（まんなかへ むかう わ）
+    case 'portal': {
+      const ring = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5))
+      return Math.floor(ring) % 3 === 0 ? 0.55 : Math.floor(ring) % 3 === 1 ? -0.25 : n
+    }
+    // つつに まいた かみと、ちいさな ほし
+    case 'fireworks': return noise > 0.92 ? 0.85 : y % 5 === 2 ? 0.5 : n
     default: return n
   }
 }
+
+/** にじの いろ（うえから した）。 */
+const RAINBOW: readonly Rgb[] = ['#ff5f6d', '#ffa24c', '#ffe066', '#7ed957', '#5ec8f2', '#8c7cf0', '#d77cf0'].map(hex)
 
 /** すきまの ある ブロックで、むこうが みえる ドット。 */
 function hole(material: Material, x: number, y: number) {
@@ -197,6 +213,8 @@ function side(material: Material, x: number, y: number, noise: number, base: Rgb
       const tool = (x >= 3 && x <= 4 && y >= 3 && y <= 11) || (x >= 2 && x <= 5 && y >= 10 && y <= 12) || (x >= 9 && x <= 13 && y >= 5 && y <= 9 && x - 9 <= y - 5)
       return tool ? shade(base, -0.55) : shade(PLANK, y % 4 === 3 ? -0.3 : (noise - 0.5) * 0.16)
     }
+    // にじは だんごとに いろを かえる
+    case 'rainbow': return shade(RAINBOW[Math.floor((TEXTURE_SIZE - 1 - y) * RAINBOW.length / TEXTURE_SIZE)], (noise - 0.5) * 0.1)
     // たなに いろとりどりの ほんが 2だん
     case 'bookshelf': {
       if (y === 0 || y === 7 || y === 8 || y === TEXTURE_SIZE - 1 || x === 0 || x === TEXTURE_SIZE - 1) return shade(PLANK, -0.2)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ANIMAL_SPAWNS, decodeHerd, feedAnimal, herdFrom, MAX_HERD, chooseAnimalStep, shearSheep } from './animals'
-import { createWorld, DEFAULT_WORLD, editWorld, surfaceOf, toggleDoor } from './world'
+import { ANIMAL_SPAWNS, decodeHerd, feedAnimal, FLY_CLIMB, hatchDragon, herdFrom, MAX_HERD, chooseAnimalStep, shearSheep, type Cell } from './animals'
+import { createWorld, DEFAULT_WORLD, editWorld, surfaceOf, toggleDoor, type World } from './world'
 
 const SIZE = DEFAULT_WORLD.size
 
@@ -95,7 +95,53 @@ describe('making friends with animals', () => {
     const saved = feedAnimal(shearSheep(herd, 0)!.herd, 2, { x: 3, z: 3 })!.herd
     expect(decodeHerd(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
     const broken = [null, {}, [{ ...herd[0], id: 'x' }], [herd[0], herd[0]], [{ ...herd[0], x: SIZE }], [{ ...herd[2], wool: 'pink' }],
-      [{ ...herd[0], kind: 'dragon' }], [{ ...herd[0], baby: 'yes' }], Array(MAX_HERD + 1).fill(herd[0])]
+      [{ ...herd[0], kind: 'unicorn' }], [{ id: 0, kind: 'dragon', x: 1, z: 1, wool: 'white' }], [{ ...herd[0], baby: 'yes' }], Array(MAX_HERD + 1).fill(herd[0])]
     for (const bad of broken) expect(decodeHerd(bad)).toBeNull()
+  })
+})
+
+describe('dragons', () => {
+  it('hatch from an egg as a baby with a new id, and not when the herd is full', () => {
+    expect(hatchDragon([], { x: 2, z: 3 })).toEqual([{ id: 0, kind: 'dragon', x: 2, z: 3, baby: true }])
+    const herd = herdFrom(ANIMAL_SPAWNS)
+    const hatched = hatchDragon(herd, { x: 4, z: 4 })!
+    expect(hatched.slice(0, -1)).toEqual(herd)
+    expect(hatched.at(-1)).toEqual({ id: herd.length, kind: 'dragon', x: 4, z: 4, baby: true })
+    expect(decodeHerd(JSON.parse(JSON.stringify(hatched)))).toEqual(hatched)
+    const full = herdFrom(Array.from({ length: MAX_HERD }, (_, i) => ({ kind: 'rabbit' as const, x: i % SIZE, z: 0 })))
+    expect(hatchDragon(full, { x: 1, z: 1 })).toBeNull()
+  })
+  it('grow up with wheat and have babies like the other animals', () => {
+    const two = hatchDragon(hatchDragon([], { x: 1, z: 1 })!, { x: 2, z: 2 })!
+    const grown = feedAnimal(feedAnimal(two, 0, { x: 1, z: 1 })!.herd, 1, { x: 2, z: 2 })!.herd
+    expect(grown.every(a => !a.baby)).toBe(true)
+    const friends = feedAnimal(grown, 0, { x: 1, z: 1 })!
+    expect(friends.result).toBe('love')
+    const family = feedAnimal(friends.herd, 1, { x: 5, z: 5 })!
+    expect(family.result).toBe('baby')
+    expect(family.herd.at(-1)).toEqual({ id: 2, kind: 'dragon', x: 5, z: 5, baby: true })
+  })
+  it('fly over water and lava and up to a few blocks, where walking animals cannot go', () => {
+    const world = createWorld()
+    // みずうみの きしから：まえ（z-1）は みず、みぎ（x+1）は ようがん、ひだり（x-1）は たかい いし
+    const from = { x: 5, z: 2 }
+    editWorld(world, { x: 6, y: 3, z: 2 }, 'lava', 'place')
+    for (let y = 3; y < 3 + FLY_CLIMB; y++) editWorld(world, { x: 4, y, z: 2 }, 'stone', 'place')
+    const reach = (target: World, flying: boolean, at: Cell = from) => {
+      const found = new Set<string>()
+      for (let i = 0; i < 4; i++) {
+        const to = { ...at }
+        if (chooseAnimalStep(target, at, to, new Int8Array(4), () => i / 4 + 0.01, flying)) found.add(`${to.x},${to.z}`)
+      }
+      return [...found].sort()
+    }
+    expect(surfaceOf(world)(5, 1)?.material).toBe('water')
+    expect(surfaceOf(world)(6, 2)?.material).toBe('lava')
+    expect(reach(world, false)).toEqual(['5,3'])
+    expect(reach(world, true)).toEqual(['4,2', '5,1', '5,3', '6,2'])
+    // もっと たかいと とべない。せかいの そとへも いかない
+    editWorld(world, { x: 4, y: 3 + FLY_CLIMB, z: 2 }, 'stone', 'place')
+    expect(reach(world, true)).toEqual(['5,1', '5,3', '6,2'])
+    expect(reach(world, true, { x: 0, z: 0 })).toEqual(['0,1', '1,0'])
   })
 })

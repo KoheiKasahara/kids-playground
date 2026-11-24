@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { observeGameActivity } from '../../utils/gameActivity'
-import { chooseAnimalStep, MAX_HERD, type Animal, type AnimalKind, type Cell, type Herd } from './animals'
+import { chooseAnimalStep, flies, MAX_HERD, type Animal, type AnimalKind, type Cell, type Herd } from './animals'
 import { hitBlock } from './raycast'
 import { createBlockGeometries, createTerrainMeshes, viewDepth, WALK_DRAW_DISTANCE } from './terrainMeshes'
 import { blockPixels, FACED, TEXTURE_SIZE, type Face } from './textures'
@@ -21,6 +21,8 @@ export type SceneApi = {
   focus: (x: number, z: number) => void
   /** ばくだんが はじけた ばしょに かけらを とばす。 */
   burst: (at: readonly Position[]) => void
+  /** はなびを その ブロックから うちあげる。 */
+  fireworks: (at: Position) => void
 }
 export type CraftSceneOptions = {
   world: World
@@ -57,6 +59,26 @@ export const DEBRIS_PER_BLAST = 18
 const DEBRIS_LIFE = 0.9
 const DEBRIS_COLORS = ['#ffb13b', '#ffe066', '#ff6a3d', '#f4f1ea', '#8a8f98'].map(color => new THREE.Color(color))
 type Debris = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; size: number; color: THREE.Color }
+/** ひかる つぶ（はなび・ドラゴンの ひ）の かずの じょうげん。 */
+export const MAX_SPARKS = 360
+/** はなびが ひらく ときの つぶの かず・あがっている じかん [s]。 */
+export const FIREWORK_SPARKS = 40
+export const ROCKET_LIFE = 0.85
+/** ドラゴンが 1かいに はく ひの つぶの かず。 */
+export const FLAME_SPARKS = 14
+// ひるの そらでも みえる こい いろ
+const FIREWORK_COLORS = ['#ff3d7f', '#ffcc00', '#00c2e0', '#3ddc4a', '#a463ff', '#ff7a00', '#ff2e2e'].map(color => new THREE.Color(color))
+const FLAME_COLORS = ['#ff3b1f', '#ff7a1a', '#ffb020', '#ffe066'].map(color => new THREE.Color(color))
+const EMBER_COLOR = new THREE.Color('#ffc46b')
+/**
+ * gravity は したむきの かそく（マイナスなら のぼる）、drag は くうきで おそく なる はやさ。
+ * burst の ある つぶ（はなびの たま）は、きえる ときに その いろで ひらく。
+ */
+type Spark = {
+  x: number; y: number; z: number; vx: number; vy: number; vz: number
+  life: number; max: number; size: number; color: THREE.Color; gravity: number; drag: number
+  burst?: readonly THREE.Color[]
+}
 
 /** Keeps the two-finger panned view over the world: moves camera and target together so the angle never changes. */
 export function clampTarget(target: THREE.Vector3, camera: THREE.Vector3, { size, height }: Dimensions) {
@@ -82,6 +104,7 @@ export function headingFromYaw(yaw: number): Heading {
 const ANIMAL_COLORS = {
   wool: '#f4f1ea', face: '#4a4038', leg: '#5b4a3e', comb: '#e2463c', beak: '#f2b632', fur: '#c9a27e',
   pink: '#f5a8c8', yellow: '#f3d75e', blue: '#8fcdf2', skin: '#efcdb9', heart: '#ff4f7b',
+  scale: '#e4572e', belly: '#f7c948', wing: '#b8322a', horn: '#fff1d0',
 } as const
 type AnimalColor = keyof typeof ANIMAL_COLORS
 const WOOL_PART: Record<WoolColor, AnimalColor> = { white: 'wool', pink: 'pink', yellow: 'yellow', blue: 'blue' }
@@ -89,7 +112,8 @@ const WOOL_PART: Record<WoolColor, AnimalColor> = { white: 'wool', pink: 'pink',
 const HEART_PARTS: readonly (readonly [readonly [number, number, number], readonly [number, number, number], number])[] = [
   [[0.16, 0.16, 0.08], [-0.08, 0.06, 0], 0], [[0.16, 0.16, 0.08], [0.08, 0.06, 0], 0], [[0.18, 0.18, 0.08], [0, -0.04, 0], Math.PI / 4],
 ]
-type Part = readonly [AnimalColor, readonly [number, number, number], readonly [number, number, number]]
+/** いろ・おおきさ・ばしょ。はねは 4つめに みぎ(1)・ひだり(-1) を もち、ばしょは つけね。 */
+type Part = readonly [AnimalColor, readonly [number, number, number], readonly [number, number, number], (1 | -1)?]
 /** はこを くみあわせた どうぶつ（まえが +z）。 */
 const ANIMAL_PARTS: Record<AnimalKind, readonly Part[]> = {
   sheep: [
@@ -107,7 +131,22 @@ const ANIMAL_PARTS: Record<AnimalKind, readonly Part[]> = {
     ['fur', [0.08, 0.3, 0.06], [0.08, 0.75, 0.28]], ['fur', [0.08, 0.3, 0.06], [-0.08, 0.75, 0.28]],
     ['wool', [0.14, 0.14, 0.1], [0, 0.34, -0.3]],
   ],
+  dragon: [
+    ['scale', [0.5, 0.42, 0.78], [0, 0.5, 0]], ['belly', [0.4, 0.08, 0.6], [0, 0.27, 0.02]],
+    ['scale', [0.38, 0.36, 0.4], [0, 0.85, 0.48]], ['belly', [0.26, 0.16, 0.18], [0, 0.76, 0.74]],
+    ['face', [0.07, 0.08, 0.04], [0.11, 0.92, 0.69]], ['face', [0.07, 0.08, 0.04], [-0.11, 0.92, 0.69]],
+    ['horn', [0.07, 0.18, 0.07], [0.11, 1.1, 0.4]], ['horn', [0.07, 0.18, 0.07], [-0.11, 1.1, 0.4]],
+    ['wing', [0.62, 0.05, 0.42], [0.2, 0.66, -0.04], 1], ['wing', [0.62, 0.05, 0.42], [-0.2, 0.66, -0.04], -1],
+    ['scale', [0.18, 0.18, 0.46], [0, 0.48, -0.6]],
+  ],
 }
+/** 1ぴきに つかう はこの かずの じょうげん（からだと ハート）。 */
+const PARTS_PER_ANIMAL = Math.max(...Object.values(ANIMAL_PARTS).map(parts => parts.length)) + HEART_PARTS.length
+/** とぶ どうぶつが じめんから うく たかさと、ハートを だす たかさ。 */
+const HOVER = 0.5
+const heartHeight = (kind: AnimalKind) => kind === 'dragon' ? 1.45 : 1.15
+/** ドラゴンの くちの ばしょ（どうぶつの なかの ざひょう）。 */
+const MOUTH = new THREE.Vector3(0, 0.76, 0.86)
 type AnimalState = {
   data: Animal; from: Cell; to: Cell; t: number; wait: number; hop: number
   fromY: number; toY: number; x: number; y: number; z: number; yaw: number; visible: boolean
@@ -181,12 +220,15 @@ export function useCraftScene(options: CraftSceneOptions) {
     const capTextures = FACED.map(id => [texture(id, 'top'), texture(id, 'bottom')] as const)
     const waterTexture = textures[materialCode('water') - 1]
     const lavaTexture = textures[materialCode('lava') - 1]
+    // ワープの うずまきは まんなかを じくに まわる
+    const portalTexture = textures[materialCode('portal') - 1]
+    portalTexture.center.set(0.5, 0.5)
     const surfaces = MATERIAL_DEFS.map((m, i) => {
       const material = (map: THREE.Texture) => new THREE.MeshLambertMaterial({
         map,
-      transparent: m.opacity !== undefined,
-      opacity: m.opacity ?? 1,
-      depthWrite: m.opacity === undefined,
+        transparent: m.opacity !== undefined,
+        opacity: m.opacity ?? 1,
+        depthWrite: m.opacity === undefined,
         // さくの すきまや くさばなの いたは うらがわも みえる
         alphaTest: m.cutout || m.cross ? 0.5 : 0,
         side: m.cutout || m.cross ? THREE.DoubleSide : THREE.FrontSide,
@@ -215,7 +257,7 @@ export function useCraftScene(options: CraftSceneOptions) {
     const unit = new THREE.BoxGeometry(1, 1, 1)
     const animalMaterial = new THREE.MeshLambertMaterial()
     const animalColors = Object.fromEntries(Object.entries(ANIMAL_COLORS).map(([name, color]) => [name, new THREE.Color(color)])) as Record<AnimalColor, THREE.Color>
-    const animalMesh = new THREE.InstancedMesh(unit, animalMaterial, MAX_HERD * 9)
+    const animalMesh = new THREE.InstancedMesh(unit, animalMaterial, MAX_HERD * PARTS_PER_ANIMAL)
     animalMesh.count = 0
     animalMesh.frustumCulled = false // Individual animals are culled before filling the batch.
     animalMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -276,10 +318,57 @@ export function useCraftScene(options: CraftSceneOptions) {
     debrisMesh.frustumCulled = false
     debrisMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     debrisMesh.name = 'debris'
+    // はなびと ドラゴンの ひは よるでも あかるく ひかる
+    const sparkMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff' })
+    const sparkMesh = new THREE.InstancedMesh(unit, sparkMaterial, MAX_SPARKS)
+    sparkMesh.count = 0
+    sparkMesh.frustumCulled = false
+    sparkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    sparkMesh.name = 'sparks'
     const effects = new THREE.Group()
-    effects.add(flashMesh, debrisMesh)
+    effects.add(flashMesh, debrisMesh, sparkMesh)
     scene.add(effects)
     const debris: Debris[] = []
+    const sparks: Spark[] = []
+    /** ふえた つぶは さいごに たす。いっぱいなら、まだ ひらいていない はなびの たまを のこして ふるい つぶから きえる。 */
+    const addSparks = (added: readonly Spark[]) => {
+      for (const spark of added) {
+        if (sparks.length >= MAX_SPARKS) {
+          const oldest = sparks.findIndex(other => !other.burst)
+          if (oldest < 0) continue
+          sparks.splice(oldest, 1)
+        }
+        sparks.push(spark)
+      }
+    }
+    const randomOf = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]
+    const openFirework = (shell: Spark, added: Spark[]) => {
+      for (let i = 0; i < FIREWORK_SPARKS; i++) {
+        // まるく ひろがる
+        const up = Math.random() * 2 - 1
+        const around = Math.random() * Math.PI * 2
+        const flat = Math.sqrt(1 - up * up)
+        const speed = 5 + Math.random() * 1.5
+        const life = 1 + Math.random() * 0.5
+        added.push({
+          x: shell.x, y: shell.y, z: shell.z, vx: Math.cos(around) * flat * speed, vy: up * speed, vz: Math.sin(around) * flat * speed,
+          life, max: life, size: 0.22 + Math.random() * 0.14, color: randomOf(shell.burst!), gravity: 3, drag: 1.6,
+        })
+      }
+    }
+    const batchSparks = () => {
+      sparkMesh.count = 0
+      for (const spark of sparks) {
+        const scale = spark.size * Math.min(1, spark.life / spark.max * 2)
+        effectPose.makeScale(scale, scale, scale).setPosition(spark.x, spark.y, spark.z)
+        sparkMesh.setMatrixAt(sparkMesh.count, effectPose)
+        sparkMesh.setColorAt(sparkMesh.count++, spark.color)
+      }
+      if (sparkMesh.count) {
+        sparkMesh.instanceMatrix.needsUpdate = true
+        sparkMesh.instanceColor!.needsUpdate = true
+      }
+    }
     const effectPose = new THREE.Matrix4()
     const noLit: readonly Position[] = []
     let shownLit: readonly Position[] | undefined
@@ -326,7 +415,7 @@ export function useCraftScene(options: CraftSceneOptions) {
       const s = ease(animal.t)
       const bounce = Math.sin(Math.PI * animal.t) * 0.18 + Math.sin(Math.PI * animal.hop) * 0.7
       animal.x = animal.from.x + (animal.to.x - animal.from.x) * s
-      animal.y = animal.fromY + (animal.toY - animal.fromY) * s + bounce
+      animal.y = animal.fromY + (animal.toY - animal.fromY) * s + bounce + (flies(animal.data.kind) ? HOVER : 0)
       animal.z = animal.from.z + (animal.to.z - animal.from.z) * s
     }
     const setAnimalPose = (animal: AnimalState) => {
@@ -338,7 +427,7 @@ export function useCraftScene(options: CraftSceneOptions) {
     const putHeart = (animal: AnimalState) => {
       const time = animal.heartTime ?? 0
       heart.rotation.y = time / 450
-      heart.position.y = 1.15 + Math.sin(time / 260) * 0.08
+      heart.position.y = heartHeight(animal.data.kind) + Math.sin(time / 260) * 0.08
       heart.updateMatrix()
       heart.matrix.premultiply(root.matrix)
       for (const [size, position, rotation] of HEART_PARTS) {
@@ -359,11 +448,20 @@ export function useCraftScene(options: CraftSceneOptions) {
         const { data } = animal
         setAnimalPose(animal)
         const parts = ANIMAL_PARTS[data.kind]
-        part.rotation.z = 0
+        // うごいている あいだは はばたき、とまると すこし ひろげて やすむ
+        const flap = animal.t < 1 || animal.hop > 0 ? Math.sin(time / 70) * 0.7 : 0.25
         for (let i = 0; i < parts.length; i++) {
-          const [color, size, position] = parts[i]
+          const [color, size, position, wing] = parts[i]
           part.scale.set(...size)
-          part.position.set(...position)
+          if (wing) {
+            // はねの つけねを じくに して まわす
+            const half = size[0] / 2
+            part.position.set(position[0] + wing * half * Math.cos(flap), position[1] + half * Math.sin(flap), position[2])
+            part.rotation.z = wing * flap
+          } else {
+            part.position.set(...position)
+            part.rotation.z = 0
+          }
           if (i === 0 && data.kind === 'sheep') {
             if (data.sheared) part.scale.set(0.5, 0.38, 0.76)
             putPart(animal, root.matrix, data.sheared ? 'skin' : WOOL_PART[data.wool ?? 'white'])
@@ -435,10 +533,12 @@ export function useCraftScene(options: CraftSceneOptions) {
       animatedTerrain = terrain.setVisibility(camera, frustum, !!walking, isNight)
       batchAnimals(time, !!walking)
       batchDebris()
+      batchSparks()
       // ひの ついた ばくだんは ちかちか ひかる
       flashMaterial.opacity = Math.floor(time / 140) % 2 ? 0.75 : 0.1
       waterTexture.offset.y = (time / 5000) % 1
       lavaTexture.offset.x = (time / 9000) % 1
+      portalTexture.rotation = (time / 1600) % (Math.PI * 2)
       const pulse = isNight ? NIGHT.glow * (0.8 + 0.2 * Math.sin(time / 380)) : DAY.glow
       for (const material of glowing) material.emissiveIntensity = pulse
       renderer.render(scene, camera)
@@ -482,7 +582,7 @@ export function useCraftScene(options: CraftSceneOptions) {
           const { from, to } = animal
           from.x = to.x
           from.z = to.z
-          if (chooseAnimalStep(latest.current.world, from, to, stepOptions, Math.random)) {
+          if (chooseAnimalStep(latest.current.world, from, to, stepOptions, Math.random, flies(animal.data.kind))) {
             animal.yaw = Math.atan2(to.x - from.x, to.z - from.z)
             animal.t = 0
             updateHeight(animal)
@@ -508,6 +608,29 @@ export function useCraftScene(options: CraftSceneOptions) {
           piece.y += piece.vy * dt
           piece.z += piece.vz * dt
         }
+      }
+      if (sparks.length) {
+        moving = true
+        const added: Spark[] = []
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const spark = sparks[i]
+          spark.life -= dt
+          if (spark.life <= 0) {
+            sparks.splice(i, 1)
+            if (spark.burst) openFirework(spark, added)
+            continue
+          }
+          const keep = 1 - Math.min(1, spark.drag * dt)
+          spark.vx *= keep
+          spark.vy = (spark.vy - spark.gravity * dt) * keep
+          spark.vz *= keep
+          spark.x += spark.vx * dt
+          spark.y += spark.vy * dt
+          spark.z += spark.vz * dt
+          // あがっていく たまは ひの こを のこす（つぶが いっぱいの ときは のこさない）
+          if (spark.burst && dt > 0 && sparks.length + added.length < MAX_SPARKS) added.push({ x: spark.x, y: spark.y, z: spark.z, vx: 0, vy: 0, vz: 0, life: 0.35, max: 0.35, size: 0.1, color: EMBER_COLOR, gravity: 2, drag: 0 })
+        }
+        addSparks(added)
       }
       if (walking) {
         eye.set(walking.x, walking.y + EYE, walking.z)
@@ -581,11 +704,31 @@ export function useCraftScene(options: CraftSceneOptions) {
       const rect = renderer.domElement.getBoundingClientRect()
       return hitAt((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / rect.height * 2 + 1)
     }
+    /** ドラゴンが むいている ほうへ ひを はく。 */
+    const breathe = (animal: AnimalState) => {
+      placeAnimal(animal)
+      setAnimalPose(animal)
+      const mouth = MOUTH.clone().applyMatrix4(root.matrix)
+      const scale = animal.data.baby ? 0.6 : 1
+      const added: Spark[] = []
+      for (let i = 0; i < FLAME_SPARKS; i++) {
+        const speed = (3.5 + Math.random() * 2) * scale
+        const spread = () => (Math.random() - 0.5) * 1.4 * scale
+        const life = 0.45 + Math.random() * 0.25
+        added.push({
+          x: mouth.x, y: mouth.y, z: mouth.z,
+          vx: Math.sin(animal.yaw) * speed + spread(), vy: spread() + 0.4, vz: Math.cos(animal.yaw) * speed + spread(),
+          life, max: life, size: (0.14 + Math.random() * 0.12) * scale, color: randomOf(FLAME_COLORS), gravity: -1.5, drag: 2.2,
+        })
+      }
+      addSparks(added)
+    }
     const act = (hit: Hit | null, kind: 'pick' | 'hold') => {
       if (!hit) return
       if ('animal' in hit) {
         if (kind === 'hold') return
         hit.animal.hop = 1
+        if (hit.animal.data.kind === 'dragon') breathe(hit.animal)
         latest.current.onAnimal?.(hit.animal.data, hit.animal.to)
         if (!frame) render()
         return
@@ -679,6 +822,15 @@ export function useCraftScene(options: CraftSceneOptions) {
         }
         if (!frame) render()
       },
+      fireworks: at => {
+        const colors = [randomOf(FIREWORK_COLORS), randomOf(FIREWORK_COLORS)]
+        addSparks([{
+          x: at.x + (Math.random() - 0.5) * 0.3, y: at.y + 0.6, z: at.z + (Math.random() - 0.5) * 0.3,
+          vx: (Math.random() - 0.5) * 0.8, vy: 11, vz: (Math.random() - 0.5) * 0.8,
+          life: ROCKET_LIFE, max: ROCKET_LIFE, size: 0.26, color: colors[0], gravity: 6, drag: 0, burst: colors,
+        }])
+        if (!frame) render()
+      },
     }
     sync.current = update
     resize()
@@ -709,6 +861,8 @@ export function useCraftScene(options: CraftSceneOptions) {
       flashMaterial.dispose()
       debrisMesh.dispose()
       debrisMaterial.dispose()
+      sparkMesh.dispose()
+      sparkMaterial.dispose()
       terrain.dispose()
       unwatchGround?.()
       outlineGeometry.dispose()

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  blockAt, brushCells, createWorld, DEFAULT_WORLD, eatCake, editWorld as mutateWorld, explode, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key,
-  materialCode, MAX_BLAST_CHAIN, netMaterialChange, PALETTE, pickAs, SPONGE_LIMIT, tendCrops as mutateCrops, toggleDoor, undoChanges, wheatAt,
+  arriveAt, blockAt, brushCells, createWorld, DEFAULT_WORLD, eatCake, editWorld as mutateWorld, explode, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key,
+  materialCode, MAX_BLAST_CHAIN, netMaterialChange, nextPortal, PALETTE, pickAs, portalGates, SPONGE_LIMIT, tendCrops as mutateCrops, toggleDoor, undoChanges, wheatAt,
   settleWalker, stairsToward, startWalker, surfaceOf, topBlock, TREASURES, walk, World, type Block, type Material, type Position,
 } from './world'
 
@@ -383,4 +383,59 @@ it('turns stairs so the high step is ahead of the player', () => {
   expect(stairsToward({ x: 0.2, z: -0.7 })).toBe('stairs_2')
   expect(stairsToward({ x: -1, z: 0.5 })).toBe('stairs_3')
   for (const id of ['stairs_1', 'stairs_2', 'stairs_3'] as const) expect(pickAs(id)).toBe('stairs')
+})
+
+describe('painting blocks', () => {
+  it('turns the touched block into the chosen one, but not air, the floor, water or plants', () => {
+    const world = createWorld()
+    const grass = { x: 8, y: 2, z: 8 }
+    expect(mutateWorld(world, grass, 'brick', 'paint')).toEqual([{ ...grass, before: materialCode('grass'), after: materialCode('brick') }])
+    expect(snapshot(world)).toHaveLength(snapshot(createWorld()).length)
+    const flower = snapshot(world).find(b => b.material === 'flower')!
+    for (const target of [grass, { x: 8, y: 3, z: 8 }, { x: 8, y: 0, z: 8 }, { x: 4, y: 2, z: 0 }, flower]) {
+      expect(mutateWorld(world, target, 'brick', 'paint')).toEqual([])
+    }
+    // くさばな・みずでは ぬれない
+    for (const material of ['flower', 'seed', 'water'] as const) expect(mutateWorld(world, { x: 9, y: 2, z: 8 }, material, 'paint')).toEqual([])
+  })
+  it('paints a whole 3×3 face, lets painted sand fall and hardens painted lava next to water', () => {
+    const world = createWorld()
+    mutateWorld(world, brushCells({ x: 8, y: 2, z: 8 }, { x: 0, y: 1, z: 0 }, true), 'stone', 'paint')
+    expect(snapshot(world).filter(b => b.y === 2 && b.material === 'stone' && Math.abs(b.x - 8) <= 1 && Math.abs(b.z - 8) <= 1)).toHaveLength(9)
+    // うかんだ ブロックを すなに すると おちる
+    mutateWorld(world, { x: 8, y: 3, z: 8 }, 'brick', 'place')
+    mutateWorld(world, { x: 8, y: 4, z: 8 }, 'brick', 'place')
+    mutateWorld(world, { x: 8, y: 3, z: 8 }, 'brick', 'remove')
+    mutateWorld(world, { x: 8, y: 4, z: 8 }, 'sand', 'paint')
+    expect(blockAt(world, { x: 8, y: 3, z: 8 })?.material).toBe('sand')
+    expect(blockAt(world, { x: 8, y: 4, z: 8 })).toBeUndefined()
+    // みずうみの きしの すなを ようがんに すると、すぐ くろいしに なる
+    const changes = mutateWorld(world, { x: 4, y: 2, z: 2 }, 'lava', 'paint')
+    expect(blockAt(world, { x: 4, y: 2, z: 2 })?.material).toBe('obsidian')
+    expect(netMaterialChange(changes, materialCode('obsidian'))).toBe(1)
+  })
+})
+
+describe('warp gates', () => {
+  it('jumps to the next gate in turn, counting joined portal blocks as one gate', () => {
+    const world = createWorld()
+    const a = { x: 3, y: 3, z: 8 }, b = { x: 12, y: 3, z: 12 }, c = { x: 8, y: 3, z: 4 }
+    mutateWorld(world, a, 'portal', 'place')
+    // ゲートが 1つだけ・ワープでない ブロックからは とばない
+    expect(nextPortal(world, a)).toBeNull()
+    mutateWorld(world, b, 'portal', 'place')
+    expect(nextPortal(world, { x: 3, y: 2, z: 8 })).toBeNull()
+    // つみかさねた ワープは 1つの ゲート
+    mutateWorld(world, { ...a, y: 4 }, 'portal', 'place')
+    expect(portalGates(world)).toEqual([a, b])
+    expect(nextPortal(world, { ...a, y: 4 })).toEqual(b)
+    expect(nextPortal(world, b)).toEqual(a)
+    // ゲートが ふえると じゅんばんに めぐる
+    mutateWorld(world, c, 'portal', 'place')
+    expect(portalGates(world)).toEqual([c, a, b])
+    expect([nextPortal(world, a), nextPortal(world, b), nextPortal(world, c)]).toEqual([b, c, a])
+    // ついたら ゲートの いちばん うえに たつ
+    expect(arriveAt(world, a)).toEqual({ ...a, y: 5 })
+    expect(arriveAt(world, b)).toEqual({ ...b, y: 4 })
+  })
 })

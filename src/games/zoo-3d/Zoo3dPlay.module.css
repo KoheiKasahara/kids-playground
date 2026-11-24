@@ -1,0 +1,899 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  background: #f7f3e3;
+  color: #2f3b2a;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(6px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+  background: #fffaf0;
+  border-bottom: 2px solid #e6dcc2;
+}
+
+.header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: clamp(18px, 5vw, 26px);
+  text-align: center;
+  color: #4b6b2f;
+}
+
+.soundButton {
+  min-width: 48px;
+  min-height: 48px;
+  border: 2px solid #c9b98f;
+  border-radius: 14px;
+  background: #fff;
+  font-size: 22px;
+}
+
+.scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: linear-gradient(#bfe7fb, #d7f0c9);
+  touch-action: none;
+}
+
+.scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.status {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+  background: rgb(247 243 227 / 86%);
+  font-size: 18px;
+}
+
+.statusIcon {
+  font-size: 64px;
+  animation: walk 1.2s ease-in-out infinite;
+}
+
+@keyframes walk {
+  0%, 100% { transform: translateX(-10px) rotate(-4deg); }
+  50% { transform: translateX(10px) rotate(4deg); }
+}
+
+.progress {
+  width: min(260px, 70vw);
+  height: 14px;
+  accent-color: #7cb342;
+}
+
+.status button,
+.dialogClose {
+  min-height: 52px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 26px;
+  background: #ff9f43;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 4px 0 #d97a22;
+}
+
+/* 画面の上に浮かぶボタン（エリア・あるく／うえから・ずかん） */
+.topBar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  max-width: 46%;
+  padding: 0 12px;
+  border: 2px solid #c9b98f;
+  border-radius: 24px;
+  background: rgb(255 255 255 / 93%);
+  color: inherit;
+  font-size: 22px;
+  pointer-events: auto;
+  box-shadow: 0 2px 0 rgb(0 0 0 / 8%);
+  touch-action: manipulation;
+}
+
+.chip b {
+  overflow: hidden;
+  font-size: clamp(13px, 3.6vw, 16px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chip:disabled {
+  opacity: 0.6;
+}
+
+.caret {
+  font-size: 12px;
+  color: #8a7a55;
+}
+
+.modeChip {
+  border-color: #7cb342;
+  background: #f1fae3;
+}
+
+/* スタンプは画面のまんなかに、ぽんっと押す */
+.toast {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border: 3px solid #ffcf4a;
+  border-radius: 18px;
+  background: #fffbea;
+  font-size: clamp(14px, 3.8vw, 17px);
+  font-weight: 700;
+  transform: translateX(-50%);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  animation: pop 0.35s ease-out;
+  pointer-events: none;
+}
+
+.toast > span:first-child {
+  font-size: 28px;
+}
+
+.toast b {
+  color: #e07800;
+  white-space: nowrap;
+}
+
+@keyframes pop {
+  0% { transform: translateX(-50%) scale(0.6); opacity: 0; }
+  70% { transform: translateX(-50%) scale(1.06); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+.hint {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 2px solid #ffd36b;
+  border-radius: 22px;
+  background: rgb(255 253 240 / 95%);
+  font-size: clamp(14px, 3.8vw, 17px);
+  font-weight: 700;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.hint > span:first-child {
+  font-size: 26px;
+}
+
+.hint span:nth-child(2) {
+  flex: 1;
+}
+
+.hint button {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 20px;
+  background: #ff9f43;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 #d97a22;
+}
+
+/* 歩くモードでは、右下に地図があるので、お知らせは上に出す */
+.page[data-mode='walk'] .hint {
+  top: 64px;
+  bottom: auto;
+}
+
+.tip {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 88%);
+  font-size: clamp(15px, 4vw, 18px);
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.page[data-mode='walk'] .tip {
+  left: 10px;
+  transform: none;
+  max-width: calc(100% - 150px);
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* 追いかけているときの「ぜんたい」は、下のお知らせと重ならないよう、上のボタンの下に置く */
+.overview {
+  position: absolute;
+  top: 64px;
+  right: 10px;
+  z-index: 3;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 2px solid #c9b98f;
+  border-radius: 24px;
+  background: rgb(255 255 255 / 92%);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.miniMap {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  width: 118px;
+  height: 118px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #e8f5d8;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
+}
+
+.miniEnclosure {
+  cursor: pointer;
+}
+
+.miniEnclosure:focus-visible circle {
+  stroke: #4c8df6;
+  stroke-width: 2;
+}
+
+.panel {
+  padding: 8px max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  background: #fffaf0;
+  border-top: 2px solid #e6dcc2;
+}
+
+.selectedCard {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 auto 8px;
+}
+
+.whoEmoji {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  font-size: 28px;
+}
+
+.who strong {
+  font-size: 22px;
+}
+
+.who small {
+  font-size: 15px;
+  color: #6e6a55;
+}
+
+.activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #eef8dc;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.close {
+  min-width: 48px;
+  min-height: 48px;
+  margin-left: auto;
+  border: 2px solid #d8ccab;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 20px;
+}
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 0 auto 8px;
+}
+
+.members button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 9px;
+  border: 2px solid #e3d4a8;
+  border-radius: 22px;
+  white-space: nowrap;
+  background: #fff;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.members button[aria-pressed='true'] {
+  border-color: #7cb342;
+  background: #eef8dc;
+}
+
+.actions,
+.picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* 動物が増えても画面を圧迫しないよう、横へスクロールする（次の列が少し見えて、続きがあると分かる） */
+.picker {
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  grid-auto-columns: calc((100% - 24px) / 3.6);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 2px 2px 6px;
+}
+
+.picker button {
+  scroll-snap-align: start;
+}
+
+.action,
+.picker button {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 84px;
+  padding: 6px 2px;
+  border: 3px solid #e3d4a8;
+  border-radius: 20px;
+  background: #fff;
+  color: inherit;
+  box-shadow: 0 4px 0 #e3d4a8;
+  touch-action: manipulation;
+}
+
+.action span,
+.picker span {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.action b,
+.picker b {
+  font-size: clamp(13px, 3.4vw, 16px);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* 長い名前（レッサーパンダ・ミーアキャット）は、途中で折り返さないよう小さくする */
+.action b[data-long],
+.picker b[data-long] {
+  font-size: clamp(11px, 2.9vw, 14px);
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.action:active,
+.picker button:active,
+.padButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #e3d4a8;
+}
+
+.action[aria-pressed='true'] {
+  border-color: #7cb342;
+  background: #eef8dc;
+  box-shadow: 0 4px 0 #7cb342;
+}
+
+.action:disabled,
+.picker button:disabled,
+.padButton:disabled {
+  opacity: 0.5;
+}
+
+.page button:focus-visible {
+  outline: 3px solid #4c8df6;
+  outline-offset: 2px;
+}
+
+/* 歩くモードのパネル: 左に十字ボタン、右に えさ・えらんだ動物 */
+.walkPanel {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.walkSide {
+  flex: 1;
+  min-width: 0;
+}
+
+.walkSide .actions {
+  gap: 6px;
+}
+
+.walkSide .action {
+  min-height: 70px;
+}
+
+.walkSide .action span {
+  font-size: 28px;
+}
+
+.walkSide .who {
+  margin-bottom: 6px;
+}
+
+.walkSide .who strong {
+  font-size: 18px;
+}
+
+.walkSide .who small,
+.walkSide .members {
+  display: none;
+}
+
+.pad {
+  display: grid;
+  grid-template-areas: '. up .' 'left . right' '. down .';
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(3, 54px);
+  gap: 4px;
+  flex: none;
+}
+
+.padButton {
+  display: grid;
+  place-items: center;
+  border: 3px solid #b8d99a;
+  border-radius: 16px;
+  background: #f4fbe9;
+  font-size: 26px;
+  box-shadow: 0 4px 0 #b8d99a;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.padButton[aria-pressed='true'] {
+  background: #d9f0bf;
+}
+
+.feedBox {
+  display: grid;
+  gap: 6px;
+}
+
+.feedTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.feedButtons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 6px;
+}
+
+.feedButtons .action {
+  min-height: 70px;
+}
+
+.feedButtons .action span {
+  font-size: 28px;
+}
+
+.walkHelp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.walkHelp span {
+  font-size: 30px;
+}
+
+.walkHelp p {
+  margin: 0;
+}
+
+/* ダイアログ（ちず・ずかん） */
+.infoBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgb(40 50 30 / 45%);
+}
+
+.dialog {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(480px, 100%);
+  max-height: calc(100dvh - 24px);
+  padding: 16px 14px;
+  overflow-y: auto;
+  border-radius: 24px;
+  background: #fffdf4;
+  text-align: center;
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 24px;
+}
+
+.dialogButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.areaList {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.areaCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'emoji name' 'emoji animals' 'emoji stamps';
+  align-items: center;
+  gap: 0 10px;
+  min-height: 84px;
+  padding: 8px 12px;
+  border: 3px solid rgb(255 255 255 / 70%);
+  border-radius: 18px;
+  color: #2f3b2a;
+  text-align: left;
+  box-shadow: 0 4px 0 rgb(0 0 0 / 12%);
+}
+
+.areaCard[aria-current='location'] {
+  border-color: #ff9f43;
+}
+
+.areaCard b {
+  grid-area: name;
+  font-size: 19px;
+}
+
+.areaEmoji {
+  grid-area: emoji;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 75%);
+  font-size: 36px;
+}
+
+.areaAnimals {
+  grid-area: animals;
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+
+.areaStamps {
+  grid-area: stamps;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.here {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ff9f43;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.infoEmoji {
+  font-size: 72px;
+  line-height: 1;
+}
+
+.where,
+.howTo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.howTo {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: #6e6a55;
+}
+
+.facts,
+.stampList {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 16px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.facts li {
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: #f1ecd8;
+}
+
+.stampList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.stampList li span:first-child {
+  font-size: 24px;
+}
+
+.stampList li span:nth-child(2) {
+  flex: 1;
+}
+
+.stampList li b {
+  font-size: 13px;
+}
+
+.stampGot {
+  background: #fff3c4;
+}
+
+.stampEmpty {
+  background: #f1efe8;
+  color: #8a8570;
+}
+
+.zukanScroll {
+  width: 100%;
+  max-height: 56dvh;
+  overflow-y: auto;
+}
+
+.zukanArea {
+  margin: 8px 0 4px;
+  font-size: 16px;
+  text-align: left;
+}
+
+.zukanGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.zukanTile {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: 96px;
+  padding: 6px 2px;
+  border: 2px solid #e3d4a8;
+  border-radius: 16px;
+  background: #fff;
+  color: inherit;
+}
+
+.zukanTile b {
+  font-size: 13px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.zukanEmoji {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.zukanEmoji[data-known='false'],
+.infoEmoji[data-known='false'] {
+  filter: brightness(0);
+  opacity: 0.3;
+}
+
+.stampRow {
+  display: flex;
+  gap: 1px;
+  font-size: 12px;
+}
+
+.stampRow .stampGot,
+.stampRow .stampEmpty {
+  min-width: 16px;
+  border-radius: 6px;
+}
+
+/* 横に広い画面では、ちずを2列にする */
+@media (min-width: 600px) {
+  .dialog:has(.areaList) {
+    width: min(680px, 100%);
+  }
+
+  .areaList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 背の低い画面（スマートフォンの横向き）では、ちずのカードを小さくする */
+@media (max-height: 520px) {
+  .areaCard {
+    min-height: 64px;
+    padding: 6px 10px;
+  }
+
+  .areaEmoji {
+    width: 44px;
+    height: 44px;
+    font-size: 28px;
+  }
+
+  .areaAnimals {
+    font-size: 16px;
+  }
+
+  .dialog {
+    padding: 10px 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusIcon,
+  .toast {
+    animation: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 38%);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    padding-top: calc(4px + env(safe-area-inset-top));
+    padding-bottom: 4px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+  }
+
+  .panel {
+    border-top: 0;
+    border-left: 2px solid #e6dcc2;
+    overflow-y: auto;
+  }
+
+  .actions,
+  .picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .picker {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
+  }
+
+  .action,
+  .picker button {
+    min-height: 64px;
+  }
+
+  .walkPanel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pad {
+    align-self: center;
+  }
+
+  .toast {
+    top: 28%;
+  }
+}

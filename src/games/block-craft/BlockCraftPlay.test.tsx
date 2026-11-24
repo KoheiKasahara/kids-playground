@@ -5,7 +5,7 @@ import { beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { isSoundEnabled } from '../../audio/sound'
 import { GAME_CATALOG } from '../gameCatalog'
 import BlockCraftPlay, { FUSE_MS, SLEEP_MS } from './BlockCraftPlay'
-import { ANIMAL_SPAWNS, herdFrom, spawnHerd, type Animal, type Cell } from './animals'
+import { ANIMAL_SPAWNS, herdFrom, MAX_HERD, spawnHerd, type Animal, type Cell, type Herd } from './animals'
 import { biome, BIOMES } from './biomes'
 import { CRAFTED_KEY, readGame, WOOL_KEY, writeGame } from './save'
 import { CRAFTED } from './recipes'
@@ -25,9 +25,9 @@ const world = (): World => scene.options.world
 const blocks = () => [...world().blocks()]
 function mount() { return render(<MemoryRouter><BlockCraftPlay /></MemoryRouter>) }
 /** こまかい そうさは、ばしょの きまった ちいさな くさはらの つづきから たしかめる。 */
-async function start(world = createWorld()) {
+async function start(world = createWorld(), herd: Herd = herdFrom(ANIMAL_SPAWNS)) {
   const user = userEvent.setup()
-  writeGame({ world, biome: 'meadow', wheat: 0, herd: herdFrom(ANIMAL_SPAWNS), seed: 0 })
+  writeGame({ world, biome: 'meadow', wheat: 0, herd, seed: 0 })
   mount()
   await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
   return user
@@ -39,7 +39,7 @@ async function startNew(name = 'くさはら') {
   await user.click(screen.getByRole('button', { name }))
   return { user, view }
 }
-const api = (): SceneApi => ({ heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter: vi.fn(), focus: vi.fn(), burst: vi.fn() })
+const api = (): SceneApi => ({ heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter: vi.fn(), focus: vi.fn(), burst: vi.fn(), fireworks: vi.fn() })
 const tap = (position: Position, normal: Position = { x: 0, y: 1, z: 0 }, direction: Position = { x: 0, y: -1, z: 1 }) => act(() => scene.options.onPick(position, normal, direction))
 
 it('shows only the essential controls', async () => {
@@ -50,8 +50,8 @@ it('shows only the essential controls', async () => {
   expect(screen.queryByRole('button', { name: 'ちかづく' })).not.toBeInTheDocument()
   expect(screen.queryByText(/ボタンで ばしょを えらぶ/)).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'よる' })).toHaveTextContent(/^☀️$/)
-  // ヘッダー（もどる・よる・おと）、ちず・あるく、おく・こわす・ひろく・もどす、ざいりょう、ほぞん・はじめの せかい
-  expect(screen.getAllByRole('button')).toHaveLength(3 + 2 + 4 + PALETTE.length + 2)
+  // ヘッダー（もどる・よる・おと）、ちず・あるく、おく・こわす・ぬる・ひろく・もどす、ざいりょう、ほぞん・はじめの せかい
+  expect(screen.getAllByRole('button')).toHaveLength(3 + 2 + 5 + PALETTE.length + 2)
 })
 
 it('switches between day and night without adding messages', async () => {
@@ -514,9 +514,9 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   expect(within(panel).getByRole('button', { name: 'まだ できない' })).toBeDisabled()
   await user.click(within(panel).getByRole('button', { name: 'きを ならべる' }))
   await user.click(within(panel).getByRole('button', { name: 'ひかりを ならべる' }))
-  // ランタンに つかう たいまつは まだ つくって いない
+  // ランタンに つかう たいまつ・はなびに つかう ばくだんは まだ つくって いない
   expect(within(panel).getByRole('button', { name: 'ランタンの レシピ' })).toBeDisabled()
-  expect(within(panel).getAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(1)
+  expect(within(panel).getAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(2)
   await user.click(within(panel).getByRole('button', { name: 'たいまつを つくる' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('status')).toHaveTextContent('たいまつが できた')
@@ -536,11 +536,12 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   await user.click(within(panel).getByRole('button', { name: 'けす' }))
   expect(within(panel).queryByRole('button', { name: /とりだす/ })).not.toBeInTheDocument()
   // 3つ ならべたら もう ならべられない
-  for (let i = 0; i < 3; i++) await user.click(within(panel).getByRole('button', { name: 'いたを ならべる' }))
+  const plank = within(panel).getByRole('button', { name: 'いたを ならべる' })
+  plank.focus()
+  await user.keyboard('{Enter}{Enter} ')
   expect(within(panel).getByRole('button', { name: 'きを ならべる' })).toBeDisabled()
-  expect(within(panel).getByRole('button', { name: 'ドアを つくる' })).toBeEnabled()
-  expect(panel).toContainElement(document.activeElement as HTMLElement)
-  fireEvent.keyDown(panel, { key: 'Escape' })
+  expect(within(panel).getByRole('button', { name: 'ドアを つくる' })).toHaveFocus()
+  await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('application')).toHaveFocus()
   // つくった ものは ほかの せかいでも つかえる
@@ -548,6 +549,23 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   await user.click(screen.getByRole('button', { name: 'さばく' }))
   expect(screen.getByRole('button', { name: 'たいまつ' })).toBeEnabled()
   expect(screen.getAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(CRAFTED.length - 1)
+})
+
+it('keeps keyboard focus in the crafting table when full slots do not match a recipe', async () => {
+  const placed = createWorld()
+  editWorld(placed, { x: 8, y: 3, z: 8 }, 'workbench', 'place')
+  const user = await start(placed)
+  tap({ x: 8, y: 3, z: 8 })
+  const panel = screen.getByRole('dialog', { name: 'クラフトだい' })
+  const wood = within(panel).getByRole('button', { name: 'きを ならべる' })
+  wood.focus()
+  await user.keyboard('{Enter}{Enter} ')
+  expect(wood).toBeDisabled()
+  expect(within(panel).getByRole('button', { name: 'まだ できない' })).toBeDisabled()
+  expect(panel).toHaveFocus()
+  await user.keyboard('{Escape}')
+  expect(panel).not.toBeInTheDocument()
+  expect(screen.getByRole('application')).toHaveFocus()
 })
 
 it('chooses an already crafted block again from the crafting table, and by a long press on it in the world', async () => {
@@ -720,4 +738,133 @@ it('places stairs that climb the way the player looks, and copies them by a long
   expect(blockAt(world(), { x: 10, y: 3, z: 10 })?.material).toBe('stairs_1')
   tap({ x: 6, y: 2, z: 10 }, { x: 0, y: 1, z: 0 }, { x: 0.1, y: -0.5, z: -0.9 })
   expect(blockAt(world(), { x: 6, y: 3, z: 10 })?.material).toBe('stairs_2')
+})
+
+it('crafts a dragon egg from lava, fire (a torch) and lava, and hatches a baby dragon that breathes fire', async () => {
+  localStorage.setItem(CRAFTED_KEY, JSON.stringify(['torch']))
+  const placed = createWorld()
+  editWorld(placed, { x: 8, y: 3, z: 8 }, 'workbench', 'place')
+  const user = await start(placed)
+  tap({ x: 8, y: 3, z: 8 })
+  const panel = screen.getByRole('dialog', { name: 'クラフトだい' })
+  expect(within(panel).getByRole('button', { name: 'たまごの レシピ' })).toHaveTextContent('🌋+🔥+🌋=🥚')
+  for (const name of ['ようがんを ならべる', 'たいまつを ならべる', 'ようがんを ならべる']) await user.click(within(panel).getByRole('button', { name }))
+  await user.click(within(panel).getByRole('button', { name: 'たまごを つくる' }))
+  expect(screen.getByRole('status')).toHaveTextContent('たまごが できた')
+  expect(screen.getByRole('button', { name: 'たまご' })).toHaveAttribute('aria-pressed', 'true')
+  tap({ x: 9, y: 2, z: 8 })
+  const egg = { x: 9, y: 3, z: 8 }
+  expect(blockAt(world(), egg)?.material).toBe('dragon_egg')
+  const animals = herd().length
+  tap(egg)
+  expect(blockAt(world(), egg)).toBeUndefined()
+  expect(herd()).toHaveLength(animals + 1)
+  const dragon = herd().at(-1)!
+  expect(dragon).toMatchObject({ kind: 'dragon', x: 9, z: 8, baby: true })
+  expect(screen.getByRole('status')).toHaveTextContent('ドラゴンが うまれた')
+  expect(playCraftSound).toHaveBeenLastCalledWith('hatch')
+  // こむぎが なくても、さわると ひを はく
+  touch(dragon)
+  expect(playCraftSound).toHaveBeenLastCalledWith('flame')
+  expect(herd().at(-1)).toBe(dragon)
+  await user.click(screen.getByRole('button', { name: /ほぞん/ }))
+  expect(readGame()?.herd.at(-1)).toEqual(dragon)
+  // もどすと たまごに もどる
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(blockAt(world(), egg)?.material).toBe('dragon_egg')
+  expect(herd()).toHaveLength(animals)
+})
+
+it('keeps the egg when there is no room for another animal', async () => {
+  const placed = createWorld()
+  const egg = { x: 9, y: 3, z: 8 }
+  editWorld(placed, egg, 'dragon_egg', 'place')
+  await start(placed, herdFrom(Array.from({ length: MAX_HERD }, (_, i) => ({ kind: 'rabbit' as const, x: i, z: 12 }))))
+  tap(egg)
+  expect(screen.getByRole('status')).toHaveTextContent('いっぱい')
+  expect(blockAt(world(), egg)?.material).toBe('dragon_egg')
+  expect(herd()).toHaveLength(MAX_HERD)
+  expect(screen.getByRole('button', { name: '↩ もどす' })).toBeDisabled()
+})
+
+it('warps between portals by touch and by walking onto one, after asking for a second portal', async () => {
+  const user = await startCrafted()
+  scene.api.current = api()
+  await user.click(screen.getByRole('button', { name: 'ワープ' }))
+  const first = { x: 4, y: 3, z: 8 }, second = { x: 12, y: 3, z: 10 }
+  tap({ ...first, y: 2 })
+  tap(first)
+  expect(screen.getByRole('status')).toHaveTextContent('もう 1つ')
+  expect(blockAt(world(), first)?.material).toBe('portal')
+  tap({ ...second, y: 2 })
+  const built = blocks()
+  tap(first)
+  expect(scene.options.cursor).toEqual({ x: 12, y: 0, z: 10 })
+  expect(scene.api.current!.focus).toHaveBeenLastCalledWith(12, 10)
+  expect(screen.getByRole('status')).toHaveTextContent('ワープ！')
+  expect(playCraftSound).toHaveBeenLastCalledWith('warp')
+  expect(blocks()).toEqual(built)
+  // あるいて ワープの うえから おりて、もういちど のると もどる
+  await user.click(screen.getByRole('button', { name: 'あるく' }))
+  expect(scene.options.walker).toEqual({ ...second, y: 4 })
+  await user.click(screen.getByRole('button', { name: 'まえへ すすむ' }))
+  expect(scene.options.walker).toEqual({ x: 13, y: 3, z: 10 })
+  expect(playCraftSound).toHaveBeenLastCalledWith('step')
+  await user.click(screen.getByRole('button', { name: 'うしろへ さがる' }))
+  expect(scene.options.walker).toEqual({ ...first, y: 4 })
+  expect(scene.options.cursor).toEqual({ x: 4, y: 0, z: 8 })
+  expect(playCraftSound).toHaveBeenLastCalledWith('warp')
+})
+
+it('launches fireworks from the block by touch, without changing the world', async () => {
+  const user = await startCrafted()
+  scene.api.current = api()
+  await user.click(screen.getByRole('button', { name: 'はなび' }))
+  const fireworks = { x: 8, y: 3, z: 8 }
+  tap({ ...fireworks, y: 2 })
+  const built = blocks()
+  tap(fireworks)
+  tap(fireworks)
+  expect(scene.api.current!.fireworks).toHaveBeenCalledTimes(2)
+  expect(scene.api.current!.fireworks).toHaveBeenLastCalledWith(fireworks)
+  expect(blocks()).toEqual(built)
+  expect(screen.getByRole('status')).toHaveTextContent('きれい')
+  expect(playCraftSound).toHaveBeenLastCalledWith('firework')
+  // もどすと はなびを おく まえに もどる（うちあげは きろくしない）
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(blockAt(world(), fireworks)).toBeUndefined()
+})
+
+it('paints touched blocks in ぬる mode, also 3×3, and keeps painting after choosing another block', async () => {
+  const user = await start()
+  const initial = blocks()
+  const paint = screen.getByRole('button', { name: '🖌️ ぬる' })
+  await user.click(screen.getByRole('button', { name: 'いし' }))
+  await user.click(paint)
+  expect(paint).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: '🧱 おく' })).toHaveAttribute('aria-pressed', 'false')
+  tap({ x: 8, y: 2, z: 8 })
+  expect(blockAt(world(), { x: 8, y: 2, z: 8 })?.material).toBe('stone')
+  expect(blockAt(world(), { x: 8, y: 3, z: 8 })).toBeUndefined()
+  expect(playCraftSound).toHaveBeenLastCalledWith('paint')
+  // ほかの ブロックを えらんでも、ながおしで えらんでも ぬる まま
+  await user.click(screen.getByRole('button', { name: 'れんが' }))
+  expect(paint).toHaveAttribute('aria-pressed', 'true')
+  await user.click(screen.getByRole('button', { name: '🔲 ひろく' }))
+  tap({ x: 8, y: 2, z: 8 })
+  expect(blocks().filter(b => b.y === 2 && b.material === 'brick')).toHaveLength(9)
+  expect(blocks()).toHaveLength(initial.length)
+  act(() => scene.options.onHold?.(blocks().find(b => b.material === 'pumpkin')!))
+  expect(screen.getByRole('button', { name: 'かぼちゃ' })).toHaveAttribute('aria-pressed', 'true')
+  expect(paint).toHaveAttribute('aria-pressed', 'true')
+  // くさばなは ぬらない
+  await user.click(screen.getByRole('button', { name: '🔲 ひろく' }))
+  vi.mocked(playCraftSound).mockClear()
+  const before = blocks()
+  tap(blocks().find(b => b.material === 'flower')!)
+  expect(blocks()).toEqual(before)
+  expect(playCraftSound).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(blocks()).toEqual(initial)
 })
