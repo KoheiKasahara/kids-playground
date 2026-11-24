@@ -1,461 +1,652 @@
 // 動物園のマップ（Three.js の座標: x 右, z 手前, y 上。単位はメートル）。
-// 動物ごとの生活エリアは円で表し、池・岩・木は避ける障害物（円）として持つ。
-// 描画（scenery.ts）と行動（behavior.ts）の両方がこのデータを参照する。
+// 園はいくつかの「エリア」に分かれ、1度に1つのエリアだけを読み込んで描く（動物が増えても重くしない）。
+// エリアの中は、園路の輪（ring）のまわりに展示場（円）を並べる。展示場には複数の種類をいっしょに入れられ、
+// 柵の種類（堀・ガラス・おり・岩のかべ・木のさく）や獣舎を動物に合わせて変える。
+// 描画（scenery.ts）・動物の行動（behavior.ts）・歩くモード（walk.ts）が、このデータを参照する。
+
+import type { SpeciesId } from './species'
 
 export type Vec2 = { x: number; z: number }
 export type Circle = Vec2 & { r: number }
 
-export type TreeKind = 'round' | 'acacia' | 'palm' | 'bush' | 'bamboo'
+export type TreeKind = 'round' | 'acacia' | 'palm' | 'bush' | 'bamboo' | 'pine'
 export type Tree = Vec2 & { kind: TreeKind; size: number }
 export type Rock = Vec2 & { r: number; h: number; color?: string }
 
+/**
+ * 柵の種類（実際の動物園を参考に、動物に合わせて変える）。
+ * - wood: 木のさく。草食の動物・ふれあい
+ * - low: 低い木のさく（中が見やすい。ふれあい広場・フラミンゴ）
+ * - moat: 堀（ほり）と低い石のかべ。ゾウ・サイ・サバンナ・サル山
+ * - glass: ガラスのかべ。ペンギン・シロクマ・ワニ・カバ（水の中が見える）
+ * - bars: 高いおり（もうじゅう）
+ * - rock: 岩のかべ（ゴリラ）
+ */
+export type Barrier = 'wood' | 'low' | 'moat' | 'glass' | 'bars' | 'rock'
+
+export type House = {
+  /** 展示場の中心から見た向き（ラジアン、+z が 0）。ふつうは見る側の反対（奥）。 */
+  angle: number
+  width: number
+  depth: number
+  height: number
+  wall: string
+  roof: string
+}
+
 export type Enclosure = {
   id: string
+  /** ここで暮らす動物の種類（サバンナのように、いっしょに入れてもよい）。 */
+  species: SpeciesId[]
   center: Vec2
   radius: number
-  /** 柵の色。エリアの見分けに使う。 */
+  barrier: Barrier
+  /** 柵の色。 */
   fence: string
   ground: string
   pond?: Circle
   trees: Tree[]
   rocks: Rock[]
-  /** 柵の切れ目（入口）の向き（ラジアン、+z が 0）。 */
-  gate: number
+  /** 見る側（園路側）の向き（ラジアン、+z が 0）。看板と見学の場所はこちら。 */
+  front: number
+  /** 奥の獣舎（動物の家）。 */
+  house?: House
+  /** 中に入れる（ふれあい）。入口は front の向き。 */
+  walkIn?: boolean
 }
 
-export type ZooMap = {
+export type AreaId = 'savanna' | 'wild' | 'forest' | 'water' | 'farm'
+
+export type AreaExit = {
+  to: AreaId
+  /** 出入口の門の位置（エリアのふち）。ここをくぐると隣のエリアへ行く。 */
+  at: Vec2
+  /** 外へ向かう向き（この向きへ歩いて出る）。 */
+  heading: number
+}
+
+export type Area = {
+  id: AreaId
+  name: string
+  emoji: string
+  /** エリアを歩ける範囲の半径。 */
   radius: number
+  /** 園路の輪の半径。展示場はこのまわりに並ぶ。 */
+  ring: number
+  /** ベンチと花だんのある広場。 */
   plaza: Circle
-  /**
-   * 内側のエリアを囲む環状の園路の半径。外側のエリアの入口はこの園路へつながり、
-   * 園路は spokes で広場とつながる。
-   */
-  ringRoad: number
-  /** 広場と環状の園路を結ぶ道（内側のエリアのすきまを通す）。 */
-  spokes: [Vec2, Vec2][]
+  grass: string
+  sky: string
+  /** 園路のそばに植える木の種類（エリアの雰囲気）。 */
+  treeKinds: TreeKind[]
   enclosures: Enclosure[]
-  /** 柵の外（園路のまわり）に置く木。 */
-  outerTrees: Tree[]
+  /** 柵の外の木（園路・展示場・出入口をよけて置く）。 */
+  trees: Tree[]
+  exits: AreaExit[]
 }
 
-/** 外側の輪に並ぶエリアの中心（angle は度で、+z が 0・+x が 90）。 */
-const OUTER_RING = 27
-/** 外側の輪のすきまの奥に、さらに並べる3つ目の輪（外側のエリアと交互）。 */
-const THIRD_RING = 37.5
-/** 3つ目の輪で使う方向（ここには、すきまの木を植えない）。 */
-const THIRD_SLOTS = [-11.25, 11.25, -33.75, 33.75]
-function outer(angleDeg: number, ring = OUTER_RING): Vec2 {
-  const a = angleDeg * Math.PI / 180
-  return { x: round(Math.sin(a) * ring), z: round(Math.cos(a) * ring) }
-}
+/** 園路の半分の幅（m）。 */
+export const PATH_HALF = 1.3
+const RING = 11.5
+/** 外側の展示場の柵と、園路の輪のあいだのすきま。 */
+const OUTER_GAP = 2.6
+
 function round(v: number): number {
   return Math.round(v * 100) / 100
 }
-/** エリアの中心から dx, dz だけずらした位置。 */
-function near(c: Vec2, dx: number, dz: number): Vec2 {
-  return { x: round(c.x + dx), z: round(c.z + dz) }
+function polar(angleDeg: number, dist: number): Vec2 {
+  const a = angleDeg * Math.PI / 180
+  return { x: round(Math.sin(a) * dist), z: round(Math.cos(a) * dist) }
 }
-/** 入口を広場（原点）へ向ける。 */
+/** 園路の輪の外側に、半径 r の展示場を置くときの中心。 */
+function outer(angleDeg: number, r: number): Vec2 {
+  return polar(angleDeg, RING + OUTER_GAP + r)
+}
+/** エリアの中心（広場）へ向く向き。 */
 function facingCenter(c: Vec2): number {
   return Math.atan2(-c.x, -c.z)
 }
-
-// 外側の輪は 22.5 度ずつ 16 か所。0 度が手前（俯瞰のカメラ側）
-const RABBIT = outer(0, 26.4)
-const PENGUIN = outer(22.5)
-const TIGER = outer(-22.5)
-const HIPPO = outer(45)
-const ZEBRA = outer(-45)
-const FLAMINGO = outer(67.5)
-const KANGAROO = outer(-67.5)
-const POLAR_BEAR = outer(90)
-const CAMEL = outer(-90)
-const CAPYBARA = outer(135)
-const CROCODILE = outer(-135)
-const MONKEY = outer(180)
-const SHEEP = outer(112.5)
-const GORILLA = outer(-112.5)
-const RED_PANDA = outer(157.5)
-const RHINO = outer(-157.5)
-const DEER = outer(-11.25, THIRD_RING)
-const FOX = outer(11.25, THIRD_RING)
-const OSTRICH = outer(-33.75, THIRD_RING)
-
-export const ZOO_MAP: ZooMap = {
-  radius: 44,
-  plaza: { x: 0, z: 0.4, r: 2.6 },
-  ringRoad: 18.6,
-  spokes: [[{ x: -2.4, z: 0.8 }, { x: -18.6, z: 0.8 }], [{ x: 2.4, z: 0.8 }, { x: 18.6, z: 0.8 }]],
-  enclosures: [
-    {
-      id: 'elephant',
-      center: { x: -6.0, z: -6.3 },
-      radius: 5.9,
-      fence: '#b98552',
-      ground: '#bfd77a',
-      pond: { x: -7.9, z: -8.6, r: 1.9 },
-      trees: [
-        { x: -9.6, z: -4.6, kind: 'round', size: 1.0 },
-        { x: -3.2, z: -10.5, kind: 'bush', size: 0.9 },
-      ],
-      rocks: [{ x: -1.3, z: -6.9, r: 0.55, h: 0.45 }],
-      gate: Math.atan2(6.0, 6.7),
-    },
-    {
-      id: 'giraffe',
-      center: { x: 6.1, z: -6.1 },
-      radius: 5.9,
-      fence: '#c99a5b',
-      ground: '#d8d38a',
-      trees: [
-        { x: 8.3, z: -9.3, kind: 'acacia', size: 1.15 },
-        { x: 2.8, z: -9.6, kind: 'acacia', size: 0.95 },
-        { x: 10.1, z: -4.4, kind: 'bush', size: 0.8 },
-      ],
-      rocks: [{ x: 3.0, z: -3.4, r: 0.42, h: 0.35 }],
-      gate: Math.atan2(-6.1, 6.5),
-    },
-    {
-      id: 'lion',
-      center: { x: -5.6, z: 7.2 },
-      radius: 5.4,
-      fence: '#a4744a',
-      ground: '#e2c27f',
-      trees: [
-        { x: -9.1, z: 10.0, kind: 'acacia', size: 0.85 },
-        { x: -1.8, z: 10.1, kind: 'bush', size: 0.8 },
-      ],
-      rocks: [
-        { x: -3.7, z: 8.8, r: 1.15, h: 0.85 },
-        { x: -7.9, z: 5.3, r: 0.55, h: 0.45 },
-        { x: -2.8, z: 5.0, r: 0.42, h: 0.35 },
-      ],
-      gate: Math.atan2(5.6, -6.8),
-    },
-    {
-      id: 'panda',
-      center: { x: 5.6, z: 7.2 },
-      radius: 5.2,
-      fence: '#9c7b55',
-      ground: '#c9dd8e',
-      trees: [
-        { x: 8.7, z: 9.3, kind: 'bamboo', size: 1.0 },
-        { x: 2.9, z: 10.2, kind: 'bamboo', size: 0.85 },
-        { x: 9.6, z: 5.4, kind: 'bush', size: 0.75 },
-      ],
-      rocks: [{ x: 3.6, z: 5.0, r: 0.45, h: 0.35 }],
-      gate: Math.atan2(-5.6, -6.8),
-    },
-    {
-      id: 'tiger',
-      center: TIGER,
-      radius: 4.9,
-      fence: '#8f6a45',
-      ground: '#c4d887',
-      pond: { ...near(TIGER, -1.9, 1.2), r: 1.3 },
-      trees: [
-        { ...near(TIGER, 2.4, 1.6), kind: 'round', size: 0.9 },
-        { ...near(TIGER, 1.2, -3.2), kind: 'bush', size: 0.8 },
-      ],
-      rocks: [{ ...near(TIGER, -2.0, -2.2), r: 0.75, h: 0.6 }],
-      gate: facingCenter(TIGER),
-    },
-    {
-      id: 'penguin',
-      center: PENGUIN,
-      radius: 4.6,
-      fence: '#7f9fb5',
-      ground: '#e4eef0',
-      pond: { ...near(PENGUIN, 1.4, 1.6), r: 1.6 },
-      trees: [],
-      rocks: [
-        { ...near(PENGUIN, -2.1, -1.6), r: 0.7, h: 0.55, color: '#e8f3f8' },
-        { ...near(PENGUIN, 2.4, -1.9), r: 0.5, h: 0.4, color: '#dcebf3' },
-        { ...near(PENGUIN, -2.6, 1.2), r: 0.4, h: 0.3, color: '#eef7fb' },
-      ],
-      gate: facingCenter(PENGUIN),
-    },
-    {
-      id: 'zebra',
-      center: ZEBRA,
-      radius: 5.0,
-      fence: '#b48a5a',
-      ground: '#dccf8e',
-      trees: [
-        { ...near(ZEBRA, -2.6, 2.0), kind: 'acacia', size: 0.9 },
-        { ...near(ZEBRA, 2.4, -2.6), kind: 'bush', size: 0.75 },
-      ],
-      rocks: [{ ...near(ZEBRA, -2.3, -2.3), r: 0.45, h: 0.35 }],
-      gate: facingCenter(ZEBRA),
-    },
-    {
-      id: 'hippo',
-      center: HIPPO,
-      radius: 5.0,
-      fence: '#9b7d62',
-      ground: '#c7d68c',
-      pond: { ...near(HIPPO, 1.9, -1.4), r: 1.9 },
-      trees: [
-        { ...near(HIPPO, -2.7, 1.9), kind: 'palm', size: 0.8 },
-        { ...near(HIPPO, -1.6, -3.4), kind: 'bush', size: 0.7 },
-      ],
-      rocks: [{ ...near(HIPPO, 2.9, 2.0), r: 0.45, h: 0.35 }],
-      gate: facingCenter(HIPPO),
-    },
-    {
-      id: 'rabbit',
-      center: RABBIT,
-      radius: 4.3,
-      fence: '#c49a6c',
-      ground: '#b9de86',
-      trees: [
-        { ...near(RABBIT, -2.3, 1.6), kind: 'bush', size: 0.7 },
-        { ...near(RABBIT, 2.4, 1.2), kind: 'bush', size: 0.65 },
-        { ...near(RABBIT, 0.6, 2.9), kind: 'round', size: 0.7 },
-      ],
-      rocks: [{ ...near(RABBIT, -1.5, -1.9), r: 0.35, h: 0.25 }],
-      gate: facingCenter(RABBIT),
-    },
-    {
-      id: 'kangaroo',
-      center: KANGAROO,
-      radius: 5.0,
-      fence: '#b06e45',
-      ground: '#e3b57c',
-      trees: [
-        { ...near(KANGAROO, -2.8, 1.9), kind: 'round', size: 0.85 },
-        { ...near(KANGAROO, -1.2, -3.3), kind: 'bush', size: 0.7 },
-      ],
-      rocks: [
-        { ...near(KANGAROO, 1.4, 2.8), r: 0.6, h: 0.45, color: '#c98f63' },
-        { ...near(KANGAROO, -3.2, -1.2), r: 0.4, h: 0.3, color: '#d29a6c' },
-      ],
-      gate: facingCenter(KANGAROO),
-    },
-    {
-      id: 'flamingo',
-      center: FLAMINGO,
-      radius: 4.8,
-      fence: '#d08aa0',
-      ground: '#cfe39a',
-      pond: { ...near(FLAMINGO, 1.9, 1.3), r: 1.8 },
-      trees: [
-        { ...near(FLAMINGO, -2.4, 2.4), kind: 'palm', size: 0.8 },
-        { ...near(FLAMINGO, -2.0, -2.6), kind: 'bush', size: 0.65 },
-      ],
-      rocks: [{ ...near(FLAMINGO, 3.1, -2.2), r: 0.35, h: 0.25 }],
-      gate: facingCenter(FLAMINGO),
-    },
-    {
-      id: 'polar_bear',
-      center: POLAR_BEAR,
-      radius: 5.1,
-      fence: '#7d9bb0',
-      ground: '#e6eef0',
-      pond: { ...near(POLAR_BEAR, -1.4, 1.6), r: 1.7 },
-      trees: [],
-      rocks: [
-        // 池のほとり（水浴びで立つ場所）をふさがないよう、池から離して置く
-        { ...near(POLAR_BEAR, 2.6, -1.0), r: 0.8, h: 0.65, color: '#eef6fa' },
-        { ...near(POLAR_BEAR, 1.3, -3.0), r: 0.5, h: 0.4, color: '#e2eff6' },
-        { ...near(POLAR_BEAR, -3.0, -2.0), r: 0.45, h: 0.35, color: '#f2f8fb' },
-      ],
-      gate: facingCenter(POLAR_BEAR),
-    },
-    {
-      id: 'camel',
-      center: CAMEL,
-      radius: 5.2,
-      fence: '#c08b55',
-      ground: '#ecd29a',
-      trees: [
-        { ...near(CAMEL, -2.6, -2.4), kind: 'palm', size: 0.95 },
-        { ...near(CAMEL, 2.9, -1.6), kind: 'palm', size: 0.8 },
-      ],
-      rocks: [
-        { ...near(CAMEL, -2.4, 2.4), r: 0.55, h: 0.4, color: '#d8b47c' },
-        { ...near(CAMEL, 1.2, 3.0), r: 0.4, h: 0.3, color: '#dcbb86' },
-      ],
-      gate: facingCenter(CAMEL),
-    },
-    {
-      id: 'monkey',
-      center: MONKEY,
-      radius: 5.0,
-      fence: '#8a6a4c',
-      ground: '#c3d08a',
-      trees: [
-        { ...near(MONKEY, -2.9, -1.4), kind: 'round', size: 0.95 },
-        { ...near(MONKEY, 2.8, -1.8), kind: 'round', size: 0.85 },
-      ],
-      // サル山: 大きな岩を重ねる
-      rocks: [
-        { ...near(MONKEY, 0.4, -2.3), r: 1.15, h: 1.0, color: '#b9ab96' },
-        { ...near(MONKEY, -1.4, -2.9), r: 0.6, h: 0.5 },
-        { ...near(MONKEY, 2.4, 1.6), r: 0.45, h: 0.35 },
-      ],
-      gate: facingCenter(MONKEY),
-    },
-    {
-      id: 'capybara',
-      center: CAPYBARA,
-      radius: 4.6,
-      fence: '#a3794f',
-      ground: '#c6db8f',
-      // お風呂の池
-      pond: { ...near(CAPYBARA, 1.0, -1.7), r: 1.5 },
-      trees: [
-        { ...near(CAPYBARA, -2.4, -1.5), kind: 'bush', size: 0.75 },
-        { ...near(CAPYBARA, -1.4, 2.6), kind: 'round', size: 0.75 },
-      ],
-      rocks: [{ ...near(CAPYBARA, 2.7, 1.3), r: 0.4, h: 0.3 }],
-      gate: facingCenter(CAPYBARA),
-    },
-    {
-      id: 'crocodile',
-      center: CROCODILE,
-      radius: 5.2,
-      fence: '#6f8a52',
-      ground: '#d6cf8e',
-      pond: { ...near(CROCODILE, 1.4, -1.9), r: 1.7 },
-      trees: [
-        { ...near(CROCODILE, -2.8, -1.8), kind: 'palm', size: 0.85 },
-        { ...near(CROCODILE, -2.4, 2.6), kind: 'bush', size: 0.7 },
-      ],
-      rocks: [{ ...near(CROCODILE, 2.9, 1.6), r: 0.45, h: 0.3 }],
-      gate: facingCenter(CROCODILE),
-    },
-    {
-      id: 'sheep',
-      center: SHEEP,
-      radius: 4.8,
-      fence: '#d2b48a',
-      ground: '#b5dc7f',
-      trees: [
-        { ...near(SHEEP, -2.5, 2.0), kind: 'round', size: 0.8 },
-        { ...near(SHEEP, 2.6, -1.8), kind: 'bush', size: 0.7 },
-        { ...near(SHEEP, -1.0, -3.0), kind: 'bush', size: 0.6 },
-      ],
-      rocks: [],
-      gate: facingCenter(SHEEP),
-    },
-    {
-      id: 'gorilla',
-      center: GORILLA,
-      radius: 5.0,
-      fence: '#7a5c41',
-      ground: '#a9c97a',
-      trees: [
-        { ...near(GORILLA, -2.6, 2.0), kind: 'round', size: 1.0 },
-        { ...near(GORILLA, 2.4, 2.4), kind: 'bamboo', size: 0.8 },
-        { ...near(GORILLA, -1.8, -2.8), kind: 'bush', size: 0.75 },
-      ],
-      rocks: [{ ...near(GORILLA, 2.6, -1.6), r: 0.6, h: 0.5 }],
-      gate: facingCenter(GORILLA),
-    },
-    {
-      id: 'red_panda',
-      center: RED_PANDA,
-      radius: 4.6,
-      fence: '#a0663f',
-      ground: '#bcd88a',
-      trees: [
-        { ...near(RED_PANDA, -2.2, -1.8), kind: 'round', size: 0.9 },
-        { ...near(RED_PANDA, 2.2, 1.9), kind: 'bamboo', size: 0.75 },
-      ],
-      rocks: [{ ...near(RED_PANDA, 1.6, -2.6), r: 0.45, h: 0.35 }],
-      gate: facingCenter(RED_PANDA),
-    },
-    {
-      id: 'rhino',
-      center: RHINO,
-      radius: 5.1,
-      fence: '#9a7a55',
-      ground: '#d9c98c',
-      // どろあびの池
-      pond: { ...near(RHINO, -1.6, -1.6), r: 1.6 },
-      trees: [
-        { ...near(RHINO, 2.5, -2.4), kind: 'acacia', size: 0.85 },
-        { ...near(RHINO, 2.6, 2.2), kind: 'bush', size: 0.7 },
-      ],
-      rocks: [{ ...near(RHINO, -2.8, 2.0), r: 0.5, h: 0.4 }],
-      gate: facingCenter(RHINO),
-    },
-    {
-      id: 'deer',
-      center: DEER,
-      radius: 4.8,
-      fence: '#9b7a4f',
-      ground: '#c0d98a',
-      trees: [
-        { ...near(DEER, -2.4, 1.8), kind: 'round', size: 0.95 },
-        { ...near(DEER, 2.5, 1.6), kind: 'round', size: 0.8 },
-      ],
-      rocks: [{ ...near(DEER, 1.8, -2.4), r: 0.4, h: 0.3 }],
-      gate: facingCenter(DEER),
-    },
-    {
-      id: 'fox',
-      center: FOX,
-      radius: 4.6,
-      fence: '#a8754a',
-      ground: '#d3dc95',
-      trees: [
-        { ...near(FOX, 2.3, 1.7), kind: 'round', size: 0.85 },
-        { ...near(FOX, -2.4, 1.4), kind: 'bush', size: 0.7 },
-      ],
-      // 巣あなのある丘
-      rocks: [{ ...near(FOX, -1.4, -2.4), r: 0.7, h: 0.55, color: '#c9a77a' }],
-      gate: facingCenter(FOX),
-    },
-    {
-      id: 'ostrich',
-      center: OSTRICH,
-      radius: 5.1,
-      fence: '#b38b5e',
-      ground: '#e4cf92',
-      trees: [
-        { ...near(OSTRICH, -2.6, 2.2), kind: 'acacia', size: 0.9 },
-        { ...near(OSTRICH, 2.7, 1.6), kind: 'bush', size: 0.7 },
-      ],
-      rocks: [{ ...near(OSTRICH, 2.2, -2.6), r: 0.45, h: 0.3 }],
-      gate: facingCenter(OSTRICH),
-    },
-  ],
-  outerTrees: [
-    // 環状の園路の内側（内側のエリアのすきま）
-    { x: -0.2, z: -14.2, kind: 'round', size: 1.1 },
-    { x: 0.1, z: 14.6, kind: 'bush', size: 0.9 },
-    { x: -14.0, z: -1.9, kind: 'bush', size: 0.8 },
-    { x: 14.2, z: -1.7, kind: 'bush', size: 0.8 },
-    // 環状の園路と外側のエリアのあいだ
-    ...Array.from({ length: 8 }, (_, i) => ({
-      ...outer(11.25 + i * 45, 21.2), kind: (['bush', 'round'] as const)[i % 2], size: 0.8,
-    })),
-    // 外側のエリアのすきまの奥と、園の外周
-    ...Array.from({ length: 16 }, (_, i) => 11.25 + i * 22.5 - (i >= 8 ? 360 : 0))
-      .filter(deg => !THIRD_SLOTS.includes(deg))
-      .map((deg, i) => ({ ...outer(deg, 31.2 + (i % 2) * 0.8), kind: (['round', 'palm', 'bush'] as const)[i % 3], size: 0.95 + (i % 3) * 0.1 })),
-    ...Array.from({ length: 16 }, (_, i) => ({
-      ...outer(i * 22.5, 36.5), kind: (['round', 'bush', 'palm'] as const)[i % 3], size: 1.15,
-    })),
-    ...Array.from({ length: 16 }, (_, i) => ({
-      ...outer(11.25 + i * 22.5, 45), kind: (['bush', 'round', 'palm'] as const)[i % 3], size: 1.2,
-    })),
-  ],
+/**
+ * 展示場の中の位置を「奥へ back・右へ side」で決める（見る側から見た左右）。
+ * 展示場の向きが変わっても、池や木の配置が同じ見え方になる。
+ */
+function local(c: Vec2, front: number, back: number, side: number): Vec2 {
+  const bx = -Math.sin(front)
+  const bz = -Math.cos(front)
+  // 見る側（front の外）から中を見たときの右
+  const sx = -bz
+  const sz = bx
+  return { x: round(c.x + bx * back + sx * side), z: round(c.z + bz * back + sz * side) }
 }
 
-export function enclosureById(id: string, map: ZooMap = ZOO_MAP): Enclosure {
-  const found = map.enclosures.find(e => e.id === id)
+type EnclosureSpec = Omit<Enclosure, 'trees' | 'rocks' | 'pond' | 'house'> & {
+  pond?: { back: number; side: number; r: number }
+  trees?: { back: number; side: number; kind: TreeKind; size: number }[]
+  rocks?: { back: number; side: number; r: number; h: number; color?: string }[]
+  house?: Omit<House, 'angle'>
+}
+
+function enclosure(spec: EnclosureSpec): Enclosure {
+  const { center: c, front } = spec
+  return {
+    ...spec,
+    pond: spec.pond ? { ...local(c, front, spec.pond.back, spec.pond.side), r: spec.pond.r } : undefined,
+    trees: (spec.trees ?? []).map(t => ({ ...local(c, front, t.back, t.side), kind: t.kind, size: t.size })),
+    rocks: (spec.rocks ?? []).map(r => ({ ...local(c, front, r.back, r.side), r: r.r, h: r.h, color: r.color })),
+    house: spec.house ? { ...spec.house, angle: front + Math.PI } : undefined,
+  }
+}
+
+function outerEnclosure(angleDeg: number, spec: Omit<EnclosureSpec, 'center' | 'front'>): Enclosure {
+  const center = outer(angleDeg, spec.radius)
+  return enclosure({ ...spec, center, front: facingCenter(center) })
+}
+
+/** 真ん中の大きな展示場（見る側は手前 +z）。 */
+function centerEnclosure(spec: Omit<EnclosureSpec, 'center' | 'front'>): Enclosure {
+  return enclosure({ ...spec, center: { x: 0, z: 0 }, front: 0 })
+}
+
+// ---------------------------------------------------------------------------
+// 柵の内側で動物が動ける広さ
+
+/** 柵から内側へ、動物が入れない幅（堀・岩のかべの厚み）。 */
+export function barrierInset(barrier: Barrier): number {
+  if (barrier === 'moat') return 1.2
+  if (barrier === 'rock') return 0.45
+  return 0
+}
+
+/** 動物が動ける円の半径（柵の内側の堀などを除く）。 */
+export function roamRadius(e: Enclosure): number {
+  return e.radius - barrierInset(e.barrier)
+}
+
+// ---------------------------------------------------------------------------
+// エリアの定義
+
+const SAVANNA_ENCLOSURES: Enclosure[] = [
+  centerEnclosure({
+    id: 'savanna-plains',
+    species: ['giraffe', 'zebra', 'ostrich'],
+    radius: 8.4,
+    barrier: 'moat',
+    fence: '#b9946a',
+    ground: '#dccf8e',
+    pond: { back: 3.2, side: -2.6, r: 1.5 },
+    trees: [
+      { back: 3.6, side: 3.4, kind: 'acacia', size: 1.1 },
+      { back: -2.8, side: -3.8, kind: 'acacia', size: 0.95 },
+      { back: -2.4, side: 4.4, kind: 'bush', size: 0.8 },
+    ],
+    rocks: [{ back: -4.0, side: 1.2, r: 0.55, h: 0.45 }],
+    // キリンの家は背が高い
+    house: { width: 4.2, depth: 3.0, height: 4.4, wall: '#e8c98f', roof: '#a8643c' },
+  }),
+  outerEnclosure(-55, {
+    id: 'elephant',
+    species: ['elephant'],
+    radius: 6.0,
+    barrier: 'moat',
+    fence: '#b98552',
+    ground: '#c9d78a',
+    pond: { back: 1.6, side: -1.5, r: 1.7 },
+    trees: [{ back: 1.3, side: 2.6, kind: 'round', size: 1.0 }],
+    rocks: [{ back: -1.6, side: 1.6, r: 0.5, h: 0.4 }],
+    house: { width: 3.8, depth: 2.8, height: 3.4, wall: '#d9b98a', roof: '#8f5a3a' },
+  }),
+  outerEnclosure(55, {
+    id: 'rhino',
+    species: ['rhino'],
+    radius: 5.4,
+    barrier: 'moat',
+    fence: '#9a7a55',
+    ground: '#d9c98c',
+    // どろあびの池
+    pond: { back: 1.1, side: 1.5, r: 1.5 },
+    trees: [{ back: 1.4, side: -2.3, kind: 'acacia', size: 0.85 }],
+    rocks: [{ back: -1.5, side: -1.2, r: 0.45, h: 0.35 }],
+  }),
+  outerEnclosure(125, {
+    id: 'hippo',
+    species: ['hippo'],
+    radius: 5.6,
+    barrier: 'glass',
+    fence: '#6d8597',
+    ground: '#c7d68c',
+    // 大きな池（ガラスごしに水の中が見える）
+    pond: { back: 0.4, side: 0.4, r: 2.3 },
+    trees: [{ back: 2.2, side: -3.0, kind: 'palm', size: 0.8 }],
+    rocks: [{ back: -1.9, side: 2.8, r: 0.4, h: 0.3 }],
+  }),
+  outerEnclosure(-125, {
+    id: 'meerkat',
+    species: ['meerkat'],
+    radius: 4.4,
+    barrier: 'glass',
+    fence: '#8a7a66',
+    ground: '#e8d6a4',
+    trees: [{ back: 2.2, side: 1.6, kind: 'bush', size: 0.6 }],
+    // すあなのある砂の山と、見はり台の岩
+    rocks: [
+      { back: 1.0, side: -1.6, r: 0.75, h: 0.55, color: '#d9be86' },
+      { back: -1.2, side: 1.2, r: 0.45, h: 0.5, color: '#c8b08a' },
+    ],
+  }),
+]
+
+const WILD_ENCLOSURES: Enclosure[] = [
+  outerEnclosure(-45, {
+    id: 'lion',
+    species: ['lion'],
+    radius: 6.0,
+    barrier: 'bars',
+    fence: '#4f5b4a',
+    ground: '#e2c27f',
+    trees: [{ back: 2.6, side: -2.4, kind: 'acacia', size: 0.9 }],
+    // ライオンの見はらし岩
+    rocks: [
+      { back: 1.2, side: 1.8, r: 1.15, h: 0.9 },
+      { back: -1.6, side: -1.8, r: 0.45, h: 0.35 },
+    ],
+    house: { width: 3.4, depth: 2.6, height: 2.6, wall: '#c9a777', roof: '#6b4a32' },
+  }),
+  outerEnclosure(45, {
+    id: 'tiger',
+    species: ['tiger'],
+    radius: 5.8,
+    barrier: 'bars',
+    fence: '#4f5b4a',
+    ground: '#c4d887',
+    pond: { back: 1.4, side: -1.7, r: 1.4 },
+    trees: [{ back: 1.6, side: 2.4, kind: 'round', size: 0.95 }],
+    rocks: [{ back: -1.6, side: 1.7, r: 0.7, h: 0.55 }],
+  }),
+  outerEnclosure(-105, {
+    id: 'cheetah',
+    species: ['cheetah'],
+    radius: 6.0,
+    barrier: 'bars',
+    fence: '#4f5b4a',
+    ground: '#e3cb86',
+    trees: [{ back: 2.6, side: 2.0, kind: 'acacia', size: 0.9 }],
+    // 見はらしの丘（アリづかのような土の山）
+    rocks: [
+      { back: 0.8, side: -2.2, r: 0.8, h: 0.75, color: '#c9a77a' },
+      { back: -2.2, side: 1.2, r: 0.4, h: 0.3 },
+    ],
+  }),
+  outerEnclosure(105, {
+    id: 'wolf',
+    species: ['wolf'],
+    radius: 5.6,
+    barrier: 'bars',
+    fence: '#4f5b4a',
+    ground: '#b9cf86',
+    trees: [
+      { back: 2.0, side: -2.2, kind: 'pine', size: 1.0 },
+      { back: 2.6, side: 1.6, kind: 'pine', size: 0.85 },
+    ],
+    // 見はらしの岩と、巣あなの丘
+    rocks: [
+      { back: 0.6, side: 2.4, r: 0.85, h: 0.7 },
+      { back: -2.4, side: -0.8, r: 0.45, h: 0.35 },
+    ],
+  }),
+  outerEnclosure(155, {
+    id: 'fox',
+    species: ['fox'],
+    radius: 4.8,
+    barrier: 'bars',
+    fence: '#5a6650',
+    ground: '#d3dc95',
+    trees: [{ back: 1.8, side: 2.0, kind: 'pine', size: 0.85 }],
+    // 巣あなのある丘
+    rocks: [{ back: 1.8, side: -1.6, r: 0.7, h: 0.55, color: '#c9a77a' }],
+  }),
+]
+
+const FOREST_ENCLOSURES: Enclosure[] = [
+  centerEnclosure({
+    id: 'monkey',
+    species: ['monkey'],
+    radius: 7.2,
+    barrier: 'moat',
+    fence: '#8a7a66',
+    ground: '#c3d08a',
+    // サル山: 真ん中に大きな岩を積む（サルはまわりを歩き回る）
+    rocks: [
+      { back: 0.0, side: 0.0, r: 1.7, h: 2.2, color: '#b9ab96' },
+      { back: 1.2, side: -1.0, r: 1.0, h: 1.3, color: '#aa9d88' },
+      { back: -0.9, side: 1.2, r: 0.8, h: 0.9 },
+    ],
+    trees: [{ back: 3.4, side: 3.2, kind: 'round', size: 0.9 }],
+  }),
+  outerEnclosure(-50, {
+    id: 'panda',
+    species: ['panda'],
+    radius: 5.8,
+    barrier: 'glass',
+    fence: '#6f7d6a',
+    ground: '#c9dd8e',
+    trees: [
+      { back: 2.2, side: 2.4, kind: 'bamboo', size: 1.0 },
+      { back: 2.6, side: -1.8, kind: 'bamboo', size: 0.85 },
+    ],
+    rocks: [{ back: -1.6, side: -2.0, r: 0.45, h: 0.35 }],
+    house: { width: 3.6, depth: 2.6, height: 2.8, wall: '#f2ede0', roof: '#4b7a3a' },
+  }),
+  outerEnclosure(50, {
+    id: 'red_panda',
+    species: ['red_panda'],
+    radius: 5.0,
+    barrier: 'low',
+    fence: '#a0663f',
+    ground: '#bcd88a',
+    trees: [
+      { back: 1.8, side: -2.0, kind: 'round', size: 0.9 },
+      { back: 2.0, side: 2.0, kind: 'bamboo', size: 0.75 },
+    ],
+    rocks: [{ back: -1.8, side: 1.4, r: 0.45, h: 0.35 }],
+  }),
+  outerEnclosure(-125, {
+    id: 'gorilla',
+    species: ['gorilla'],
+    radius: 5.8,
+    barrier: 'rock',
+    fence: '#9a8f80',
+    ground: '#a9c97a',
+    trees: [
+      { back: 1.6, side: -2.3, kind: 'round', size: 1.0 },
+      { back: 2.2, side: 2.0, kind: 'bamboo', size: 0.8 },
+    ],
+    rocks: [{ back: -1.5, side: 2.0, r: 0.6, h: 0.5 }],
+  }),
+  outerEnclosure(125, {
+    id: 'bear',
+    species: ['bear'],
+    radius: 5.8,
+    barrier: 'moat',
+    fence: '#8a7a66',
+    ground: '#b5cf86',
+    // 水あそびの池と、大きな岩
+    pond: { back: 1.2, side: 1.4, r: 1.4 },
+    trees: [{ back: 1.0, side: -2.2, kind: 'pine', size: 1.0 }],
+    rocks: [{ back: -1.4, side: -0.6, r: 0.75, h: 0.6 }],
+  }),
+]
+
+const WATER_ENCLOSURES: Enclosure[] = [
+  centerEnclosure({
+    id: 'capybara',
+    species: ['capybara'],
+    radius: 5.6,
+    barrier: 'low',
+    fence: '#a3794f',
+    ground: '#c6db8f',
+    // カピバラの おふろ
+    pond: { back: 1.5, side: -0.6, r: 1.6 },
+    trees: [{ back: 1.8, side: 2.8, kind: 'round', size: 0.8 }],
+    rocks: [{ back: -1.6, side: 2.2, r: 0.4, h: 0.3 }],
+  }),
+  outerEnclosure(-50, {
+    id: 'penguin',
+    species: ['penguin'],
+    radius: 6.0,
+    barrier: 'glass',
+    fence: '#6f93ab',
+    ground: '#e4eef0',
+    pond: { back: 1.2, side: 0.6, r: 2.2 },
+    rocks: [
+      { back: -1.0, side: -2.6, r: 0.7, h: 0.55, color: '#e8f3f8' },
+      { back: 2.8, side: -2.2, r: 0.5, h: 0.4, color: '#dcebf3' },
+      { back: -2.2, side: 2.4, r: 0.4, h: 0.3, color: '#eef7fb' },
+    ],
+  }),
+  outerEnclosure(50, {
+    id: 'polar_bear',
+    species: ['polar_bear'],
+    radius: 6.0,
+    barrier: 'glass',
+    fence: '#6f93ab',
+    ground: '#e6eef0',
+    pond: { back: 0.9, side: -1.2, r: 2.0 },
+    // 池のほとり（水浴びで立つ場所）をふさがないよう、池から離して置く
+    rocks: [
+      { back: 2.4, side: 2.4, r: 0.8, h: 0.65, color: '#eef6fa' },
+      { back: -2.2, side: 2.4, r: 0.5, h: 0.4, color: '#e2eff6' },
+    ],
+  }),
+  outerEnclosure(-125, {
+    id: 'crocodile',
+    species: ['crocodile'],
+    radius: 5.6,
+    barrier: 'glass',
+    fence: '#5f7a52',
+    ground: '#d6cf8e',
+    pond: { back: 1.0, side: 1.0, r: 1.9 },
+    trees: [{ back: 1.6, side: -2.9, kind: 'palm', size: 0.85 }],
+    rocks: [{ back: -2.0, side: -1.6, r: 0.45, h: 0.3 }],
+  }),
+  outerEnclosure(125, {
+    id: 'flamingo',
+    species: ['flamingo'],
+    radius: 5.4,
+    barrier: 'low',
+    fence: '#d08aa0',
+    ground: '#cfe39a',
+    pond: { back: 0.9, side: 0.9, r: 1.9 },
+    trees: [{ back: 2.2, side: -2.6, kind: 'palm', size: 0.8 }],
+    rocks: [{ back: -2.4, side: -1.6, r: 0.35, h: 0.25 }],
+  }),
+]
+
+const FARM_ENCLOSURES: Enclosure[] = [
+  centerEnclosure({
+    id: 'fureai',
+    species: ['rabbit', 'sheep', 'goat'],
+    radius: 7.0,
+    barrier: 'low',
+    fence: '#c49a6c',
+    ground: '#b9de86',
+    walkIn: true,
+    trees: [
+      { back: 3.6, side: -3.2, kind: 'round', size: 0.9 },
+      { back: 1.0, side: 4.4, kind: 'bush', size: 0.7 },
+    ],
+    rocks: [{ back: -1.8, side: -3.6, r: 0.35, h: 0.25 }],
+    // 赤い屋根の小屋
+    house: { width: 4.0, depth: 2.6, height: 2.6, wall: '#f4e6cc', roof: '#c8553d' },
+  }),
+  outerEnclosure(-50, {
+    id: 'alpaca',
+    species: ['alpaca'],
+    radius: 5.4,
+    barrier: 'wood',
+    fence: '#b98a5a',
+    ground: '#d7d89a',
+    trees: [{ back: 2.4, side: 2.2, kind: 'round', size: 0.85 }],
+    // すなあびの くぼみ
+    rocks: [{ back: 1.4, side: -2.2, r: 0.5, h: 0.3, color: '#d8c08e' }],
+    house: { width: 3.2, depth: 2.4, height: 2.3, wall: '#f1e2c4', roof: '#b4743f' },
+  }),
+  outerEnclosure(50, {
+    id: 'deer',
+    species: ['deer'],
+    radius: 5.4,
+    barrier: 'wood',
+    fence: '#9b7a4f',
+    ground: '#c0d98a',
+    trees: [
+      { back: 1.8, side: -2.4, kind: 'round', size: 0.95 },
+      { back: 2.4, side: 2.0, kind: 'pine', size: 0.8 },
+    ],
+    rocks: [{ back: -1.8, side: 1.8, r: 0.4, h: 0.3 }],
+  }),
+  outerEnclosure(-125, {
+    id: 'kangaroo',
+    species: ['kangaroo'],
+    radius: 5.6,
+    barrier: 'wood',
+    fence: '#b06e45',
+    ground: '#e3b57c',
+    trees: [
+      { back: 1.8, side: -2.6, kind: 'round', size: 0.85 },
+      { back: 2.6, side: 1.6, kind: 'bush', size: 0.7 },
+    ],
+    rocks: [{ back: -1.6, side: 2.2, r: 0.6, h: 0.45, color: '#c98f63' }],
+  }),
+  outerEnclosure(125, {
+    id: 'camel',
+    species: ['camel'],
+    radius: 5.8,
+    barrier: 'wood',
+    fence: '#c08b55',
+    ground: '#ecd29a',
+    trees: [
+      { back: 2.0, side: -2.4, kind: 'palm', size: 0.95 },
+      { back: 2.4, side: 2.4, kind: 'palm', size: 0.8 },
+    ],
+    rocks: [{ back: -1.8, side: -1.6, r: 0.55, h: 0.4, color: '#d8b47c' }],
+  }),
+]
+
+type AreaSpec = Omit<Area, 'trees' | 'exits' | 'radius' | 'ring' | 'plaza'> & { plaza?: Circle }
+
+/** 回る順（サバンナ → もうじゅう → … → ふれあい → サバンナ）。出入口はこの順につながる。 */
+const AREA_SPECS: AreaSpec[] = [
+  { id: 'savanna', name: 'サバンナ', emoji: '🦒', grass: '#b8cf6a', sky: '#bfe7fb', treeKinds: ['acacia', 'bush', 'round'], enclosures: SAVANNA_ENCLOSURES },
+  { id: 'wild', name: 'もうじゅうの もり', emoji: '🦁', grass: '#8fc062', sky: '#c4e6f5', treeKinds: ['round', 'pine', 'bush'], enclosures: WILD_ENCLOSURES, plaza: { x: 0, z: 0, r: 2.8 } },
+  { id: 'forest', name: 'パンダの もり', emoji: '🐼', grass: '#94c866', sky: '#c8ecf3', treeKinds: ['bamboo', 'round', 'bush'], enclosures: FOREST_ENCLOSURES },
+  { id: 'water', name: 'こおりと みずべ', emoji: '🐧', grass: '#a6d07a', sky: '#cfeefc', treeKinds: ['palm', 'round', 'bush'], enclosures: WATER_ENCLOSURES },
+  { id: 'farm', name: 'ふれあい ひろば', emoji: '🐰', grass: '#a3d66f', sky: '#c6ecfb', treeKinds: ['round', 'bush', 'pine'], enclosures: FARM_ENCLOSURES },
+]
+
+export const AREA_ORDER: AreaId[] = AREA_SPECS.map(a => a.id)
+
+function hash(n: number): number {
+  const s = Math.sin(n * 12.9898) * 43758.5453
+  return s - Math.floor(s)
+}
+
+/** 園路（輪・出入口へのまっすぐな道・展示場の前へのびる道）の線分。 */
+const pathCache = new WeakMap<object, [Vec2, Vec2][]>()
+
+export function pathSegments(area: Pick<Area, 'ring' | 'radius' | 'enclosures'>): [Vec2, Vec2][] {
+  const cached = pathCache.get(area)
+  if (cached) return cached
+  const segments: [Vec2, Vec2][] = []
+  pathCache.set(area, segments)
+  const center = area.enclosures.find(e => Math.hypot(e.center.x, e.center.z) < 0.5)
+  if (center) {
+    segments.push([{ x: 0, z: area.ring }, { x: 0, z: area.radius }], [{ x: 0, z: -area.ring }, { x: 0, z: -area.radius }])
+  } else {
+    segments.push([{ x: 0, z: -area.radius }, { x: 0, z: area.radius }])
+  }
+  for (const e of area.enclosures) {
+    if (e === center) continue
+    // 見る側の柵から、園路の輪までまっすぐのばす
+    const fx = e.center.x + Math.sin(e.front) * e.radius
+    const fz = e.center.z + Math.cos(e.front) * e.radius
+    const r = Math.hypot(fx, fz)
+    const k = area.ring / Math.max(r, 1e-6)
+    segments.push([{ x: fx, z: fz }, { x: fx * k, z: fz * k }])
+  }
+  return segments
+}
+
+function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x
+  const dz = b.z - a.z
+  const len2 = dx * dx + dz * dz
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / len2)) : 0
+  return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t)
+}
+
+/** 点が園路の上か（輪・まっすぐな道・広場）。 */
+export function onPath(area: Pick<Area, 'ring' | 'radius' | 'enclosures' | 'plaza'>, p: Vec2, margin = 0): boolean {
+  if (Math.abs(Math.hypot(p.x, p.z) - area.ring) < PATH_HALF + margin) return true
+  if (distance(p, area.plaza) < area.plaza.r + margin) return true
+  return pathSegments(area).some(([a, b]) => segmentDistance(p, a, b) < PATH_HALF + margin)
+}
+
+function buildArea(spec: AreaSpec, index: number): Area {
+  const reach = Math.max(...spec.enclosures.map(e => Math.hypot(e.center.x, e.center.z) + e.radius))
+  const radius = round(reach + 3)
+  // 広場は入口からの道の横に置く（入ってすぐの道をふさがない）
+  const plaza = spec.plaza ?? { x: PATH_HALF + 2.6, z: RING + 4.2, r: 2.2 }
+  const n = AREA_SPECS.length
+  const prev = AREA_SPECS[(index + n - 1) % n].id
+  const next = AREA_SPECS[(index + 1) % n].id
+  const exits: AreaExit[] = [
+    // 手前（俯瞰のカメラ側）は前のエリアから来る入口、奥は次のエリアへの出口
+    { to: prev, at: { x: 0, z: radius - 0.6 }, heading: 0 },
+    { to: next, at: { x: 0, z: -(radius - 0.6) }, heading: Math.PI },
+  ]
+  const base = { ring: RING, radius, enclosures: spec.enclosures, plaza }
+  // 柵の外の木: 園路・展示場・出入口・広場をよけて、輪のすきまとエリアのふちに植える
+  const trees: Tree[] = []
+  const candidates: Vec2[] = []
+  for (let i = 0; i < 36; i++) candidates.push(polar(i * 10 + 5, RING + 2.3))
+  for (let i = 0; i < 44; i++) candidates.push(polar(i * (360 / 44), radius - 1.2 - (i % 2) * 0.9))
+  for (let i = 0; i < 12; i++) candidates.push(polar(i * 30 + 15, RING - 2.4))
+  candidates.forEach((p, i) => {
+    if (spec.enclosures.some(e => distance(p, e.center) < e.radius + 1.6)) return
+    if (onPath(base, p, 1.0)) return
+    if (exits.some(x => distance(p, x.at) < 3.2)) return
+    if (trees.some(t => distance(p, t) < 2.6)) return
+    const kind = spec.treeKinds[Math.floor(hash(i * 7.7 + index) * spec.treeKinds.length)]
+    trees.push({ ...p, kind, size: round(0.8 + hash(i * 3.3 + index) * 0.4) })
+  })
+  return { ...spec, ...base, trees, exits }
+}
+
+export const AREAS: Area[] = AREA_SPECS.map(buildArea)
+
+export function areaById(id: AreaId): Area {
+  const found = AREAS.find(a => a.id === id)
+  if (!found) throw new Error(`unknown area: ${id}`)
+  return found
+}
+
+export function isAreaId(value: unknown): value is AreaId {
+  return typeof value === 'string' && (AREA_ORDER as string[]).includes(value)
+}
+
+/** その種類の動物がいるエリアと展示場。 */
+export function homeOf(species: SpeciesId): { area: Area; enclosure: Enclosure } {
+  for (const area of AREAS) {
+    const enclosure = area.enclosures.find(e => e.species.includes(species))
+    if (enclosure) return { area, enclosure }
+  }
+  throw new Error(`no enclosure for ${species}`)
+}
+
+/** エリアにいる動物の種類（展示場の並び順）。 */
+export function speciesOfArea(area: Area): SpeciesId[] {
+  return area.enclosures.flatMap(e => e.species)
+}
+
+export function enclosureById(area: Area, id: string): Enclosure {
+  const found = area.enclosures.find(e => e.id === id)
   if (!found) throw new Error(`unknown enclosure: ${id}`)
   return found
 }
 
-/** 木の幹・岩・池を、動物がよける円として返す。 */
+/** 獣舎の、展示場の内側にはみ出す部分を、動物がよける円で近似する。 */
+export function houseCircle(e: Enclosure): Circle | undefined {
+  const h = e.house
+  if (!h) return undefined
+  const d = e.radius - 0.2
+  return { x: e.center.x + Math.sin(h.angle) * d, z: e.center.z + Math.cos(h.angle) * d, r: Math.max(h.width, h.depth) * 0.5 }
+}
+
+/** 木の幹・岩・池・獣舎を、動物がよける円として返す。 */
 export function obstaclesOf(enclosure: Enclosure): Circle[] {
   const trees = enclosure.trees.map(t => ({ x: t.x, z: t.z, r: t.kind === 'bush' ? 0.75 * t.size : t.kind === 'bamboo' ? 0.55 * t.size : 0.45 * t.size }))
   const rocks = enclosure.rocks.map(r => ({ x: r.x, z: r.z, r: r.r }))
-  return enclosure.pond ? [...trees, ...rocks, enclosure.pond] : [...trees, ...rocks]
+  const house = houseCircle(enclosure)
+  return [...trees, ...rocks, ...(enclosure.pond ? [enclosure.pond] : []), ...(house ? [house] : [])]
 }
 
 export function distance(a: Vec2, b: Vec2): number {
@@ -464,21 +655,15 @@ export function distance(a: Vec2, b: Vec2): number {
 
 /** 線分 a→b が円（半径 + margin）を横切るか。 */
 export function segmentHitsCircle(a: Vec2, b: Vec2, c: Circle, margin = 0): boolean {
-  const dx = b.x - a.x
-  const dz = b.z - a.z
-  const len2 = dx * dx + dz * dz
-  const t = len2 > 0 ? Math.max(0, Math.min(1, ((c.x - a.x) * dx + (c.z - a.z) * dz) / len2)) : 0
-  const px = a.x + dx * t
-  const pz = a.z + dz * t
-  return Math.hypot(c.x - px, c.z - pz) < c.r + margin
+  return segmentDistance(c, a, b) < c.r + margin
 }
 
-/** エリアの内側（縁から margin 内側）に収まるように点を引き戻す。 */
+/** 動物が動ける範囲（堀などの内側、縁から margin 内側）に収まるように点を引き戻す。 */
 export function clampToEnclosure(p: Vec2, enclosure: Enclosure, margin: number): Vec2 {
   const dx = p.x - enclosure.center.x
   const dz = p.z - enclosure.center.z
   const d = Math.hypot(dx, dz)
-  const limit = Math.max(0.1, enclosure.radius - margin)
+  const limit = Math.max(0.1, roamRadius(enclosure) - margin)
   if (d <= limit) return p
   return { x: enclosure.center.x + dx / d * limit, z: enclosure.center.z + dz / d * limit }
 }
@@ -509,4 +694,10 @@ export function pondShore(enclosure: Enclosure, from: Vec2, gap: number): Vec2 |
   const dz = from.z - pond.z
   const d = Math.hypot(dx, dz) || 1
   return clampToEnclosure({ x: pond.x + dx / d * (pond.r + gap), z: pond.z + dz / d * (pond.r + gap) }, enclosure, gap)
+}
+
+/** 看板の位置（見る側の柵の外、入口の道の少し横）。 */
+export function signPosition(e: Enclosure): Vec2 & { angle: number } {
+  const angle = e.front + (e.walkIn ? 0.36 : 0.3) * Math.min(1, 6 / e.radius)
+  return { x: e.center.x + Math.sin(angle) * (e.radius + 0.9), z: e.center.z + Math.cos(angle) * (e.radius + 0.9), angle }
 }

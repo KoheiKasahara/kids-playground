@@ -1,18 +1,23 @@
 // 動物の種類ごとの定義（見た目のモデル・エサ・固有アクション・説明・ふるまいの傾向）。
 // モデルとモーションの実体は public/models/zoo-3d/*.glb、長さや移動量は models/*.json を正とする。
 
+import alpacaManifest from './models/alpaca.json'
+import bearManifest from './models/bear.json'
 import camelManifest from './models/camel.json'
 import capybaraManifest from './models/capybara.json'
+import cheetahManifest from './models/cheetah.json'
 import crocodileManifest from './models/crocodile.json'
 import deerManifest from './models/deer.json'
 import elephantManifest from './models/elephant.json'
 import flamingoManifest from './models/flamingo.json'
 import foxManifest from './models/fox.json'
 import giraffeManifest from './models/giraffe.json'
+import goatManifest from './models/goat.json'
 import gorillaManifest from './models/gorilla.json'
 import hippoManifest from './models/hippo.json'
 import kangarooManifest from './models/kangaroo.json'
 import lionManifest from './models/lion.json'
+import meerkatManifest from './models/meerkat.json'
 import monkeyManifest from './models/monkey.json'
 import ostrichManifest from './models/ostrich.json'
 import pandaManifest from './models/panda.json'
@@ -23,11 +28,12 @@ import redPandaManifest from './models/red_panda.json'
 import rhinoManifest from './models/rhino.json'
 import sheepManifest from './models/sheep.json'
 import tigerManifest from './models/tiger.json'
+import wolfManifest from './models/wolf.json'
 import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer' | 'fox' | 'ostrich'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer' | 'fox' | 'ostrich' | 'wolf' | 'bear' | 'cheetah' | 'goat' | 'alpaca' | 'meerkat'
 
 export type SpecialAction = {
   clip: string
@@ -53,7 +59,11 @@ export type Species = {
   /** 追いかけるカメラが見る高さと距離。 */
   follow: { height: number; distance: number }
   members: { id: string; scale: number; label: string }[]
-  mood: { idle: [number, number]; wander: number; run: number; special: number; graze: number; sleep: number }
+  /**
+   * ふるまいの傾向。idle は待つ時間（秒）、ほかは次の行動を選ぶ重み。
+   * curious は、柵の前に人（歩くモード）がいるときに見に来る重み（省略すると 1）。
+   */
+  mood: { idle: [number, number]; wander: number; run: number; special: number; graze: number; sleep: number; curious?: number }
 }
 
 export const SPECIES: Record<SpeciesId, Species> = {
@@ -637,9 +647,163 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [2, 4.5], wander: 4.5, run: 1.4, special: 1.2, graze: 1.4, sleep: 0.5 },
   },
+  wolf: {
+    id: 'wolf',
+    name: 'オオカミ',
+    emoji: '🐺',
+    color: '#8e949d',
+    manifest: wolfManifest as AnimalManifest,
+    food: { id: 'meat', label: 'おにく', emoji: '🍖' },
+    specials: [
+      { clip: 'Howl', label: 'アオーン', emoji: '🌕' },
+      { clip: 'Play', label: 'あそぼう', emoji: '🐾' },
+    ],
+    facts: [
+      'かぞくで むれを つくって くらすよ',
+      'とおぼえで、とおくの なかまと おはなしするよ',
+      'イヌの ごせんぞさまだよ',
+    ],
+    reach: (wolfManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.6,
+    hit: [{ y: 0.62, z: 0, r: 0.42 }, { y: 0.9, z: 0.58, r: 0.3 }],
+    follow: { height: 0.7, distance: 6 },
+    members: [
+      { id: 'wolf-dad', scale: 1, label: 'おとうさん' },
+      { id: 'wolf-mom', scale: 0.94, label: 'おかあさん' },
+      { id: 'wolf-pup', scale: 0.55, label: 'こども' },
+    ],
+    mood: { idle: [2, 4.5], wander: 5, run: 1.4, special: 1.3, graze: 0.7, sleep: 0.8, curious: 1.3 },
+  },
+  bear: {
+    id: 'bear',
+    name: 'クマ',
+    emoji: '🐻',
+    color: '#8a5a36',
+    manifest: bearManifest as AnimalManifest,
+    food: { id: 'apple', label: 'りんご', emoji: '🍎' },
+    specials: [
+      { clip: 'Stand', label: 'たちあがる', emoji: '🐾' },
+      { clip: 'Beg', label: 'おねだり', emoji: '🙏' },
+    ],
+    facts: [
+      'はなが よくて、とおくの においも わかるよ',
+      'さむい ふゆは あなの なかで ながく ねむるよ',
+      'かたの もりあがりは、つよい きんにくだよ',
+    ],
+    reach: (bearManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.9,
+    hit: [{ y: 0.7, z: 0, r: 0.6 }, { y: 0.98, z: 0.72, r: 0.38 }],
+    follow: { height: 0.8, distance: 6.5 },
+    members: [
+      { id: 'bear-mom', scale: 1, label: 'おかあさん' },
+      { id: 'bear-cub', scale: 0.55, label: 'こども' },
+      { id: 'bear-baby', scale: 0.45, label: 'あかちゃん' },
+    ],
+    mood: { idle: [2.5, 5], wander: 4, run: 0.5, special: 1.4, graze: 1.2, sleep: 0.9, curious: 1.4 },
+  },
+  cheetah: {
+    id: 'cheetah',
+    name: 'チーター',
+    emoji: '🐆',
+    color: '#edbd5e',
+    manifest: cheetahManifest as AnimalManifest,
+    food: { id: 'meat', label: 'おにく', emoji: '🍖' },
+    specials: [
+      { clip: 'Lookout', label: 'みはり', emoji: '👀' },
+      { clip: 'Stretch', label: 'のびー', emoji: '🐾' },
+    ],
+    facts: [
+      'りくで いちばん あしが はやい どうぶつだよ',
+      'めから くちへ くろい「なみだの すじ」が あるよ',
+      'ことりのような かわいい こえで なくよ',
+    ],
+    reach: (cheetahManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.7,
+    hit: [{ y: 0.75, z: 0, r: 0.5 }, { y: 1.02, z: 0.65, r: 0.32 }],
+    follow: { height: 0.8, distance: 6 },
+    members: [
+      { id: 'cheetah-mom', scale: 1, label: 'おかあさん' },
+      { id: 'cheetah-cub', scale: 0.55, label: 'こども' },
+    ],
+    mood: { idle: [2, 4.5], wander: 4, run: 1.8, special: 1.3, graze: 0.6, sleep: 0.9, curious: 1.0 },
+  },
+  goat: {
+    id: 'goat',
+    name: 'ヤギ',
+    emoji: '🐐',
+    color: '#d9d2c3',
+    manifest: goatManifest as AnimalManifest,
+    food: { id: 'leaves', label: 'はっぱ', emoji: '🌿' },
+    specials: [
+      { clip: 'Bleat', label: 'メェ〜', emoji: '🎵' },
+      { clip: 'Butt', label: 'ごっつん', emoji: '💥' },
+    ],
+    facts: [
+      'あごに しろい ひげが あるよ',
+      'たかい いわの うえに のぼるのが とくいだよ',
+      'つので なかまと おしあいっこを して あそぶよ',
+    ],
+    reach: (goatManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.5,
+    hit: [{ y: 0.6, z: 0, r: 0.36 }, { y: 0.9, z: 0.48, r: 0.22 }],
+    follow: { height: 0.6, distance: 4.8 },
+    members: [
+      { id: 'goat-mom', scale: 1, label: 'おかあさん' },
+      { id: 'goat-kid', scale: 0.6, label: 'こども' },
+    ],
+    mood: { idle: [1.8, 4], wander: 4.5, run: 0.9, special: 1.4, graze: 1.8, sleep: 0.5, curious: 2.0 },
+  },
+  alpaca: {
+    id: 'alpaca',
+    name: 'アルパカ',
+    emoji: '🦙',
+    color: '#ddbb8c',
+    manifest: alpacaManifest as AnimalManifest,
+    food: { id: 'carrot', label: 'にんじん', emoji: '🥕' },
+    specials: [
+      { clip: 'Hum', label: 'ふんふん', emoji: '🎶' },
+      { clip: 'Peek', label: 'のぞきこみ', emoji: '🔍' },
+    ],
+    facts: [
+      'ふわふわの けは、セーターや マフラーに なるよ',
+      'きげんが いいと「ふんふん」と ハミングするよ',
+      'ラクダの なかまだよ',
+    ],
+    reach: (alpacaManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.6,
+    hit: [{ y: 0.85, z: 0, r: 0.42 }, { y: 1.4, z: 0.5, r: 0.24 }, { y: 1.1, z: 0.4, r: 0.18 }],
+    follow: { height: 1.0, distance: 5.5 },
+    members: [
+      { id: 'alpaca-mom', scale: 1, label: 'おかあさん' },
+      { id: 'alpaca-kid', scale: 0.62, label: 'こども' },
+    ],
+    mood: { idle: [2.5, 5], wander: 4, run: 0.6, special: 1.4, graze: 1.8, sleep: 0.6, curious: 2.2 },
+  },
+  meerkat: {
+    id: 'meerkat',
+    name: 'ミーアキャット',
+    emoji: '🐾',
+    color: '#cba77b',
+    manifest: meerkatManifest as AnimalManifest,
+    food: { id: 'insect', label: 'いもむし', emoji: '🐛' },
+    specials: [
+      { clip: 'Sentry', label: 'みはりばん', emoji: '🧍' },
+      { clip: 'Dig', label: 'あなほり', emoji: '⛏️' },
+    ],
+    facts: [
+      'うしろあしで すっくと たって、みはりばんを するよ',
+      'かぞく みんなで あなを ほって くらすよ',
+      'めの まわりが くろいのは、まぶしさを ふせぐためだよ',
+    ],
+    reach: (meerkatManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.2,
+    hit: [{ y: 0.32, z: 0, r: 0.26 }, { y: 0.48, z: 0.28, r: 0.2 }],
+    follow: { height: 0.35, distance: 3.8 },
+    members: [
+      { id: 'meerkat-dad', scale: 1, label: 'おとうさん' },
+      { id: 'meerkat-mom', scale: 0.95, label: 'おかあさん' },
+      { id: 'meerkat-kid', scale: 0.72, label: 'こども' },
+      { id: 'meerkat-baby', scale: 0.6, label: 'あかちゃん' },
+    ],
+    mood: { idle: [1.5, 3.5], wander: 5, run: 1.6, special: 1.8, graze: 1.6, sleep: 0.6, curious: 1.8 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer', 'fox', 'ostrich']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer', 'fox', 'ostrich', 'wolf', 'bear', 'cheetah', 'goat', 'alpaca', 'meerkat']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`

@@ -23,14 +23,14 @@ export function overviewDistance(aspect: number, radius: number): number {
   const vfov = (fovFor(aspect) * Math.PI) / 180
   const half = Math.atan(Math.tan(vfov / 2) * aspect)
   const fit = radius / Math.sin(half)
-  return Math.max(18, Math.min(56, fit))
+  return Math.max(18, Math.min(64, fit))
 }
 
 export type Pose = { target: [number, number, number]; distance: number; polar: number; azimuth: number }
 
-export function overviewPose(aspect: number): Pose {
-  // 園の中心と、まわりの輪の手前側が収まる広さ（奥の輪は回して見る）
-  return { target: [0, 0.4, 3], distance: overviewDistance(aspect, 22), polar: 0.8, azimuth: 0 }
+/** エリアを斜め上から見る。radius はエリアの半径（手前の展示場まで収め、奥は回して見る）。 */
+export function overviewPose(aspect: number, radius = 28): Pose {
+  return { target: [0, 0.4, radius * 0.03], distance: overviewDistance(aspect, radius * 0.82), polar: 0.72, azimuth: 0 }
 }
 
 export function cameraPosition(pose: Pose): [number, number, number] {
