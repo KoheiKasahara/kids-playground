@@ -78,6 +78,13 @@ export const MATERIALS = [
   { id: 'jack', label: 'ランタン', color: '#f39a2b', emoji: '🏮', glow: true },
   { id: 'door_open', label: 'ひらいた ドア', color: '#9a6534', emoji: '🚪', cutout: true, passable: true, hidden: true, pickAs: 'door' },
   { id: 'cake_half', label: 'たべかけの ケーキ', color: '#f6e3cf', emoji: '🍰', width: 0.6, height: 0.5, hidden: true, pickAs: 'cake' },
+  { id: 'rainbow', label: 'にじ', color: '#f28cb1', emoji: '🌈' },
+  { id: 'chocolate', label: 'チョコ', color: '#6b3f26', emoji: '🍫' },
+  { id: 'bamboo', label: 'たけ', color: '#7fb850', emoji: '🎋' },
+  // クラフトで つくる：タッチすると ドラゴンが うまれる・つぎの ワープへ とぶ・はなびが あがる
+  { id: 'dragon_egg', label: 'たまご', color: '#c8432f', emoji: '🥚', width: 0.66, height: 0.8 },
+  { id: 'portal', label: 'ワープ', color: '#9b5cf6', emoji: '🌀', glow: true },
+  { id: 'fireworks', label: 'はなび', color: '#3d5bd9', emoji: '🎆' },
 ] as const satisfies readonly MaterialDef[]
 export const MATERIAL_DEFS: readonly MaterialDef[] = MATERIALS
 export type Material = typeof MATERIALS[number]['id']
@@ -441,7 +448,10 @@ export function brushCells(center: Position, normal: Position, wide: boolean): P
   return cells
 }
 
-export function editWorld(world: World, target: Position | readonly Position[], material: Material, mode: 'place' | 'remove'): Changes {
+/** おく・こわす・ぬる（さわった ブロックを えらんだ ブロックに かえる）。 */
+export type EditMode = 'place' | 'remove' | 'paint'
+
+export function editWorld(world: World, target: Position | readonly Position[], material: Material, mode: EditMode): Changes {
   const targets: readonly Position[] = Array.isArray(target) ? target : [target as Position]
   const valid = targets.filter(p => inside(world, p) && p.y > 0)
   const get = (p: Position) => world.codeAt(p.x, p.y, p.z)
@@ -461,6 +471,19 @@ export function editWorld(world: World, target: Position | readonly Position[], 
       return
     }
     const code = materialCode(material)
+    if (mode === 'paint') {
+      // くさばなと みずは ぬれない（ブロックを べつの ブロックに かえるだけ）
+      if (code === water || definitionAt(code).plant) return
+      const painted: Position[] = []
+      for (const p of valid) {
+        const existing = get(p)
+        if (!existing || existing === code || existing === water || definitionAt(existing).plant) continue
+        write(p, code)
+        painted.push(p)
+      }
+      if (material === 'sponge') for (const p of painted) absorb(world, write, p)
+      return
+    }
     const placed: Position[] = []
     for (const p of valid) {
       const existing = get(p)
@@ -522,6 +545,50 @@ export function eatCake(world: World, p: Position): Changes {
   if (material !== 'cake' && material !== 'cake_half') return []
   return world.change(write => write(p, material === 'cake' ? materialCode('cake_half') : 0), true)
 }
+
+const portal = materialCode('portal')
+/** start から つながっている ワープブロックを ぜんぶ group に いれる。 */
+function joinPortals(world: World, start: number, group: Set<number>) {
+  group.add(start)
+  const queue = [start]
+  for (let i = 0; i < queue.length; i++) {
+    const p = world.position(queue[i])
+    for (const d of AROUND) {
+      const index = world.index({ x: p.x + d.x, y: p.y + d.y, z: p.z + d.z })
+      if (index < 0 || group.has(index) || world.codeAtIndex(index) !== portal) continue
+      group.add(index)
+      queue.push(index)
+    }
+  }
+}
+
+/**
+ * せかいに ある ワープゲート。つながった ワープブロックは 1つの ゲートで、
+ * いちばん したの ブロック（ほぞんの じゅんで さいしょ）を ゲートの ばしょと する。
+ */
+export function portalGates(world: World): Position[] {
+  const gates: Position[] = []
+  const seen = new Set<number>()
+  for (let index = 0; index < world.volume; index++) {
+    if (world.codeAtIndex(index) !== portal || seen.has(index)) continue
+    gates.push(world.position(index))
+    joinPortals(world, index, seen)
+  }
+  return gates
+}
+
+/** さわった ワープの つぎの ゲート（ばしょの じゅんに めぐる）。ほかに ゲートが なければ null。 */
+export function nextPortal(world: World, from: Position): Position | null {
+  if (world.codeAt(from.x, from.y, from.z) !== portal) return null
+  const gates = portalGates(world)
+  if (gates.length < 2) return null
+  const here = new Set<number>()
+  joinPortals(world, world.index(from), here)
+  return gates[(gates.findIndex(gate => here.has(world.index(gate))) + 1) % gates.length]
+}
+
+/** ワープした さきで、ゲートの うえに たつ。 */
+export const arriveAt = (world: World, gate: Position) => settleWalker(world, { ...gate, y: Math.min(world.height - 1, gate.y + 1) })
 
 /** ばくだんが こわす はんい（ブロックの まんなかからの きょり）。 */
 export const BLAST_RADIUS = 2.5

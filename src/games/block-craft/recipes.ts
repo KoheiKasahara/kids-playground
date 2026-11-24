@@ -13,6 +13,10 @@ export const RECIPES = [
   { result: 'cake', ingredients: ['honey', 'snow', 'melon'] },
   // つくった たいまつも ざいりょうに なる
   { result: 'jack', ingredients: ['pumpkin', 'torch'] },
+  // ようがんと ひ（たいまつ）と ようがんで、ドラゴンが うまれる たまご
+  { result: 'dragon_egg', ingredients: ['lava', 'torch', 'lava'] },
+  { result: 'portal', ingredients: ['obsidian', 'crystal', 'obsidian'] },
+  { result: 'fireworks', ingredients: ['bomb', 'lamp', 'crystal'] },
 ] as const satisfies readonly Recipe[]
 
 /** クラフトだいに ならべられる かず。 */

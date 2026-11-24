@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CRAFT_SLOTS, craftResult, INGREDIENTS, isCrafted, RECIPES, type CraftedMaterial } from './recipes'
 import { materialDef, type Material } from './world'
 import styles from './BlockCraftPlay.module.css'
@@ -79,7 +79,11 @@ export default function CraftPanel({ crafted, onCraft, onClose, onSelect }: Prop
           const ready = ingredients.every(usable)
           return <button key={made} disabled={!ready} onClick={() => update([...ingredients])}
             aria-label={`${materialDef(made).label}の レシピ${done ? '（つくった）' : ''}`}>
-            <span aria-hidden="true">{ingredients.map(m => usable(m) ? materialDef(m).emoji : '❓').join('＋')}＝{materialDef(made).emoji}</span>
+            {/* せまい がめんでも 3つの ざいりょうと できる ものが ならぶよう、きごうは ちいさく */}
+            <span aria-hidden="true">
+              {ingredients.map((m, i) => <Fragment key={i}>{i > 0 && <span className={styles.sign}>+</span>}{usable(m) ? materialDef(m).emoji : '❓'}</Fragment>)}
+              <span className={styles.sign}>=</span>{materialDef(made).emoji}
+            </span>
             {done && <span className={styles.done} aria-hidden="true">✓</span>}
           </button>
         })}
