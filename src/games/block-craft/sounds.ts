@@ -3,6 +3,7 @@ import { getSharedAudioContext, isSoundEnabled, playNoiseBurst, playTone } from 
 export type CraftSound = 'place' | 'remove' | 'select' | 'grow' | 'treasure' | 'complete' | 'pet' | 'step'
   | 'cool' | 'harvest' | 'feed' | 'baby' | 'shear'
   | 'craft' | 'door' | 'fuse' | 'boom' | 'sleep' | 'morning' | 'eat'
+  | 'paint' | 'hatch' | 'flame' | 'warp' | 'firework'
 
 /** ふくすうの おとを じゅんばんに ならす（ドレミの ような みじかい フレーズ）。 */
 const PHRASES: Partial<Record<CraftSound, readonly number[]>> = {
@@ -23,6 +24,8 @@ const PHRASES: Partial<Record<CraftSound, readonly number[]>> = {
   sleep: [659, 523, 392],
   morning: [523, 784, 1047],
   eat: [440, 587],
+  // ぬりかえる「ぺたっ」
+  paint: [698, 932],
 }
 const SOFT: readonly CraftSound[] = ['pet', 'feed', 'baby', 'sleep', 'eat']
 
@@ -63,6 +66,31 @@ export function playCraftSound(action: CraftSound) {
     // ドカーン（ひくい ざらざらと ひくい おと）
     playNoiseBurst(ctx, ctx.currentTime, 0.6, 0.3, 'lowpass', 700)
     playTone(ctx, 90, ctx.currentTime, 0.45, 0.2, 'sine')
+    return
+  }
+  if (action === 'hatch') {
+    // たまごが「パリッ」と われて、ドラゴンの ファンファーレ
+    playNoiseBurst(ctx, ctx.currentTime, 0.1, 0.1, 'highpass', 2500)
+    ;[392, 523, 659, 784, 1047].forEach((frequency, i) => playTone(ctx, frequency, ctx.currentTime + 0.14 + i * 0.1, 0.12, 0.07, 'triangle'))
+    return
+  }
+  if (action === 'flame') {
+    // ドラゴンの ひ「ごおっ」
+    playNoiseBurst(ctx, ctx.currentTime, 0.45, 0.16, 'lowpass', 1100)
+    playTone(ctx, 147, ctx.currentTime, 0.3, 0.1, 'sawtooth')
+    return
+  }
+  if (action === 'warp') {
+    // ふしぎな「ひゅいーん」（たかく のぼっていく）
+    ;[440, 587, 784, 1047, 1397].forEach((frequency, i) => playTone(ctx, frequency, ctx.currentTime + i * 0.06, 0.1, 0.06, 'sine'))
+    return
+  }
+  if (action === 'firework') {
+    // 「ひゅるる〜」と あがって「ドーン」、きらきら
+    ;[880, 1047, 1245, 1480].forEach((frequency, i) => playTone(ctx, frequency, ctx.currentTime + i * 0.12, 0.12, 0.035, 'sine'))
+    playNoiseBurst(ctx, ctx.currentTime + 0.55, 0.5, 0.3, 'lowpass', 900)
+    playTone(ctx, 110, ctx.currentTime + 0.55, 0.35, 0.15, 'sine')
+    playNoiseBurst(ctx, ctx.currentTime + 0.75, 0.4, 0.05, 'highpass', 5000)
     return
   }
   if (action === 'step') {

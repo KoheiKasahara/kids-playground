@@ -11,6 +11,7 @@ export function viewDepth(camera: THREE.Camera, x: number, y: number, z: number)
 }
 const water = materialCode('water') - 1
 const lava = materialCode('lava') - 1
+const portal = materialCode('portal') - 1
 /** よるに ゆらめく あかり。 */
 const lights = (['lamp', 'torch', 'jack'] as const).map(id => materialCode(id) - 1)
 
@@ -143,7 +144,7 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
         // Cull only when even the nearest corner is fully fogged.
         const near = viewDepth(camera, m[2] > 0 ? max.x : min.x, m[6] > 0 ? max.y : min.y, m[10] > 0 ? max.z : min.z)
         group.visible = (!walking || near <= WALK_DRAW_DISTANCE) && frustum.intersectsBox(bounds)
-        if (group.visible && (meshes[water] || meshes[lava] || (night && lights.some(i => meshes[i])))) animated = true
+        if (group.visible && (meshes[water] || meshes[lava] || meshes[portal] || (night && lights.some(i => meshes[i])))) animated = true
       }
       return animated
     },
