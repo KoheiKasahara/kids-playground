@@ -1,7 +1,8 @@
 import { seeded } from './terrain'
 import { DEFAULT_WORLD, isTall, landmark, materialCode, materialId, type Material, type World, type Block, type WoolColor } from './world'
 
-export type AnimalKind = 'sheep' | 'chicken' | 'rabbit'
+/** ドラゴンは たまごから うまれ、とんで いどうする。 */
+export type AnimalKind = 'sheep' | 'chicken' | 'rabbit' | 'dragon'
 export type Cell = { x: number; z: number }
 export type Spawn = Cell & { kind: AnimalKind; wool?: WoolColor }
 
@@ -17,7 +18,10 @@ export type Animal = Spawn & {
 export type Herd = readonly Animal[]
 /** どうぶつの かずの じょうげん（ふえすぎて おもく ならないように）。 */
 export const MAX_HERD = 16
-export const ANIMAL_KINDS: readonly AnimalKind[] = ['sheep', 'chicken', 'rabbit']
+export const ANIMAL_KINDS: readonly AnimalKind[] = ['sheep', 'chicken', 'rabbit', 'dragon']
+/** とぶ どうぶつが 1かいで のぼりおり できる たかさ。 */
+export const FLY_CLIMB = 3
+export const flies = (kind: AnimalKind) => kind === 'dragon'
 export const WOOL_COLORS: readonly WoolColor[] = ['white', 'pink', 'yellow', 'blue']
 
 /** くさはらの どうぶつ。 */
@@ -67,16 +71,17 @@ export function walkable(ground: Block | undefined): ground is Block {
   return !!ground && ground.material !== 'water' && ground.material !== 'cactus' && ground.material !== 'lava' && !isTall(materialCode(ground.material))
 }
 
-/** Reuse the destination and direction buffer in the animation loop. */
-export function chooseAnimalStep(world: World, from: Cell, to: Cell, options: Int8Array, random: () => number) {
+/** Reuse the destination and direction buffer in the animation loop. とぶ どうぶつは みず・ようがんの うえも こえ、たかい だんも のぼれる。 */
+export function chooseAnimalStep(world: World, from: Cell, to: Cell, options: Int8Array, random: () => number, flying = false) {
   const here = world.topY(from.x, from.z, true)
+  const climb = flying ? FLY_CLIMB : 1
   let count = 0
   for (let i = 0; i < STEPS.length; i++) {
     const x = from.x + STEPS[i].x, z = from.z + STEPS[i].z
     const y = world.topY(x, z, true)
-    if (y < 0 || (here >= 0 && Math.abs(y - here) > 1)) continue
+    if (y < 0 || (here >= 0 && Math.abs(y - here) > climb)) continue
     const ground = world.codeAt(x, y, z)
-    if (ground !== WATER && ground !== CACTUS && ground !== LAVA && !isTall(ground)) options[count++] = i
+    if (flying || (ground !== WATER && ground !== CACTUS && ground !== LAVA && !isTall(ground))) options[count++] = i
   }
   if (!count) return false
   const step = STEPS[options[Math.min(count - 1, Math.floor(random() * count))]]
@@ -108,6 +113,13 @@ export function feedAnimal(herd: Herd, id: number, at: Cell): { herd: Herd; resu
   if (!mate || herd.length >= MAX_HERD) return { herd: mark('love', true), result: 'love' }
   const baby: Animal = { id: Math.max(...herd.map(a => a.id)) + 1, kind: animal.kind, x: at.x, z: at.z, baby: true, ...(animal.wool && { wool: animal.wool }) }
   return { herd: [...mark('love', false, [id, mate.id]), baby], result: 'baby' }
+}
+
+/** たまごから ドラゴンの あかちゃんが うまれる。どうぶつが いっぱいなら null。 */
+export function hatchDragon(herd: Herd, at: Cell): Herd | null {
+  if (herd.length >= MAX_HERD) return null
+  const id = herd.reduce((top, a) => Math.max(top, a.id), -1) + 1
+  return [...herd, { id, kind: 'dragon', x: at.x, z: at.z, baby: true }]
 }
 
 /** ひつじの けを とる。とれた けいとの いろを かえす。 */

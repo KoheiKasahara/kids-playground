@@ -67,7 +67,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
 
       // おもな そうさが ぜんぶ がめんの なかに あり、ページは スクロールしない
       const name = (text: string | RegExp) => page.getByRole('button', { name: text })
-      const controls = [name('タイトルへ もどる'), name('よる'), name('おと'), name('ちず'), name('あるく'), name(/おく/), name(/こわす/), name(/ひろく/), name(/もどす/), name(/ほぞん/), name(/はじめの せかい/), page.getByRole('button', { name: 'くさ', exact: true })]
+      const controls = [name('タイトルへ もどる'), name('よる'), name('おと'), name('ちず'), name('あるく'), name(/おく/), name(/こわす/), name(/ぬる/), name(/ひろく/), name(/もどす/), name(/ほぞん/), name(/はじめの せかい/), page.getByRole('button', { name: 'くさ', exact: true })]
       for (const control of controls) await expect(control).toBeInViewport({ ratio: 1 })
       await expect(canvas).toBeInViewport({ ratio: 1 })
       const box = (await canvas.boundingBox())!
