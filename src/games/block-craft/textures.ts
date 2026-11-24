@@ -182,12 +182,6 @@ function cap(material: Material, face: Face, x: number, y: number, noise: number
     case 'bookshelf': return shade(PLANK, y % 4 === 3 ? -0.3 : n)
     // たばねた わらの きりくち
     case 'hay': return shade(base, ring > 6.5 ? -0.25 : (x * 3 + y * 5) % 7 === 0 ? -0.3 : 0.1 + n)
-    // たなに いろとりどりの ほんが 2だん
-    case 'bookshelf': {
-      if (y === 0 || y === 7 || y === 8 || y === TEXTURE_SIZE - 1 || x === 0 || x === TEXTURE_SIZE - 1) return shade(PLANK, -0.2)
-      const book = BOOKS[(Math.floor(x / 2) + (y > 7 ? 3 : 0)) % BOOKS.length]
-      return x % 2 === 1 && noise > 0.7 ? shade(book, -0.45) : shade(book, (y === 2 || y === 11) ? 0.3 : (noise - 0.5) * 0.16)
-    }
     default: return shade(base, pattern(material, x, y, noise))
   }
 }
@@ -202,6 +196,12 @@ function side(material: Material, x: number, y: number, noise: number, base: Rgb
     case 'workbench': {
       const tool = (x >= 3 && x <= 4 && y >= 3 && y <= 11) || (x >= 2 && x <= 5 && y >= 10 && y <= 12) || (x >= 9 && x <= 13 && y >= 5 && y <= 9 && x - 9 <= y - 5)
       return tool ? shade(base, -0.55) : shade(PLANK, y % 4 === 3 ? -0.3 : (noise - 0.5) * 0.16)
+    }
+    // たなに いろとりどりの ほんが 2だん
+    case 'bookshelf': {
+      if (y === 0 || y === 7 || y === 8 || y === TEXTURE_SIZE - 1 || x === 0 || x === TEXTURE_SIZE - 1) return shade(PLANK, -0.2)
+      const book = BOOKS[(Math.floor(x / 2) + (y > 7 ? 3 : 0)) % BOOKS.length]
+      return x % 2 === 1 && noise > 0.7 ? shade(book, -0.45) : shade(book, (y === 2 || y === 11) ? 0.3 : (noise - 0.5) * 0.16)
     }
     default: return shade(base, pattern(material, x, y, noise))
   }
