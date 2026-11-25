@@ -462,6 +462,8 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('メェ〜', () => playZooSound('mee')),
     sample('ごっつん', () => playZooSound('bonk')),
     sample('ピッピッ', () => playZooSound('peep')),
+    sample('ぶーぶー', () => playZooSound('oink')),
+    sample('おねがい たっせい', () => playZooSound('medal')),
   ],
   'stripe-rally': [
     sample('スタート', () => raceChime('start')),

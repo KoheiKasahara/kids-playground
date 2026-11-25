@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
@@ -9,7 +9,8 @@ import { playZooSound } from './sounds'
 import { SPECIES, type Species, type SpeciesId } from './species'
 import { useZooEngine, type ViewMode, type ZooHint, type ZooStatus } from './useZooEngine'
 import { MiniMap, WalkPad, type MiniMapHandle } from './WalkControls'
-import { AreaMapDialog, ZukanDialog } from './ZooDialogs'
+import { AreaMapDialog, CelebrationDialog, MissionDialog, ZukanDialog, type Celebration } from './ZooDialogs'
+import { allDone, applyObservation, createMissions, isWanted, missionText, type MissionSet } from './missions'
 import { addStamp, countStamps, hasStamp, loadSave, stampInfo, writeSave, type StampKind, type Zukan } from './zukan'
 import { areaById, speciesOfArea, type AreaId } from './zooMap'
 import styles from './Zoo3dPlay.module.css'
@@ -48,33 +49,98 @@ export default function Zoo3dPlay() {
   const [activity, setActivity] = useState<Activity | null>(null)
   const [hint, setHint] = useState<ZooHint | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
-  const [dialog, setDialog] = useState<'map' | 'zukan' | null>(null)
+  const [dialog, setDialog] = useState<'map' | 'zukan' | 'missions' | null>(null)
   const [zukanFocus, setZukanFocus] = useState<SpeciesId | null>(null)
   const [reducedMotion] = useState(() => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const miniMap = useRef<MiniMapHandle | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const areaRef = useRef(area)
 
+  const [medals, setMedals] = useState(initial.medals)
+  const medalsRef = useRef(medals)
+  // おねがいは エリアごとに覚えておき、行ったり来たりしても続きから できる（保存はメダルの数だけ）
+  const [missions] = useState(() => new Map<AreaId, MissionSet>([[initial.area, createMissions(initial.area, speciesOfArea(areaById(initial.area)), initial.zukan)]]))
+  const missionsOf = useCallback((id: AreaId): MissionSet => {
+    let set = missions.get(id)
+    if (!set) {
+      set = createMissions(id, speciesOfArea(areaById(id)), zukanRef.current)
+      missions.set(id, set)
+    }
+    return set
+  }, [missions])
+  const [missionSet, setMissionSet] = useState<MissionSet>(() => missions.get(initial.area)!)
+  const [missionToast, setMissionToast] = useState<{ key: number; index: number } | null>(null)
+  const [celebration, setCelebration] = useState<Celebration | null>(null)
+  const missionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => { clearTimeout(toastTimer.current); clearTimeout(missionTimer.current) }, [])
+
+  const persist = useCallback(() => {
+    writeSave({ zukan: zukanRef.current, area: areaRef.current, medals: medalsRef.current })
+  }, [])
+
+  const progressMission = useCallback((species: SpeciesId, kind: StampKind) => {
+    const id = areaRef.current
+    const { set, completed } = applyObservation(missionsOf(id), species, kind)
+    if (!completed.length) return
+    missions.set(id, set)
+    setMissionSet(set)
+    playZooSound('medal')
+    clearTimeout(missionTimer.current)
+    if (allDone(set)) {
+      medalsRef.current += 1
+      setMedals(medalsRef.current)
+      persist()
+      vibrate('celebrate')
+      setMissionToast(null)
+      setCelebration({ kind: 'medal', medals: medalsRef.current })
+      return
+    }
+    vibrate('success')
+    setMissionToast(t => ({ key: (t?.key ?? 0) + 1, index: completed[0] }))
+    missionTimer.current = setTimeout(() => setMissionToast(null), 2800)
+  }, [missions, missionsOf, persist])
+
   const onObserve = useCallback((species: SpeciesId, kind: StampKind) => {
     const next = addStamp(zukanRef.current, species, kind)
-    if (!next) return
-    zukanRef.current = next
-    setZukan(next)
-    writeSave({ zukan: next, area: areaRef.current })
-    playZooSound('stamp')
-    vibrate('success')
-    clearTimeout(toastTimer.current)
-    setToast(t => ({ key: (t?.key ?? 0) + 1, species, kind }))
-    toastTimer.current = setTimeout(() => setToast(null), 2600)
-  }, [])
+    if (next) {
+      const here = speciesOfArea(areaById(areaRef.current))
+      const before = countStamps(zukanRef.current, here)
+      zukanRef.current = next
+      setZukan(next)
+      persist()
+      playZooSound('stamp')
+      vibrate('success')
+      clearTimeout(toastTimer.current)
+      setToast(t => ({ key: (t?.key ?? 0) + 1, species, kind }))
+      toastTimer.current = setTimeout(() => setToast(null), 2600)
+      // このエリアの動物のスタンプが ぜんぶ そろったら、お祝い
+      const after = countStamps(next, here)
+      if (before.got < before.total && after.got === after.total) setCelebration({ kind: 'area', area: areaRef.current })
+    }
+    // おねがいは、スタンプを持っていても もう一度 できる
+    progressMission(species, kind)
+  }, [persist, progressMission])
   const onArea = useCallback((id: AreaId) => {
     if (areaRef.current !== id) playZooSound('gate')
     areaRef.current = id
     setAreaState(id)
-    writeSave({ zukan: zukanRef.current, area: id })
-  }, [])
+    setMissionSet(missionsOf(id))
+    setMissionToast(null)
+    persist()
+  }, [missionsOf, persist])
   const onSelect = useCallback((id: string | null) => setSelected(id), [])
   const hasStampCb = useCallback((species: SpeciesId, kind: StampKind) => hasStamp(zukanRef.current, species, kind), [])
+  const wantedCb = useCallback((species: SpeciesId, kind: StampKind) => isWanted(missions.get(areaRef.current), species, kind), [missions])
+  const closeCelebration = () => {
+    // メダルのあとは、つぎの おねがいを出す
+    if (celebration?.kind === 'medal') {
+      const id = areaRef.current
+      const set = createMissions(id, speciesOfArea(areaById(id)), zukanRef.current)
+      missions.set(id, set)
+      setMissionSet(set)
+    }
+    setCelebration(null)
+  }
   const onVisitor = useCallback((x: number, z: number, yaw: number) => miniMap.current?.update(x, z, yaw), [])
 
   const { registerContainer, retry, select, feed: feedFood, setFollow, overview, setMode, setArea, walkInput, goTo, walkToEnclosure } = useZooEngine({
@@ -92,6 +158,7 @@ export default function Zoo3dPlay() {
     onObserve,
     onHint: setHint,
     hasStamp: hasStampCb,
+    wanted: wantedCb,
   })
   const ready = status === 'ready'
   const member = selected ? MEMBER_BY_ID.get(selected) : undefined
@@ -99,6 +166,7 @@ export default function Zoo3dPlay() {
   const areaSpecies = useMemo(() => speciesOfArea(areaInfo), [areaInfo])
   const nearbyEnclosure = nearby ? areaInfo.enclosures.find(e => e.id === nearby) : undefined
   const total = useMemo(() => countStamps(zukan, Object.keys(SPECIES) as SpeciesId[]), [zukan])
+  const missionDone = missionSet.done.filter(Boolean).length
 
   const choose = (id: SpeciesId) => {
     primeAudio()
@@ -203,10 +271,19 @@ export default function Zoo3dPlay() {
               <span aria-hidden="true">📖</span><b>{total.got}</b>
             </button>
           </div>
+          <button type="button" className={`${styles.chip} ${styles.missionChip}`} disabled={!ready} onClick={() => { primeAudio(); playZooSound('info'); setDialog('missions') }}
+            aria-label={`おねがい（${missionDone}こ できた / ${missionSet.missions.length}こ）`} data-done={missionDone === missionSet.missions.length || undefined}>
+            <span aria-hidden="true">📋</span><b>おねがい {missionDone}/{missionSet.missions.length}</b>
+          </button>
           {toast && <div key={toast.key} className={styles.toast} role="status">
             <span aria-hidden="true">{SPECIES[toast.species].emoji}</span>
             <span>{SPECIES[toast.species].name}の「{stampInfo(toast.species, toast.kind).label}」</span>
             <b><span aria-hidden="true">{stampInfo(toast.species, toast.kind).emoji}</span> スタンプ！</b>
+          </div>}
+          {missionToast && <div key={`m${missionToast.key}`} className={`${styles.toast} ${styles.missionToast}`} role="status">
+            <span aria-hidden="true">✅</span>
+            <span>{missionText(missionSet.missions[missionToast.index]).text}</span>
+            <b>おねがい できた！</b>
           </div>}
           {ready && hint && <div className={styles.hint} role="status">
             <span aria-hidden="true">{SPECIES[hint.species].emoji}</span>
@@ -260,6 +337,8 @@ export default function Zoo3dPlay() {
               </div>}
         </section>
         {dialog === 'map' && <AreaMapDialog current={area} zukan={zukan} onGo={goArea} onClose={() => setDialog(null)} />}
+        {dialog === 'missions' && <MissionDialog set={missionSet} medals={medals} onClose={() => setDialog(null)} />}
+        {celebration && <CelebrationDialog celebration={celebration} onClose={closeCelebration} />}
         {dialog === 'zukan' && <ZukanDialog zukan={zukan} focus={zukanFocus} area={area} onFocus={setZukanFocus} onClose={() => setDialog(null)} />}
       </main>
     </GamePlaySurface>

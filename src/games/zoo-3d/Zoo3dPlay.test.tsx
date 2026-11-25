@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import Zoo3dPlay from './Zoo3dPlay'
 import { SPECIES } from './species'
 import type { ZooEngineOptions } from './useZooEngine'
+import { stampKinds } from './zukan'
 import { areaById, speciesOfArea } from './zooMap'
 
 const engine = vi.hoisted(() => ({
@@ -160,5 +161,49 @@ describe('3Dどうぶつえんの画面', () => {
     renderZoo()
     expect(engine.options?.initialArea).toBe('farm')
     expect(engine.options?.hasStamp?.('lion', 'see')).toBe(true)
+  })
+  test('しいくいんさんの おねがいを ぜんぶ できると メダルがもらえ、つぎの おねがいが出る', async () => {
+    const user = userEvent.setup()
+    renderZoo()
+    ready()
+    await user.click(screen.getByRole('button', { name: 'おねがい（0こ できた / 3こ）' }))
+    const dialog = screen.getByRole('dialog', { name: 'しいくいんさんの おねがい' })
+    const items = within(within(dialog).getByRole('list', { name: 'おねがい' })).getAllByRole('listitem')
+    expect(items).toHaveLength(3)
+    expect(items[0]).toHaveTextContent(/に .+を あげよう/)
+    await user.click(within(dialog).getByRole('button', { name: 'とじる' }))
+
+    // お題の中身は ランダムなので、エンジンの判定（wanted）から当てはまる できごとを探して起こす
+    const here = speciesOfArea(areaById('savanna'))
+    const events = here.flatMap(id => ['feed', 'see', 'sleep', ...SPECIES[id].specials.map(s => s.clip)].map(kind => [id, kind] as const))
+    const wanted = () => events.filter(([id, kind]) => engine.options?.wanted?.(id, kind))
+    const first = wanted()[0]
+    act(() => engine.options?.onObserve?.(first[0], first[1]))
+    expect(screen.getByText('おねがい できた！')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'おねがい（1こ できた / 3こ）' })).toBeInTheDocument()
+    // できた お題は もう「みにいく」の お知らせを出さない
+    expect(engine.options?.wanted?.(first[0], first[1])).toBe(false)
+
+    for (let i = 0; i < 3 && wanted().length; i++) {
+      const [id, kind] = wanted()[0]
+      act(() => engine.options?.onObserve?.(id, kind))
+    }
+    const medal = screen.getByRole('dialog', { name: 'メダル ゲット！' })
+    expect(medal).toHaveTextContent('メダルは 1こ')
+    expect(JSON.parse(localStorage.getItem('zoo-3d-v1')!).medals).toBe(1)
+    await user.click(within(medal).getByRole('button', { name: 'つぎの おねがい' }))
+    expect(screen.getByRole('button', { name: 'おねがい（0こ できた / 3こ）' })).toBeInTheDocument()
+  })
+
+  test('エリアの動物の スタンプが ぜんぶ そろうと お祝いが出る', () => {
+    const farm = speciesOfArea(areaById('farm'))
+    const zukan = Object.fromEntries(farm.map(id => [id, stampKinds(id)]))
+    // ブタの さいごの スタンプ だけ まだ
+    zukan.pig = stampKinds('pig').filter(k => k !== 'Oink')
+    localStorage.setItem('zoo-3d-v1', JSON.stringify({ zukan, area: 'farm', medals: 2 }))
+    renderZoo()
+    ready()
+    act(() => engine.options?.onObserve?.('pig', 'Oink'))
+    expect(screen.getByRole('dialog', { name: 'ふれあい ひろば コンプリート！' })).toBeInTheDocument()
   })
 })

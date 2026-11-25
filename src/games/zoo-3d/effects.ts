@@ -207,7 +207,7 @@ export function createEffects(): Effects {
 // ---------------------------------------------------------------------------
 // エサ
 
-export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana' | 'cracker' | 'insect'
+export type FoodKind = 'apple' | 'leaves' | 'meat' | 'bamboo' | 'fish' | 'grass' | 'watermelon' | 'carrot' | 'shrimp' | 'banana' | 'cracker' | 'insect' | 'corn'
 
 export function createFood(kind: FoodKind): THREE.Group {
   const group = new THREE.Group()
@@ -301,6 +301,25 @@ export function createFood(kind: FoodKind): THREE.Group {
       whisker.rotation.set(0.9, 0, s * 0.4)
       whisker.position.set(s * 0.02, 0.06, 0.13)
       group.add(whisker)
+    }
+  } else if (kind === 'corn') {
+    // とうもろこし: 黄色い粒の実と、両がわの緑の皮
+    const cob = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.2, 4, 8), mat('#ffd23f'))
+    cob.rotation.x = Math.PI / 2
+    cob.position.set(0, 0.065, 0)
+    group.add(cob)
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2
+      const kernel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 5, 4), mat('#f5b82e'))
+      kernel.position.set(Math.cos(a) * 0.058, 0.065 + Math.sin(a) * 0.058, -0.06 + (i % 3) * 0.06)
+      group.add(kernel)
+    }
+    for (const s of [-1, 1]) {
+      const husk = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), mat('#7cc35a'))
+      husk.scale.set(0.5, 0.25, 1.9)
+      husk.position.set(s * 0.06, 0.05, 0.09)
+      husk.rotation.y = s * 0.25
+      group.add(husk)
     }
   } else if (kind === 'carrot') {
     // にんじん: オレンジの円すいと緑の葉
