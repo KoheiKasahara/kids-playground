@@ -338,6 +338,88 @@ const BUILDINGS: Record<BuildingId, BuildingArt> = {
     </g>,
     windows: [[22, 52, 28, 18]],
   },
+  'log-house': {
+    body: <g>{shadow}
+      <rect x="62" y="22" width="9" height="18" fill="#868e96" {...LINE} />
+      <rect x="18" y="46" width="64" height="40" fill="#c8874f" {...LINE} />
+      {[55, 64, 73].map((y) => <path key={y} d={`M18 ${y} L82 ${y}`} stroke="#8d5a2b" strokeWidth="2" />)}
+      <path d="M10 50 L50 20 L90 50 Z" fill="#2f9e44" {...LINE} />
+      <rect x="44" y="62" width="13" height="24" rx="2" fill="#6b3e1e" {...LINE} />
+    </g>,
+    windows: [[24, 57, 13, 11], [64, 57, 13, 11]],
+  },
+  'flower-shop': {
+    body: <g>{shadow}
+      <rect x="16" y="40" width="68" height="46" fill="#fff9db" {...LINE} />
+      <path d="M16 32 L84 32 L90 46 L10 46 Z" fill="#51cf66" />
+      {[22, 38, 54, 70].map((x) => <path key={x} d={`M${x} 32 L${x + 8} 32 L${x + 9} 46 L${x - 1} 46 Z`} fill="#ffffff" />)}
+      <path d="M16 32 L84 32 L90 46 L10 46 Z" fill="none" {...LINE} />
+      <circle cx="50" cy="21" r="8" fill="#ff8cc6" {...LINE} strokeWidth={1.8} />
+      <circle cx="50" cy="21" r="3" fill="#ffd43b" />
+      <rect x="62" y="62" width="14" height="24" rx="2" fill="#2b8a3e" {...LINE} />
+      {([[22, '#ff6b81'], [36, '#ffd43b'], [50, '#b197fc']] as const).map(([x, color]) => <g key={x}>
+        <path d={`M${x - 5} 78 L${x + 5} 78 L${x + 4} 86 L${x - 4} 86 Z`} fill="#c0703c" {...LINE} strokeWidth={1.4} />
+        <circle cx={x} cy="74" r="4.5" fill={color} {...LINE} strokeWidth={1.4} />
+      </g>)}
+    </g>,
+    windows: [[22, 52, 30, 16]],
+  },
+  sushi: {
+    body: <g>{shadow}
+      <rect x="14" y="42" width="72" height="44" fill="#f3e5c8" {...LINE} />
+      <path d="M6 46 L20 30 L80 30 L94 46 Z" fill="#495057" {...LINE} />
+      <rect x="30" y="14" width="40" height="16" rx="4" fill="#ffffff" {...LINE} strokeWidth={1.8} />
+      {([[42, '#ff8a65'], [58, '#e03131']] as const).map(([x, color]) => <g key={x}>
+        <ellipse cx={x} cy="25" rx="6" ry="3" fill="#ffffff" stroke="#46404f" strokeWidth="1.2" />
+        <path d={`M${x - 7} 23 Q${x} 16 ${x + 7} 23 Z`} fill={color} stroke="#46404f" strokeWidth="1.2" />
+      </g>)}
+      <rect x="40" y="52" width="32" height="34" fill="#c8a26b" {...LINE} />
+      {[40, 51, 62].map((x) => <rect key={x} x={x} y="46" width="10" height="16" fill="#1c3f7a" {...LINE} strokeWidth={1.4} />)}
+      <path d="M80 50 L80 54" stroke="#46404f" strokeWidth="1.6" />
+      <ellipse cx="80" cy="59" rx="4.5" ry="5.5" fill="#e03131" {...LINE} strokeWidth={1.6} />
+    </g>,
+    windows: [[19, 52, 15, 16]],
+    bulbs: [[80, 59, 3.5]],
+  },
+  library: {
+    body: <g>{shadow}
+      <rect x="14" y="42" width="72" height="44" fill="#f8f0e3" {...LINE} />
+      <path d="M8 44 L50 16 L92 44 Z" fill="#7b5ea7" {...LINE} />
+      <path d="M38 32 L50 29 L62 32 L62 39 L50 36 L38 39 Z" fill="#ffffff" {...LINE} strokeWidth={1.4} />
+      <path d="M50 29 L50 36" stroke="#46404f" strokeWidth="1.4" />
+      {[22, 33, 67, 78].map((x) => <rect key={x} x={x - 3} y="46" width="6" height="34" fill="#ffffff" {...LINE} strokeWidth={1.4} />)}
+      <rect x="10" y="80" width="80" height="6" fill="#d8ccb8" {...LINE} strokeWidth={1.6} />
+      <rect x="43" y="60" width="14" height="20" rx="2" fill="#8d5a2b" {...LINE} />
+    </g>,
+    windows: [[40, 46, 20, 10]],
+  },
+  'post-office': {
+    body: <g>{shadow}
+      <rect x="14" y="38" width="62" height="48" fill="#fff5f0" {...LINE} />
+      <rect x="10" y="30" width="70" height="10" fill="#e03131" {...LINE} />
+      <circle cx="45" cy="19" r="9" fill="#ffffff" {...LINE} strokeWidth={1.8} />
+      <path d="M40 15 L50 15 M40 19 L50 19 M45 19 L45 25" stroke="#e03131" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="38" y="62" width="14" height="24" rx="2" fill="#a61e1e" {...LINE} />
+      <rect x="84" y="80" width="4" height="7" fill="#46404f" />
+      <rect x="80" y="58" width="12" height="22" rx="4" fill="#e03131" {...LINE} strokeWidth={1.8} />
+      <rect x="83" y="64" width="6" height="2" fill="#46404f" />
+    </g>,
+    windows: [[20, 48, 14, 12], [56, 48, 14, 12]],
+  },
+  'gas-station': {
+    body: <g>{shadow}
+      <rect x="58" y="50" width="32" height="36" fill="#f1f3f5" {...LINE} />
+      {[16, 48].map((x) => <rect key={x} x={x} y="36" width="5" height="50" fill="#dee2e6" {...LINE} strokeWidth={1.4} />)}
+      <rect x="8" y="26" width="84" height="12" rx="2" fill="#1c7ed6" {...LINE} />
+      <rect x="9" y="34" width="82" height="3" fill="#fcc419" />
+      <rect x="26" y="58" width="14" height="28" rx="2" fill="#e03131" {...LINE} />
+      <rect x="29" y="62" width="8" height="7" fill="#ffffff" />
+      <path d="M40 66 Q46 66 46 74 L46 80" stroke="#46404f" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <rect x="68" y="66" width="12" height="20" rx="2" fill="#495057" {...LINE} />
+    </g>,
+    windows: [[62, 54, 24, 9]],
+    bulbs: [[32, 42, 3], [74, 42, 3]],
+  },
   heliport: {
     body: <g>
       <rect x="8" y="12" width="84" height="76" rx="10" fill="#7d8590" {...LINE} />
@@ -457,6 +539,18 @@ const BUILDINGS: Record<BuildingId, BuildingArt> = {
       {([[22, '#e03131'], [31, '#fd7e14'], [40, '#82c91e']] as const).map(([cx, color]) => <circle key={cx} cx={cx} cy="71" r="4.5" fill={color} />)}
     </g>,
     windows: [[18, 50, 56, 16], [126, 50, 56, 16], [88, 54, 24, 32]],
+  },
+  aquarium: {
+    body: <g>{wideShadow}
+      <rect x="14" y="40" width="172" height="46" fill="#e7f5ff" {...LINE} />
+      <path d="M60 40 Q100 -4 140 40 Z" fill="#4dabf7" {...LINE} />
+      <ellipse cx="96" cy="28" rx="12" ry="6" fill="#ffa94d" {...LINE} strokeWidth={1.6} />
+      <path d="M107 28 L116 22 L116 34 Z" fill="#ffa94d" {...LINE} strokeWidth={1.6} />
+      <circle cx="90" cy="27" r="1.8" fill="#46404f" />
+      <rect x="10" y="34" width="180" height="8" fill="#1971c2" {...LINE} />
+      <rect x="90" y="60" width="20" height="26" rx="3" fill="#1864ab" {...LINE} />
+    </g>,
+    windows: [[22, 50, 58, 26], [120, 50, 58, 26]],
   },
   pool: {
     body: <g>
