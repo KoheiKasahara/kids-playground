@@ -11,8 +11,8 @@
 
 | ファイル | 元のファイル | 使い道 |
 | --- | --- | --- |
-| `horse-eating.glb` | `static/assets/horse/animations/eating.glb` | キリン・シマウマ・ヒツジ・シカ・ヤギの「首を下げて食べる」 |
-| `horse-sleep.glb` | `static/assets/horse/animations/sleep.glb` | キリン・シマウマ・ラクダ・ヒツジ・シカ・ヤギ・アルパカの伏せ・睡眠の姿勢 |
+| `horse-eating.glb` | `static/assets/horse/animations/eating.glb` | キリン・シマウマ・ヒツジ・シカ・ヤギ・ウマの「首を下げて食べる」 |
+| `horse-sleep.glb` | `static/assets/horse/animations/sleep.glb` | キリン・シマウマ・ラクダ・ヒツジ・シカ・ヤギ・アルパカ・ウマの伏せ・睡眠の姿勢 |
 | `fox-howl.glb` | `static/assets/fox/animations/howl.glb` | ライオン・トラの「吠える」、キツネの「コーン」、オオカミの「アオーン」（座って頭を上げる） |
 | `fox-sleep.glb` | `static/assets/fox/animations/sleep.glb` | キツネ・オオカミの丸まって眠る姿勢（ライオンは手続き的な伏せを採用） |
 | `fox-sit.glb` | `static/assets/fox/animations/sit.glb` | パンダの「てをふる」、ニホンザルの「ぱちぱち」「ぽりぽり」、ゴリラの「ドシン」、クマの「おねだり」、チーターの「みはり」の座り姿勢 |

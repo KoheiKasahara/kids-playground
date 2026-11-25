@@ -65,7 +65,7 @@ describe('どうぶつえんの マップ', () => {
   })
 
   test('水浴びをする動物の展示場には池があり、ほとりは動ける範囲の内側', () => {
-    for (const id of ['elephant', 'hippo', 'polar_bear', 'capybara', 'rhino'] as const) {
+    for (const id of ['elephant', 'hippo', 'polar_bear', 'capybara', 'rhino', 'raccoon'] as const) {
       const e = homeOf(id).enclosure
       expect(e.pond, id).toBeDefined()
       const shore = pondShore(e, e.center, 1)!

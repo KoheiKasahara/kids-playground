@@ -142,6 +142,50 @@
   background: #f1fae3;
 }
 
+/* しいくいんさんの おねがい。ぜんぶ できたら みどりに する */
+.missionChip {
+  position: absolute;
+  top: 62px;
+  left: 8px;
+  z-index: 3;
+  border-color: #ffb74d;
+  background: #fff4df;
+}
+
+.missionChip[data-done] {
+  border-color: #7cb342;
+  background: #e6f7d4;
+}
+
+/* おねがいが できたら、スタンプより少し下に出す */
+.missionToast {
+  top: 50%;
+  border-color: #8bc34a;
+  background: #f3fbe8;
+}
+
+.missionToast b {
+  color: #3f8f2a;
+}
+
+.celebrate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 34px;
+}
+
+.celebrateBig {
+  font-size: 72px;
+  animation: celebrate 0.9s ease-out;
+}
+
+@keyframes celebrate {
+  0% { transform: scale(0.3) rotate(-30deg); opacity: 0; }
+  60% { transform: scale(1.2) rotate(8deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+
 /* スタンプは画面のまんなかに、ぽんっと押す */
 .toast {
   position: absolute;
@@ -223,7 +267,7 @@
 
 /* 歩くモードでは、右下に地図があるので、お知らせは上に出す */
 .page[data-mode='walk'] .hint {
-  top: 64px;
+  top: 116px;
   bottom: auto;
 }
 
@@ -840,7 +884,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .statusIcon,
-  .toast {
+  .toast,
+  .celebrateBig {
     animation: none;
   }
 }

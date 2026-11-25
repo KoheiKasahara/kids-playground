@@ -49,6 +49,8 @@ export type ZooEngineOptions = {
   onObserve?: (species: SpeciesId, kind: StampKind) => void
   onHint?: (hint: ZooHint | null) => void
   hasStamp?: (species: SpeciesId, kind: StampKind) => boolean
+  /** スタンプを持っていても、いま見てほしいもの（おねがいのお題）。お知らせを出す。 */
+  wanted?: (species: SpeciesId, kind: StampKind) => boolean
   onEvent?: (event: ZooEvent) => void
 }
 
@@ -333,7 +335,7 @@ export function useZooEngine(options: ZooEngineOptions) {
 
     function offerHint(inst: Instance, kind: StampKind) {
       const o = optionsRef.current
-      if (hint || o.hasStamp?.(inst.state.species, kind)) return
+      if (hint || (o.hasStamp?.(inst.state.species, kind) && !o.wanted?.(inst.state.species, kind))) return
       // すでに大きく見えているなら、お知らせはいらない（そのまま見ればスタンプになる）
       if ((apparent.get(inst.state.id) ?? 0) >= WATCH_SIZE) return
       hint = { id: inst.state.id, species: inst.state.species, kind }
@@ -343,7 +345,8 @@ export function useZooEngine(options: ZooEngineOptions) {
     function checkHint() {
       if (!hint) return
       const inst = instanceOf(hint.id)
-      const still = inst && doingKind(inst) === hint.kind && !optionsRef.current.hasStamp?.(hint.species, hint.kind)
+      const o = optionsRef.current
+      const still = inst && doingKind(inst) === hint.kind && (!o.hasStamp?.(hint.species, hint.kind) || !!o.wanted?.(hint.species, hint.kind))
       if (!still) {
         hint = null
         optionsRef.current.onHint?.(null)
