@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { boxesOverlap } from './support/layout'
+import { boxesOverlap, expectScaledBoardInViewport } from './support/layout'
 
 for (const viewport of [{ width: 667, height: 375 }, { width: 844, height: 390 }]) {
   test.describe(`${viewport.width}x${viewport.height} 横画面レビューの回帰`, () => {
@@ -70,7 +70,7 @@ for (const viewport of [{ width: 667, height: 375 }, { width: 844, height: 390 }
       await page.getByRole('button', { name: 'ばんめんを したへ', exact: true }).tap()
       await page.getByRole('button', { name: 'ばんめんを ぜんたいひょうじ', exact: true }).tap()
       await expect(page.getByTestId('puzzle-part')).toHaveCount(1)
-      await expect(board).toBeInViewport({ ratio: 1 })
+      await expectScaledBoardInViewport(board)
     })
 
     test('ピンボールの全体表示が操作列の高さに縮まない [flag-pinball]', async ({ page }) => {
@@ -79,11 +79,11 @@ for (const viewport of [{ width: 667, height: 375 }, { width: 844, height: 390 }
         await page.getByRole('button', { name, exact: true }).tap()
       }
       const board = page.getByTestId('pinball-board')
-      await expect(board).toBeInViewport({ ratio: 1 })
+      await expectScaledBoardInViewport(board)
       expect((await board.boundingBox())!.height).toBeGreaterThan(280)
       await page.getByRole('button', { name: 'ばんめんを おおきく', exact: true }).tap()
       await page.getByRole('button', { name: 'ばんめんを ぜんたいひょうじ', exact: true }).tap()
-      await expect(board).toBeInViewport({ ratio: 1 })
+      await expectScaledBoardInViewport(board)
       expect((await board.boundingBox())!.height).toBeGreaterThan(280)
     })
 
@@ -92,7 +92,7 @@ for (const viewport of [{ width: 667, height: 375 }, { width: 844, height: 390 }
       await page.getByRole('button', { name: 'にほん', exact: true }).tap()
       await page.getByRole('button', { name: 'スタート！', exact: true }).tap()
       const board = page.getByTestId('adventure-board')
-      await expect(board).toBeInViewport({ ratio: 1 })
+      await expectScaledBoardInViewport(board)
       expect((await board.boundingBox())!.height).toBeGreaterThan(280)
     })
 
