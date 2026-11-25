@@ -1,9 +1,10 @@
-// エリアを選ぶ「ちず」と、観察のスタンプを集める「ずかん」。
+// エリアを選ぶ「ちず」、観察のスタンプを集める「ずかん」、しいくいんさんの「おねがい」とお祝い。
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import { SPECIES, type SpeciesId } from './species'
 import { countStamps, discovered, hasStamp, stampInfo, stampKinds, type Zukan } from './zukan'
-import { AREAS, homeOf, speciesOfArea, type AreaId } from './zooMap'
+import { AREAS, areaById, homeOf, speciesOfArea, type AreaId } from './zooMap'
+import { missionText, type MissionSet } from './missions'
 import styles from './Zoo3dPlay.module.css'
 
 /** ダイアログの外側（背景）をタップすると閉じる。Escape でも閉じる。 */
@@ -137,6 +138,56 @@ export function ZukanDialog({ zukan, focus, area, onFocus, onClose }: {
         ))}
       </div>
       <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>とじる</button>
+    </Backdrop>
+  )
+}
+
+export function MissionDialog({ set, medals, onClose }: { set: MissionSet; medals: number; onClose: () => void }) {
+  const area = areaById(set.area)
+  return (
+    <Backdrop label="しいくいんさんの おねがい" onClose={onClose}>
+      <h2 className={styles.dialogTitle}><span aria-hidden="true">📋</span> おねがい</h2>
+      <p className={styles.where}><span aria-hidden="true">{area.emoji}</span> {area.name}の しいくいんさんから</p>
+      <ul className={styles.stampList} aria-label="おねがい">
+        {set.missions.map((m, i) => {
+          const { emoji, text } = missionText(m)
+          const done = set.done[i]
+          return (
+            <li key={`${m.species}-${m.kind}`} className={done ? styles.stampGot : styles.stampEmpty}>
+              <span aria-hidden="true">{m.species ? SPECIES[m.species].emoji : emoji}</span>
+              <span>{text}</span>
+              <b>{done ? '✅ できた！' : 'まだ'}</b>
+            </li>
+          )
+        })}
+      </ul>
+      <p className={styles.where}>ぜんぶ できたら メダル <span aria-hidden="true">🏅</span> × {medals}</p>
+      <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>とじる</button>
+    </Backdrop>
+  )
+}
+
+export type Celebration = { kind: 'medal'; medals: number } | { kind: 'area'; area: AreaId }
+
+/** メダルをもらったとき・エリアの ずかんを ぜんぶ集めたときのお祝い。 */
+export function CelebrationDialog({ celebration, onClose }: { celebration: Celebration; onClose: () => void }) {
+  const medal = celebration.kind === 'medal'
+  const area = medal ? undefined : areaById(celebration.area)
+  const title = medal ? 'メダル ゲット！' : `${area!.name} コンプリート！`
+  return (
+    <Backdrop label={title} onClose={onClose}>
+      <div className={styles.celebrate} aria-hidden="true">
+        <span>🎉</span><span className={styles.celebrateBig}>{medal ? '🏅' : '🏆'}</span><span>🎉</span>
+      </div>
+      <h2 className={styles.dialogTitle}>{title}</h2>
+      <p className={styles.where}>
+        {medal
+          ? `おねがいを ぜんぶ できたね！ メダルは ${celebration.medals}こ`
+          : `${area!.name}の どうぶつの スタンプを ぜんぶ あつめたよ！`}
+      </p>
+      <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>
+        {medal ? 'つぎの おねがい' : 'やったね！'}
+      </button>
     </Backdrop>
   )
 }

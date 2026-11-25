@@ -3,7 +3,7 @@
 
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
-export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore' | 'stamp' | 'gate' | 'howl' | 'yip' | 'chirp' | 'mee' | 'bonk' | 'peep'
+export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore' | 'stamp' | 'gate' | 'howl' | 'yip' | 'chirp' | 'mee' | 'bonk' | 'peep' | 'oink' | 'medal'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -65,6 +65,11 @@ export function playZooSound(sound: ZooSound): void {
         playTone(ctx, 330, now, 0.08, 0.22, 'triangle')
         playNoiseBurst(ctx, now, 0.05, 0.14, 'lowpass', 1400)
         ;[1047, 1319, 1568, 2093].forEach((f, i) => playTone(ctx, f, now + 0.1 + i * 0.07, 0.18, 0.1, 'sine'))
+        return
+      case 'medal':
+        // おねがい たっせい: ドミソドの ファンファーレと、きらきら
+        ;[523, 659, 784, 1047].forEach((f, i) => playTone(ctx, f, now + i * 0.11, i === 3 ? 0.42 : 0.16, 0.14, 'triangle'))
+        ;[1568, 2093, 2637].forEach((f, i) => playTone(ctx, f, now + 0.5 + i * 0.08, 0.2, 0.08, 'sine'))
         return
       case 'gate':
         // となりのエリアへ: 足音2つと、上がる音
@@ -182,6 +187,13 @@ export function playZooSound(sound: ZooSound): void {
           tone.oscillator.frequency.exponentialRampToValueAtTime(70, now + i * 0.14 + 0.12)
           tone.oscillator.start(now + i * 0.14)
           tone.oscillator.stop(now + i * 0.14 + 0.12)
+        }
+        return
+      case 'oink':
+        // ブタの「ぶーぶー」: 鼻にかかった低い声を2回、短くはずませる
+        for (const t of [0, 0.3]) {
+          voice(ctx, now + t, [[0, 190], [0.06, 260], [0.2, 170]], 0.22, 'sawtooth', 900, 18)
+          playNoiseBurst(ctx, now + t, 0.12, 0.1, 'lowpass', 600)
         }
         return
       case 'snort':

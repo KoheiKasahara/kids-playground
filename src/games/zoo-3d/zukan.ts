@@ -59,7 +59,8 @@ export function discovered(zukan: Zukan, species: SpeciesId): boolean {
 
 const KEY = 'zoo-3d-v1'
 
-export type ZooSave = { zukan: Zukan; area: AreaId }
+/** medals は、しいくいんさんの おねがいを ぜんぶ できた回数。 */
+export type ZooSave = { zukan: Zukan; area: AreaId; medals: number }
 
 function storage(): Storage | undefined {
   try {
@@ -71,10 +72,11 @@ function storage(): Storage | undefined {
 
 /** 保存した内容を読む。へんなデータは捨て、知っている動物・スタンプだけを残す。 */
 export function parseSave(data: unknown): ZooSave {
-  const result: ZooSave = { zukan: {}, area: AREA_ORDER[0] }
+  const result: ZooSave = { zukan: {}, area: AREA_ORDER[0], medals: 0 }
   if (!data || typeof data !== 'object') return result
-  const { zukan, area } = data as Record<string, unknown>
+  const { zukan, area, medals } = data as Record<string, unknown>
   if (isAreaId(area)) result.area = area
+  if (typeof medals === 'number' && Number.isFinite(medals) && medals > 0) result.medals = Math.min(9999, Math.floor(medals))
   if (zukan && typeof zukan === 'object') {
     for (const [id, kinds] of Object.entries(zukan as Record<string, unknown>)) {
       if (!(id in SPECIES) || !Array.isArray(kinds)) continue

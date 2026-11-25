@@ -439,12 +439,25 @@ const WATER_ENCLOSURES: Enclosure[] = [
     trees: [{ back: 2.2, side: -2.6, kind: 'palm', size: 0.8 }],
     rocks: [{ back: -2.4, side: -1.6, r: 0.35, h: 0.25 }],
   }),
+  outerEnclosure(87, {
+    id: 'raccoon',
+    species: ['raccoon'],
+    radius: 4.6,
+    barrier: 'low',
+    fence: '#8b6a4a',
+    ground: '#bcd88c',
+    // てあらいの おがわ
+    pond: { back: 0.8, side: -1.0, r: 1.4 },
+    trees: [{ back: 2.2, side: 1.8, kind: 'round', size: 0.85 }],
+    rocks: [{ back: -1.6, side: 1.8, r: 0.4, h: 0.3 }],
+    house: { width: 2.6, depth: 2.0, height: 2.0, wall: '#e8dcc4', roof: '#6f8f5a' },
+  }),
 ]
 
 const FARM_ENCLOSURES: Enclosure[] = [
   centerEnclosure({
     id: 'fureai',
-    species: ['rabbit', 'sheep', 'goat'],
+    species: ['rabbit', 'sheep', 'goat', 'pig'],
     radius: 7.0,
     barrier: 'low',
     fence: '#c49a6c',
@@ -508,6 +521,18 @@ const FARM_ENCLOSURES: Enclosure[] = [
       { back: 2.4, side: 2.4, kind: 'palm', size: 0.8 },
     ],
     rocks: [{ back: -1.8, side: -1.6, r: 0.55, h: 0.4, color: '#d8b47c' }],
+  }),
+  outerEnclosure(87, {
+    id: 'horse',
+    species: ['horse'],
+    radius: 5.0,
+    barrier: 'wood',
+    fence: '#f3efe6',
+    ground: '#b5d983',
+    trees: [{ back: 2.4, side: -2.0, kind: 'round', size: 0.9 }],
+    rocks: [{ back: -1.6, side: 2.0, r: 0.4, h: 0.3, color: '#cbb48a' }],
+    // うまごや
+    house: { width: 3.2, depth: 2.4, height: 2.5, wall: '#e9d3b0', roof: '#8a5a3a' },
   }),
 ]
 

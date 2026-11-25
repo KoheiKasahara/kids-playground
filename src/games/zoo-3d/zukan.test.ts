@@ -83,12 +83,14 @@ describe('どうぶつ ずかん', () => {
 
   test('保存して読み直せる。へんなデータは捨てて、知っているスタンプだけ残す', () => {
     const zukan = addStamp(addStamp({}, 'lion', 'see')!, 'lion', 'Roar')!
-    expect(writeSave({ zukan, area: 'wild' })).toBe(true)
-    expect(loadSave()).toEqual({ zukan, area: 'wild' })
-    expect(parseSave({ zukan: { lion: ['see', 'see', 'Fly', 3], dragon: ['see'], panda: 'see' }, area: 'moon' }))
-      .toEqual({ zukan: { lion: ['see'] }, area: 'savanna' })
-    expect(parseSave(null)).toEqual({ zukan: {}, area: 'savanna' })
+    expect(writeSave({ zukan, area: 'wild', medals: 3 })).toBe(true)
+    expect(loadSave()).toEqual({ zukan, area: 'wild', medals: 3 })
+    expect(parseSave({ zukan: { lion: ['see', 'see', 'Fly', 3], dragon: ['see'], panda: 'see' }, area: 'moon', medals: -2 }))
+      .toEqual({ zukan: { lion: ['see'] }, area: 'savanna', medals: 0 })
+    expect(parseSave({ zukan: {}, area: 'farm', medals: 2.7 })).toEqual({ zukan: {}, area: 'farm', medals: 2 })
+    expect(parseSave({ zukan: {}, area: 'farm', medals: 'たくさん' }).medals).toBe(0)
+    expect(parseSave(null)).toEqual({ zukan: {}, area: 'savanna', medals: 0 })
     localStorage.setItem('zoo-3d-v1', '{こわれた')
-    expect(loadSave()).toEqual({ zukan: {}, area: 'savanna' })
+    expect(loadSave()).toEqual({ zukan: {}, area: 'savanna', medals: 0 })
   })
 })

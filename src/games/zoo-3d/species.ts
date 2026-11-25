@@ -15,6 +15,7 @@ import giraffeManifest from './models/giraffe.json'
 import goatManifest from './models/goat.json'
 import gorillaManifest from './models/gorilla.json'
 import hippoManifest from './models/hippo.json'
+import horseManifest from './models/horse.json'
 import kangarooManifest from './models/kangaroo.json'
 import lionManifest from './models/lion.json'
 import meerkatManifest from './models/meerkat.json'
@@ -22,8 +23,10 @@ import monkeyManifest from './models/monkey.json'
 import ostrichManifest from './models/ostrich.json'
 import pandaManifest from './models/panda.json'
 import penguinManifest from './models/penguin.json'
+import pigManifest from './models/pig.json'
 import polarBearManifest from './models/polar_bear.json'
 import rabbitManifest from './models/rabbit.json'
+import raccoonManifest from './models/raccoon.json'
 import redPandaManifest from './models/red_panda.json'
 import rhinoManifest from './models/rhino.json'
 import sheepManifest from './models/sheep.json'
@@ -33,7 +36,7 @@ import zebraManifest from './models/zebra.json'
 import type { FoodKind } from './effects'
 import type { AnimalManifest } from './motion'
 
-export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer' | 'fox' | 'ostrich' | 'wolf' | 'bear' | 'cheetah' | 'goat' | 'alpaca' | 'meerkat'
+export type SpeciesId = 'elephant' | 'giraffe' | 'lion' | 'panda' | 'tiger' | 'penguin' | 'zebra' | 'hippo' | 'rabbit' | 'kangaroo' | 'flamingo' | 'polar_bear' | 'camel' | 'monkey' | 'capybara' | 'crocodile' | 'sheep' | 'gorilla' | 'red_panda' | 'rhino' | 'deer' | 'fox' | 'ostrich' | 'wolf' | 'bear' | 'cheetah' | 'goat' | 'alpaca' | 'meerkat' | 'pig' | 'raccoon' | 'horse'
 
 export type SpecialAction = {
   clip: string
@@ -801,9 +804,84 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
     mood: { idle: [1.5, 3.5], wander: 5, run: 1.6, special: 1.8, graze: 1.6, sleep: 0.6, curious: 1.8 },
   },
+  pig: {
+    id: 'pig',
+    name: 'ブタ',
+    emoji: '🐷',
+    color: '#f4b6b8',
+    manifest: pigManifest as AnimalManifest,
+    food: { id: 'corn', label: 'とうもろこし', emoji: '🌽' },
+    specials: [
+      { clip: 'Root', label: 'はなで ほりほり', emoji: '🐽' },
+      { clip: 'Oink', label: 'ぶーぶー', emoji: '🎶' },
+    ],
+    facts: [
+      'はなが とっても よくて、つちの なかの たべものも みつけるよ',
+      'どろあびを して、からだを ひやすよ',
+      'じつは きれいずきで、とても かしこいよ',
+    ],
+    reach: (pigManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.6,
+    hit: [{ y: 0.45, z: 0, r: 0.42 }, { y: 0.58, z: 0.55, r: 0.3 }],
+    follow: { height: 0.5, distance: 5 },
+    members: [
+      { id: 'pig-mom', scale: 1, label: 'おかあさん' },
+      { id: 'pig-piglet', scale: 0.55, label: 'こぶた' },
+    ],
+    mood: { idle: [2.5, 5], wander: 4.5, run: 0.6, special: 1.5, graze: 1.6, sleep: 0.8, curious: 1.6 },
+  },
+  raccoon: {
+    id: 'raccoon',
+    name: 'アライグマ',
+    emoji: '🦝',
+    color: '#8f8a84',
+    manifest: raccoonManifest as AnimalManifest,
+    food: { id: 'shrimp', label: 'ザリガニ', emoji: '🦞' },
+    specials: [
+      { clip: 'Wash', label: 'てあらい', emoji: '🫧', atPond: true },
+      { clip: 'Peekaboo', label: 'いないいないばあ', emoji: '🙈' },
+    ],
+    facts: [
+      'まえあしを みずに いれて、ごしごし こするよ',
+      'めの まわりが くろくて、マスクを しているみたい',
+      'しっぽに しましまの わが あるよ',
+    ],
+    reach: (raccoonManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.3,
+    hit: [{ y: 0.48, z: 0, r: 0.34 }, { y: 0.64, z: 0.42, r: 0.27 }],
+    follow: { height: 0.5, distance: 4.8 },
+    members: [
+      { id: 'raccoon-mom', scale: 1, label: 'おかあさん' },
+      { id: 'raccoon-kid', scale: 0.65, label: 'こども' },
+    ],
+    mood: { idle: [2, 4.5], wander: 4.5, run: 0.9, special: 1.5, graze: 1.5, sleep: 0.7, curious: 1.4 },
+  },
+  horse: {
+    id: 'horse',
+    name: 'ウマ',
+    emoji: '🐴',
+    color: '#b8693a',
+    manifest: horseManifest as AnimalManifest,
+    food: { id: 'carrot', label: 'にんじん', emoji: '🥕' },
+    specials: [
+      { clip: 'Neigh', label: 'ヒヒーン', emoji: '📣' },
+      { clip: 'Prance', label: 'ぱかぱか', emoji: '🎠' },
+    ],
+    facts: [
+      'ながい たてがみと、ふさふさの しっぽが あるよ',
+      'ひとを せなかに のせて はしれるよ',
+      'たったままでも ねむることが できるよ',
+    ],
+    reach: (horseManifest as AnimalManifest).clips.Eat.food?.reach ?? 0.9,
+    hit: [{ y: 1.0, z: 0, r: 0.55 }, { y: 1.55, z: 0.75, r: 0.4 }],
+    follow: { height: 1.0, distance: 7 },
+    members: [
+      { id: 'horse-mom', scale: 1, label: 'おかあさん' },
+      { id: 'horse-foal', scale: 0.6, label: 'こうま' },
+    ],
+    mood: { idle: [2.5, 5], wander: 5, run: 1.0, special: 1.2, graze: 1.5, sleep: 0.35, curious: 1.6 },
+  },
 }
 
-export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer', 'fox', 'ostrich', 'wolf', 'bear', 'cheetah', 'goat', 'alpaca', 'meerkat']
+export const SPECIES_ORDER: SpeciesId[] = ['elephant', 'giraffe', 'lion', 'panda', 'tiger', 'penguin', 'zebra', 'hippo', 'rabbit', 'kangaroo', 'flamingo', 'polar_bear', 'camel', 'monkey', 'capybara', 'crocodile', 'sheep', 'gorilla', 'red_panda', 'rhino', 'deer', 'fox', 'ostrich', 'wolf', 'bear', 'cheetah', 'goat', 'alpaca', 'meerkat', 'pig', 'raccoon', 'horse']
 
 export function modelUrl(species: Species): string {
   return `${import.meta.env.BASE_URL}models/zoo-3d/${species.manifest.model}`
