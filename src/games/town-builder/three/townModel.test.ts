@@ -17,8 +17,8 @@ function everythingTown(): Town {
   const small = BUILDINGS.filter((id) => !isLarge(id))
   const squares = BUILDINGS.filter((id) => isLarge(id) && PARTS.find((part) => part.id === id)?.size?.[1] === 2)
   const wides = BUILDINGS.filter((id) => isLarge(id) && PARTS.find((part) => part.id === id)?.size?.[1] === 1)
-  // 1マスの もの（0・2 ぎょうめ と 6 ぎょうめの のこり）、2×2（4〜5 ぎょうめ）、よこ 2マス（6 ぎょうめ）。
-  small.forEach((id, n) => { town = applyTool(town, n < 28 ? at(n % COLS, n < COLS ? 0 : 2) : at(8 + n - 28, 6), id) })
+  // 1マスの もの（0・2 ぎょうめ と 6 ぎょうめの よこ 2マスの うしろ）、2×2（4〜5 ぎょうめ）、よこ 2マス（6 ぎょうめの はじめ）。
+  small.forEach((id, n) => { town = applyTool(town, n < 28 ? at(n % COLS, n < COLS ? 0 : 2) : at(wides.length * 2 + n - 28, 6), id) })
   squares.forEach((id, n) => { town = applyTool(town, at(n * 2, 4), id) })
   wides.forEach((id, n) => { town = applyTool(town, at(n * 2, 6), id) })
   for (const row of [1, 3, 7]) for (let col = 0; col < COLS; col += 1) town = applyTool(town, at(col, row), 'road')
@@ -69,9 +69,9 @@ it('builds every kind of part on the board, with bridges, crossings and moving p
   // ランプは ひだり・みぎの くみごとに 1つ（こうごに ひかる）。
   expect(model.crossings.every((crossing) => crossing.lamps.length === 2)).toBe(true)
 
-  // かんらんしゃ・ふうしゃ・ふんすい・けむり・プロペラ・とうだい・メリーゴーランド・ロケット・ジェットコースターが うごく。
-  expect(model.ticks).toHaveLength(9)
-  for (const id of ['ferris', 'windmill', 'fountain', 'factory', 'heliport', 'lighthouse', 'merry', 'rocket', 'coaster']) {
+  // かんらんしゃ・ふうしゃ・ふんすい・けむり・プロペラ・とうだい・メリーゴーランド・ロケット・ジェットコースター・すいぞくかんの さかなが うごく。
+  expect(model.ticks).toHaveLength(10)
+  for (const id of ['ferris', 'windmill', 'fountain', 'factory', 'heliport', 'lighthouse', 'merry', 'rocket', 'coaster', 'aquarium']) {
     expect(model.root.getObjectByName(`${id}-motion`), id).toBeDefined()
   }
   const wheel = model.root.getObjectByName('ferris-motion')!.children[0]

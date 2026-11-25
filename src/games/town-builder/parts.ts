@@ -14,6 +14,7 @@ export type BuildingId =
   | 'icecream' | 'bakery' | 'heliport' | 'shrine'
   | 'mountain' | 'ranch' | 'beach'
   | 'merry' | 'coaster' | 'rocket' | 'circus'
+  | 'log-house' | 'flower-shop' | 'sushi' | 'library' | 'post-office' | 'gas-station' | 'aquarium'
 
 export type NetworkId = 'road' | 'rail'
 /** マスに のる もの。みちと せんろが かさなると ふみきり（crossing）になる。 */
@@ -63,11 +64,14 @@ export const PARTS: readonly PartDefinition[] = [
   { id: 'apartment', label: 'マンション', category: 'home', residents: 12, needsRoad: true },
   { id: 'tower', label: 'タワーマンション', category: 'home', residents: 30, needsRoad: true },
   { id: 'igloo', label: 'かまくら', category: 'home', residents: 2, needsRoad: true },
+  { id: 'log-house', label: 'ログハウス', category: 'home', residents: 4, needsRoad: true },
   { id: 'big-apartment', label: 'ながい マンション', category: 'home', residents: 24, needsRoad: true, size: [2, 1] },
   { id: 'shop', label: 'コンビニ', category: 'shop', needsRoad: true },
   { id: 'cake', label: 'ケーキやさん', category: 'shop', needsRoad: true },
   { id: 'icecream', label: 'アイスやさん', category: 'shop', needsRoad: true },
   { id: 'bakery', label: 'パンやさん', category: 'shop', needsRoad: true },
+  { id: 'flower-shop', label: 'はなやさん', category: 'shop', needsRoad: true },
+  { id: 'sushi', label: 'おすしやさん', category: 'shop', needsRoad: true },
   { id: 'office', label: 'ビル', category: 'shop', needsRoad: true },
   { id: 'depart', label: 'デパート', category: 'shop', needsRoad: true },
   { id: 'factory', label: 'こうじょう', category: 'shop', needsRoad: true },
@@ -77,6 +81,9 @@ export const PARTS: readonly PartDefinition[] = [
   { id: 'fire', label: 'しょうぼうしょ', category: 'town', needsRoad: true },
   { id: 'police', label: 'けいさつ', category: 'town', needsRoad: true },
   { id: 'station', label: 'えき', category: 'town', needsRoad: true },
+  { id: 'library', label: 'としょかん', category: 'town', needsRoad: true },
+  { id: 'post-office', label: 'ゆうびんきょく', category: 'town', needsRoad: true },
+  { id: 'gas-station', label: 'ガソリンスタンド', category: 'town', needsRoad: true },
   { id: 'heliport', label: 'ヘリポート', category: 'town', needsRoad: true },
   { id: 'shrine', label: 'じんじゃ', category: 'town' },
   { id: 'lighthouse', label: 'とうだい', category: 'town' },
@@ -107,6 +114,7 @@ export const PARTS: readonly PartDefinition[] = [
   { id: 'pool', label: 'プール', category: 'fun', needsRoad: true, size: [2, 1] },
   { id: 'coaster', label: 'ジェットコースター', category: 'fun', needsRoad: true, size: [2, 2] },
   { id: 'stadium', label: 'スタジアム', category: 'fun', needsRoad: true, size: [2, 2] },
+  { id: 'aquarium', label: 'すいぞくかん', category: 'fun', needsRoad: true, size: [2, 1] },
   { id: 'zoo', label: 'どうぶつえん', category: 'fun', needsRoad: true, size: [2, 2] },
 ]
 
