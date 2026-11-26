@@ -605,6 +605,19 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('おちた', kabukuwa.playFall),
     sample('かった', kabukuwa.playWin),
     background('BGM', 3, kabukuwa.startBgm),
+    background('BGM わざを ためて きまる', 3, ({ advance }) => {
+      const stop = kabukuwa.startBgm()
+      advance(800)
+      kabukuwa.bgmWindup(.5)
+      advance(500)
+      kabukuwa.bgmHit(true)
+      return stop
+    }),
+    background('BGM カットインの あと', 4, () => {
+      const stop = kabukuwa.startBgm()
+      kabukuwa.bgmCutIn(1.8)
+      return stop
+    }),
   ],
   'onaji-pon': [sample('つなぐ', () => onaji.playConnectSound(1)), sample('ひく', onaji.playDrawSound), sample('だめ', onaji.playNopeSound), sample('クリア', onaji.playClearSound)],
 }

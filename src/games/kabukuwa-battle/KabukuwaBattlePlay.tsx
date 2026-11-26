@@ -15,7 +15,7 @@ import {
   type BeetleGroup, type Species,
 } from './species'
 import { setSpriteBudget } from './sprite'
-import { moveRepertoire, techniqueFor, type Technique } from './techniques'
+import { moveRepertoire, techniqueFor, windupDuration, type Technique } from './techniques'
 import { resultText, STAGES, stageById, type Stage } from './stages'
 import * as sound from './sounds'
 import styles from './KabukuwaBattlePlay.module.css'
@@ -423,6 +423,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       // スローは カットインの あいだ（とまって いる あいだ）も へるので、そのぶん ながく する。
       if (!still) slow = CUT_IN_SECONDS + 1.2
       sound.playCutIn()
+      sound.bgmCutIn(CUT_IN_SECONDS)
       vibrate('impact')
       setCutIn({ side: winner, kind, variant })
       setMessage(kind === 'comeback' ? `${name(winner)}の ぎゃくてん！ ${CUT_IN_STYLES[variant].shout}` : `${name(winner)}が せっせんを せいした！ ${CUT_IN_STYLES[variant].shout}`)
@@ -436,6 +437,8 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         case 'clash': sound.playClash(); vibrate('tap'); setMessage('ガシッ！ くみあった！'); pop('ガシッ！', e.u, e.v, 34, false, 'clash'); break
         case 'windup':
           sound.playWindup(e.move === 'utchari')
+          // うっちゃりは ためずに すぐ なげるので、ロールは いれない。
+          if (e.move !== 'utchari') sound.bgmWindup(windupDuration(battle.f[e.side].sp, e.move))
           showMove(e.side, e.move)
           setMessage(`${name(e.side)}の ${techniqueFor(battle.f[e.side].sp, e.move).name}！`)
           break
@@ -444,6 +447,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
           vibrate('impact')
           const def = name((1 - e.side) as 0 | 1)
           const special = e.move === 'utchari'
+          sound.bgmHit(e.big || special)
           const technique = techniqueFor(battle.f[e.side].sp, e.move)
           const action = e.move === 'sweep' ? 'を よこに なげた！'
             : e.move === 'rush' ? 'を れんぞくで おした！'
