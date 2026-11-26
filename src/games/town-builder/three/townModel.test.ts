@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { isBuildingTool, isLarge, PARTS, type BuildingId } from '../parts'
 import { createMapTown, MAPS } from '../maps'
 import { applyTool, COLS, createEmptyTown, ROWS, type Town } from '../town'
+import { TownKit } from './townKit'
 import { buildTownModel } from './townModel'
 
 afterEach(() => vi.restoreAllMocks())
@@ -134,6 +135,35 @@ it('draws buildings placed bigger at the bigger size, centred on their cells', (
   expect(height(big)).toBeGreaterThan(height(small) * 2.5)
   small.dispose()
   big.dispose()
+})
+
+it('shares vertices in large static meshes and can address vertices past the 16-bit limit', () => {
+  const kit = new TownKit()
+  // 1まい 33,124 ちょうてん。2まいめの おわりは 16 ビットでは あらわせない。
+  const plane = kit.own(new THREE.PlaneGeometry(1, 1, 181, 181))
+  kit.place(plane, '#ff0000', new THREE.Matrix4())
+  kit.place(plane, '#0000ff', new THREE.Matrix4().makeTranslation(2, 0, 0))
+  const [mesh] = kit.merge()
+  const vertices = plane.attributes.position.count
+  const { position, color } = mesh.geometry.attributes
+  expect(position.count).toBe(2 * vertices)
+  expect(mesh.geometry.index!.array.at(-1)).toBe(vertices + plane.index!.array.at(-1)!)
+  expect(position.getX(vertices)).toBeCloseTo(position.getX(0) + 2)
+  expect([color.getX(0), color.getZ(vertices)]).toEqual([1, 1])
+  kit.dispose()
+})
+
+it('keeps the water surface, riverbanks and outside edges pickable with the ground batched', () => {
+  const sand: Town = createEmptyTown().map(() => ({ ground: 'sand', part: null }))
+  const model = buildTownModel(applyTool(sand, at(COLS / 2, ROWS / 2), 'water'))
+  const hit = (from: THREE.Vector3, direction: THREE.Vector3) =>
+    new THREE.Raycaster(from, direction).intersectObject(model.root)[0]?.point
+  const down = new THREE.Vector3(0, -1, 0)
+  expect(hit(new THREE.Vector3(0.5, 1, 0.5), down)?.y).toBeCloseTo(-0.04)
+  expect(hit(new THREE.Vector3(2.5, 1, 0.5), down)?.y).toBeCloseTo(0)
+  expect(hit(new THREE.Vector3(0.5, -0.02, 0.5), new THREE.Vector3(1, 0, 0))?.x).toBeCloseTo(1)
+  expect(hit(new THREE.Vector3(-COLS / 2 - 1, -0.05, 0.5), new THREE.Vector3(1, 0, 0))?.x).toBeCloseTo(-COLS / 2)
+  model.dispose()
 })
 
 it.each(MAPS.map((map) => [map.id]))('keeps the %s map light to draw: few meshes for the whole town', (id) => {

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { colOf, COLS, railMask, roadMask, rowOf, ROWS, type Ground, type Town } from '../town'
+import { colOf, COLS, railMask, roadMask, rowOf, ROWS, waterMask, type Ground, type Town } from '../town'
 import { directions, segmentsOf } from '../trackGeometry'
 import { Frame, matrixOf, type Mat, type TownKit } from './townKit'
 import { tileCenter, tileNoise, type Point } from './townLayout'
@@ -212,6 +212,8 @@ export type GroundResult = { crossings: Crossing[]; pool: THREE.MeshBasicMateria
 export function buildGround(kit: TownKit, town: Town, root: THREE.Group): GroundResult {
   const pool = createPoolMaterial(kit)
   const crossings: Crossing[] = []
+  const surface = kit.own(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2))
+  const waterMaterial = kit.mat(WATER, { rough: 0.18, metal: 0.05 })
   // ちずの したの つち。
   new Frame(kit, new THREE.Matrix4(), false).box(SOIL, [COLS, 0.55, ROWS], [0, -0.65, 0])
   new Frame(kit, new THREE.Matrix4(), false).box('#8a5a32', [COLS - 0.6, 0.25, ROWS - 0.6], [0, -0.9, 0])
@@ -221,18 +223,22 @@ export function buildGround(kit: TownKit, town: Town, root: THREE.Group): Ground
     const flat = new Frame(kit, base, false)
     const ground = tile.ground
     const water = ground === 'water'
-    if (ground === 'water') {
-      // かわは くさはらより すこし ひくく して、きしを みせる。
-      flat.box(kit.mat(WATER, { rough: 0.18, metal: 0.05 }), [1, 0.06, 1], [0, -0.1, 0])
+    const col = colOf(index)
+    const row = rowOf(index)
+    const material = water ? waterMaterial : LAND[ground][(col + row) % 2]
+    // ちずの ふち・みずぎわは よこも みえる。それいがいの マスは うえの めんだけで よい。
+    const edge = col === 0 || col === COLS - 1 || row === 0 || row === ROWS - 1
+    if (edge || (!water && waterMask(town, index) !== 0)) {
+      flat.box(material, [1, water ? 0.06 : 0.1, 1], [0, -0.1, 0])
     } else {
-      flat.box(LAND[ground][(colOf(index) + rowOf(index)) % 2], [1, 0.1, 1], [0, -0.1, 0])
+      flat.put(surface, material, [0, water ? -0.04 : 0, 0], [1, 1, 1])
     }
     const part = tile.part
     if (part === 'road' || part === 'crossing') road(flat, roadMask(town, index), water)
     if (part === 'rail' || part === 'crossing') rail(flat, railMask(town, index), water, part === 'crossing')
     if (part === 'crossing') crossings.push(crossingSignals(kit, index, root))
     const standing = new Frame(kit, base)
-    if (part === 'road' && !water && (colOf(index) + rowOf(index)) % 2 === 0) lamp(standing, pool)
+    if (part === 'road' && !water && (col + row) % 2 === 0) lamp(standing, pool)
     if (!part && ground === 'grass') tufts(flat, index)
   })
   return { crossings, pool }

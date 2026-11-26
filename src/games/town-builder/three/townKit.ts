@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // 3D の まちを くみたてる どうぐ。
 // うごかない ものは ざいりょうごとに 1つの かたちへ まとめ（えがく かいすうを へらす）、
@@ -42,14 +42,14 @@ export function matrixOf(at: V3 = ZERO, rot: V3 = ZERO, scale: V3 = ONE): THREE.
   )
 }
 
-/** まとめられる よう、どの かたちも index なし・position と normal だけに そろえる。 */
+/** もとの かたちごとに 1かいだけ、いちと むきが おなじ ちょうてんを まとめる。 */
 function normalize(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-  const flat = geometry.index ? geometry.toNonIndexed() : geometry
-  if (flat !== geometry) geometry.dispose()
-  for (const name of Object.keys(flat.attributes)) if (name !== 'position' && name !== 'normal') flat.deleteAttribute(name)
-  if (!flat.attributes.normal) flat.computeVertexNormals()
-  flat.clearGroups()
-  return flat
+  for (const name of Object.keys(geometry.attributes)) if (name !== 'position' && name !== 'normal') geometry.deleteAttribute(name)
+  if (!geometry.attributes.normal) geometry.computeVertexNormals()
+  geometry.clearGroups()
+  const indexed = mergeVertices(geometry)
+  geometry.dispose()
+  return indexed
 }
 
 /** そこが y=0 の さんかくの やね（むねは x じく、はば・たかさ・おくゆき 1）。 */
@@ -100,6 +100,45 @@ function arcGeometry(cx: number, cz: number, inner: number, outer: number, a0: n
 type Part = { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4; color?: THREE.Color }
 type Batch = { material: THREE.Material; cast: boolean; parts: Part[] }
 
+/** ぶひんを コピーしてから つなぐと まちを ひらく ときに おもいので、さいごの バッファへ ちょくせつ かく。 */
+function mergeParts(parts: readonly Part[]): THREE.BufferGeometry {
+  let vertexCount = 0
+  let indexCount = 0
+  for (const { geometry } of parts) {
+    vertexCount += geometry.attributes.position.count
+    indexCount += geometry.index?.count ?? geometry.attributes.position.count
+  }
+  const positions = new Float32Array(vertexCount * 3)
+  const normals = new Float32Array(vertexCount * 3)
+  const colors = parts[0]?.color ? new Float32Array(vertexCount * 3) : null
+  const indices = vertexCount > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount)
+  const vector = new THREE.Vector3()
+  const normalMatrix = new THREE.Matrix3()
+  let vertexOffset = 0
+  let indexOffset = 0
+  for (const { geometry, matrix, color } of parts) {
+    const { position, normal } = geometry.attributes
+    normalMatrix.getNormalMatrix(matrix)
+    for (let i = 0; i < position.count; i++) {
+      const offset = (vertexOffset + i) * 3
+      vector.fromBufferAttribute(position, i).applyMatrix4(matrix).toArray(positions, offset)
+      vector.fromBufferAttribute(normal, i).applyNormalMatrix(normalMatrix).toArray(normals, offset)
+      if (colors && color) color.toArray(colors, offset)
+    }
+    const index = geometry.index
+    const count = index?.count ?? position.count
+    for (let i = 0; i < count; i++) indices[indexOffset++] = vertexOffset + (index?.getX(i) ?? i)
+    vertexOffset += position.count
+  }
+  const merged = new THREE.BufferGeometry()
+  merged.setIndex(new THREE.BufferAttribute(indices, 1))
+  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  merged.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  if (colors) merged.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  merged.computeBoundingSphere()
+  return merged
+}
+
 /** かたちを おく さき（まちの うごかない もの・いっしょに うごく もの）。 */
 export type Sink = { place(geometry: THREE.BufferGeometry, material: Mat, matrix: THREE.Matrix4, cast?: boolean): void }
 
@@ -124,24 +163,7 @@ class Batcher implements Sink {
   merge(): THREE.Mesh[] {
     const meshes: THREE.Mesh[] = []
     for (const batch of this.batches.values()) {
-      const parts = batch.parts.map(({ geometry, matrix, color }) => {
-        const part = geometry.clone().applyMatrix4(matrix)
-        if (color) {
-          const colors = new Float32Array(part.attributes.position.count * 3)
-          for (let n = 0; n < colors.length; n += 3) {
-            colors[n] = color.r
-            colors[n + 1] = color.g
-            colors[n + 2] = color.b
-          }
-          part.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-        }
-        return part
-      })
-      const merged = mergeGeometries(parts, false)
-      parts.forEach((part) => part.dispose())
-      if (!merged) continue
-      merged.computeBoundingSphere()
-      this.kit.own(merged)
+      const merged = this.kit.own(mergeParts(batch.parts))
       const mesh = new THREE.Mesh(merged, batch.material)
       mesh.castShadow = batch.cast
       mesh.receiveShadow = true
@@ -324,10 +346,7 @@ export class TownKit implements Sink {
 
   /** いくつかの かたちを 1つの Mesh に する（あとで ざいりょうを とりかえる もの。ふみきりの ランプ など）。 */
   joined(parts: readonly { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[], material: Mat, cast = false): THREE.Mesh {
-    const clones = parts.map(({ geometry, matrix }) => geometry.clone().applyMatrix4(matrix))
-    const merged = this.own(mergeGeometries(clones, false) ?? new THREE.BufferGeometry())
-    clones.forEach((clone) => clone.dispose())
-    merged.computeBoundingSphere()
+    const merged = this.own(mergeParts(parts))
     const mesh = new THREE.Mesh(merged, this.resolve(material))
     mesh.castShadow = cast
     mesh.receiveShadow = true
