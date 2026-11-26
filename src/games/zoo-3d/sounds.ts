@@ -4,6 +4,7 @@
 import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst, playTone } from '../../audio/sound'
 
 export type ZooSound = 'select' | 'drop' | 'munch' | 'happy' | 'trumpet' | 'splash' | 'roar' | 'hum' | 'squeak' | 'honk' | 'neigh' | 'yawn' | 'sniff' | 'punch' | 'boing' | 'growl' | 'clap' | 'kiki' | 'purr' | 'chomp' | 'baa' | 'drum' | 'snort' | 'kon' | 'info' | 'snore' | 'stamp' | 'gate' | 'howl' | 'yip' | 'chirp' | 'mee' | 'bonk' | 'peep' | 'oink' | 'medal'
+  | 'countdown' | 'go' | 'cheer' | 'goal'
 
 function withContext(play: (ctx: AudioContext, now: number) => void): void {
   if (!isSoundEnabled()) return
@@ -236,6 +237,28 @@ export function playZooSound(sound: ZooSound): void {
         return
       case 'snore':
         voice(ctx, now, [[0, 90], [0.5, 120], [0.9, 85]], 0.08, 'triangle', 500)
+        return
+      // ---- どうぶつレース ----
+      case 'countdown':
+        // よーい: 「ピッ」
+        playTone(ctx, 880, now, 0.16, 0.2, 'triangle')
+        return
+      case 'go':
+        // どん！: 高い「ピーッ」と、やわらかい「ぱん」
+        playNoiseBurst(ctx, now, 0.1, 0.18, 'lowpass', 1800)
+        playTone(ctx, 1320, now, 0.5, 0.2, 'triangle')
+        playTone(ctx, 1760, now, 0.5, 0.07, 'sine')
+        return
+      case 'cheer':
+        // おきゃくさんの「わーっ」と はくしゅ
+        for (let i = 0; i < 6; i++) playNoiseBurst(ctx, now + i * 0.13, 0.32, 0.07, 'bandpass', 900 + (i % 3) * 380)
+        for (let i = 0; i < 8; i++) playNoiseBurst(ctx, now + 0.05 + i * 0.11 + (i % 2) * 0.03, 0.04, 0.12, 'highpass', 2400)
+        return
+      case 'goal':
+        // ゴール！: ソドミソーの ファンファーレと、きらきら
+        ;[392, 523, 659, 784].forEach((f, i) => playTone(ctx, f, now + i * 0.12, i === 3 ? 0.5 : 0.14, 0.15, 'triangle'))
+        ;[1047, 1319, 1568].forEach(f => playTone(ctx, f, now + 0.5, 0.45, 0.06, 'sine'))
+        ;[2093, 2637].forEach((f, i) => playTone(ctx, f, now + 0.62 + i * 0.08, 0.18, 0.06, 'sine'))
         return
     }
   })

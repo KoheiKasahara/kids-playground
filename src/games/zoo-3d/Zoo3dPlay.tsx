@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useNavigate } from 'react-router-dom'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
@@ -35,6 +36,7 @@ const ACTIVITY: Record<Activity, { emoji: string; label: string }> = {
 type Toast = { key: number; species: SpeciesId; kind: StampKind }
 
 export default function Zoo3dPlay() {
+  const navigate = useNavigate()
   const [sound, toggleSound] = useSoundToggle()
   const [initial] = useState(loadSave)
   const [zukan, setZukan] = useState<Zukan>(initial.zukan)
@@ -336,7 +338,8 @@ export default function Zoo3dPlay() {
                 })}
               </div>}
         </section>
-        {dialog === 'map' && <AreaMapDialog current={area} zukan={zukan} onGo={goArea} onClose={() => setDialog(null)} />}
+        {dialog === 'map' && <AreaMapDialog current={area} zukan={zukan} onGo={goArea}
+          onRace={() => { primeAudio(); playZooSound('gate'); navigate('/games/zoo-3d/race') }} onClose={() => setDialog(null)} />}
         {dialog === 'missions' && <MissionDialog set={missionSet} medals={medals} onClose={() => setDialog(null)} />}
         {celebration && <CelebrationDialog celebration={celebration} onClose={closeCelebration} />}
         {dialog === 'zukan' && <ZukanDialog zukan={zukan} focus={zukanFocus} area={area} onFocus={setZukanFocus} onClose={() => setDialog(null)} />}

@@ -1,13 +1,13 @@
-// ふれあいの演出（ハート・音符・Zzz・水しぶき・キラキラ）とエサの小物。
+// ふれあいの演出（ハート・音符・Zzz・水しぶき・キラキラ・つちけむり）とエサの小物。
 // 粒は種類ごとに1つの Points（独自シェーダーで粒ごとの大きさ・透明度）にまとめ、描画呼び出しを抑える。
 
 import * as THREE from 'three'
 
-export type ParticleKind = 'heart' | 'note' | 'sleep' | 'water' | 'sparkle'
+export type ParticleKind = 'heart' | 'note' | 'sleep' | 'water' | 'sparkle' | 'dust'
 
 type Particle = { pos: THREE.Vector3; vel: THREE.Vector3; age: number; life: number; size: number; gravity: number }
 
-const CAPACITY: Record<ParticleKind, number> = { heart: 24, note: 16, sleep: 8, water: 140, sparkle: 40 }
+const CAPACITY: Record<ParticleKind, number> = { heart: 24, note: 16, sleep: 8, water: 140, sparkle: 40, dust: 90 }
 
 function drawTexture(kind: ParticleKind): THREE.Texture {
   const size = 64
@@ -37,6 +37,16 @@ function drawTexture(kind: ParticleKind): THREE.Texture {
     const text = kind === 'note' ? '♪' : 'Z'
     ctx.strokeText(text, 0, 2)
     ctx.fillText(text, 0, 2)
+  } else if (kind === 'dust') {
+    // つちけむり・どろはね（レースで 走ったあと）
+    const g = ctx.createRadialGradient(-4, -4, 2, 0, 0, 28)
+    g.addColorStop(0, 'rgba(236,214,170,0.95)')
+    g.addColorStop(0.5, 'rgba(196,160,110,0.7)')
+    g.addColorStop(1, 'rgba(160,120,80,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(0, 0, 28, 0, Math.PI * 2)
+    ctx.fill()
   } else if (kind === 'water') {
     const g = ctx.createRadialGradient(-6, -6, 2, 0, 0, 28)
     g.addColorStop(0, '#ffffff')
@@ -118,7 +128,7 @@ class ParticlePool {
       if (p.age >= p.life) continue
       p.vel.y -= p.gravity * dt
       p.pos.addScaledVector(p.vel, dt)
-      if (this.kind === 'water' && p.pos.y < 0.05) continue
+      if ((this.kind === 'water' || this.kind === 'dust') && p.pos.y < 0.05 && p.vel.y < 0) continue
       alive.push(p)
     }
     this.particles = alive
@@ -143,7 +153,8 @@ class ParticlePool {
 export type Effects = {
   group: THREE.Group
   burst: (kind: ParticleKind, at: THREE.Vector3, count?: number) => void
-  spray: (from: THREE.Vector3, dir: THREE.Vector3, count: number) => void
+  /** 水しぶき（kind を dust にすると つちけむり・どろはね）。 */
+  spray: (from: THREE.Vector3, dir: THREE.Vector3, count: number, kind?: 'water' | 'dust') => void
   update: (dt: number) => void
   setScale: (pixelsPerUnit: number) => void
   dispose: () => void
@@ -153,7 +164,7 @@ export function createEffects(): Effects {
   const group = new THREE.Group()
   group.name = 'zoo-effects'
   const pools = new Map<ParticleKind, ParticlePool>()
-  const kinds: ParticleKind[] = ['heart', 'note', 'sleep', 'water', 'sparkle']
+  const kinds: ParticleKind[] = ['heart', 'note', 'sleep', 'water', 'sparkle', 'dust']
   for (const kind of kinds) {
     const material = new THREE.ShaderMaterial({
       uniforms: { map: { value: drawTexture(kind) }, scale: { value: 400 } },
@@ -182,14 +193,16 @@ export function createEffects(): Effects {
         pool.spawn(tmpP, tmpV, kind === 'sleep' ? 2.4 : 1.4 + Math.random() * 0.4, size)
       }
     },
-    spray(from, dir, count) {
-      const pool = pools.get('water')!
+    spray(from, dir, count, kind = 'water') {
+      const pool = pools.get(kind)!
+      const dust = kind === 'dust'
       for (let i = 0; i < count; i++) {
-        tmpV.copy(dir).multiplyScalar(2.6 + Math.random() * 1.2)
+        tmpV.copy(dir).multiplyScalar(dust ? 0.8 + Math.random() * 0.8 : 2.6 + Math.random() * 1.2)
         tmpV.x += (Math.random() - 0.5) * 0.9
         tmpV.y += (Math.random() - 0.5) * 0.6
         tmpV.z += (Math.random() - 0.5) * 0.9
-        pool.spawn(from, tmpV, 1.4, 0.16 + Math.random() * 0.1, 6)
+        if (dust) pool.spawn(from, tmpV, 0.9, 0.35 + Math.random() * 0.25, 2)
+        else pool.spawn(from, tmpV, 1.4, 0.16 + Math.random() * 0.1, 6)
       }
     },
     update(dt) {

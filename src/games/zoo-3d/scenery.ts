@@ -22,8 +22,8 @@ export type Scenery = {
 
 const color = new THREE.Color()
 
-/** 頂点カラー付きの非インデックス形状を集め、最後に1つへまとめる。 */
-class Batch {
+/** 頂点カラー付きの非インデックス形状を集め、最後に1つへまとめる（レース場の景色でも使う）。 */
+export class Batch {
   private parts: THREE.BufferGeometry[] = []
 
   add(geometry: THREE.BufferGeometry, hex: string | THREE.Color, matrix: THREE.Matrix4, jitter = 0, seed = 0): void {
@@ -57,12 +57,12 @@ class Batch {
   }
 }
 
-function hash(n: number): number {
+export function hash(n: number): number {
   const s = Math.sin(n * 12.9898) * 43758.5453
   return s - Math.floor(s)
 }
 
-const m4 = (x: number, y: number, z: number, sx = 1, sy = 1, sz = 1, ry = 0, rx = 0, rz = 0) =>
+export const m4 = (x: number, y: number, z: number, sx = 1, sy = 1, sz = 1, ry = 0, rx = 0, rz = 0) =>
   new THREE.Matrix4().compose(new THREE.Vector3(x, y, z),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz))
 
@@ -299,7 +299,7 @@ function addHouse(batch: Batch, e: Enclosure, h: House): void {
   }
 }
 
-function addTree(batch: Batch, t: Tree, canopies: THREE.Sphere[], seed: number): void {
+export function addTree(batch: Batch, t: Tree, canopies: THREE.Sphere[], seed: number): void {
   const s = t.size
   const trunk = '#9a6a43'
   if (t.kind === 'round') {
@@ -374,7 +374,7 @@ function addTree(batch: Batch, t: Tree, canopies: THREE.Sphere[], seed: number):
   }
 }
 
-function addRock(batch: Batch, r: Rock, seed: number): void {
+export function addRock(batch: Batch, r: Rock, seed: number): void {
   const base = new THREE.Color(r.color ?? '#b7aa98')
   batch.add(new THREE.DodecahedronGeometry(r.r, 0), base, m4(r.x, r.h * 0.4, r.z, 1, r.h / r.r, 0.9, seed), 0.22, seed)
   batch.add(new THREE.DodecahedronGeometry(r.r * 0.5, 0), r.color ? base.clone().multiplyScalar(1.04) : '#c8bca9',

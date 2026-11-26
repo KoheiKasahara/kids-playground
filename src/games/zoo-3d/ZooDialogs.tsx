@@ -5,6 +5,7 @@ import { SPECIES, type SpeciesId } from './species'
 import { countStamps, discovered, hasStamp, stampInfo, stampKinds, type Zukan } from './zukan'
 import { AREAS, areaById, homeOf, speciesOfArea, type AreaId } from './zooMap'
 import { missionText, type MissionSet } from './missions'
+import { RACES } from './race/races'
 import styles from './Zoo3dPlay.module.css'
 
 /** ダイアログの外側（背景）をタップすると閉じる。Escape でも閉じる。 */
@@ -25,8 +26,8 @@ function Backdrop({ label, onClose, children }: { label: string; onClose: () => 
   )
 }
 
-export function AreaMapDialog({ current, zukan, onGo, onClose }: {
-  current: AreaId; zukan: Zukan; onGo: (area: AreaId) => void; onClose: () => void
+export function AreaMapDialog({ current, zukan, onGo, onRace, onClose }: {
+  current: AreaId; zukan: Zukan; onGo: (area: AreaId) => void; onRace: () => void; onClose: () => void
 }) {
   return (
     <Backdrop label="どこへ いく？" onClose={onClose}>
@@ -48,6 +49,14 @@ export function AreaMapDialog({ current, zukan, onGo, onClose }: {
             </button>
           )
         })}
+        {/* どうぶつレースじょう: エリアとは別の画面で、どうぶつの かけっこを みる */}
+        <button type="button" className={`${styles.areaCard} ${styles.raceArea}`} onClick={onRace}
+          aria-label="どうぶつレースじょう。どうぶつの かけっこを みる">
+          <span className={styles.areaEmoji} aria-hidden="true">🏁</span>
+          <b>どうぶつレースじょう</b>
+          <span className={styles.areaAnimals} aria-hidden="true">{RACES.map(r => r.emoji).join('')}</span>
+          <span className={styles.areaStamps} aria-hidden="true">かけっこを みよう</span>
+        </button>
       </div>
       <button type="button" className={styles.dialogClose} onClick={onClose}>とじる</button>
     </Backdrop>
