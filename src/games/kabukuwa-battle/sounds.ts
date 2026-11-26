@@ -113,7 +113,7 @@ export function playBuzz(voice: number) {
     depth.gain.value = voice * .25
     lfo.connect(depth).connect(osc.frequency)
     gain.gain.setValueAtTime(0, s)
-    gain.gain.linearRampToValueAtTime(.16, s + .01)
+    gain.gain.linearRampToValueAtTime(.28, s + .01)
     gain.gain.exponentialRampToValueAtTime(.001, s + .09)
     osc.connect(gain).connect(getSoundOutput(ctx))
     osc.start(s); lfo.start(s)
@@ -135,8 +135,8 @@ export function playReady() {
   if (!ctx) return
   const t = ctx.currentTime
   for (const at of [0, .32]) {
-    slide(ctx, 150, 52, t + at, .32, .5, 'sine')
-    noise(ctx, t + at, .08, .18, 'lowpass', 900)
+    slide(ctx, 150, 52, t + at, .32, .6, 'sine')
+    noise(ctx, t + at, .08, .42, 'lowpass', 900)
   }
 }
 
@@ -204,8 +204,8 @@ export function playFall() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  slide(ctx, 1200, 180, t, .8, .14, 'pulse')
-  noise(ctx, t, .6, .12, 'bandpass', 3000, 600)
+  slide(ctx, 1200, 180, t, .8, .18, 'pulse')
+  noise(ctx, t, .6, .15, 'bandpass', 3000, 600)
 }
 
 /** しがみついた「ぎゅっ」。 */
@@ -289,6 +289,16 @@ const BGM_MELODY = (
 /** 1しょうせつ ごとの コード（A から なんはんおん）。Am F G Em Am F G E */
 const BGM_CHORDS: [number, number, number][] = [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -2, 2], [0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -1, 2]]
 const BGM_BPM = 152
+/** BGM ぜんたいの おおきさ。たたかいの こうかおんより ちいさく、でも きこえる くらい。 */
+const BGM_VOLUME = .66
+/** カットインの あと、もりあがる ところ（5しょうせつめ）から はじめる。 */
+const BGM_CHORUS = 4 * 8
+/** カットインの あとは 2はんおん あげて（てんちょう）もりあげる。 */
+const BGM_CLIMAX_KEY = 2
+/** フィルターを あけて いる ときの たかさ（ほぼ そのまま とおす）。 */
+const BGM_OPEN_HZ = 18000
+/** カットインの あいだは とおくで なって いる ように こもらせる。 */
+const BGM_MUFFLED_HZ = 420
 const semi = (base: number, n: number) => base * Math.pow(2, n / 12)
 
 /** ビブラートの かかった ブラス ふうの リード（のこぎり波を すこし まるめる）。 */
@@ -337,14 +347,66 @@ function bassNote(ctx: AudioContext, dest: AudioNode, f: number, start: number, 
   osc.stop(start + dur + .03)
 }
 
+/** シンバル「シャーン」。 */
+function crash(ctx: AudioContext, dest: AudioNode, start: number, vol: number) {
+  noise(ctx, start, .9, vol, 'highpass', 5200, undefined, dest)
+  noise(ctx, start, .35, vol * .6, 'bandpass', 3200, 8000, dest)
+}
+
+/** スネア「タッ」。 */
+function snare(ctx: AudioContext, dest: AudioNode, start: number, vol: number) {
+  noise(ctx, start, .12, vol, 'bandpass', 1800, undefined, dest)
+  slide(ctx, 260, 160, start, .07, vol * .5, 'triangle', dest)
+}
+
+/** たたかいの うごきに あわせて BGM を かえる そうさ。 */
+type BgmControl = {
+  windup: (seconds: number) => void
+  hit: (big: boolean) => void
+  cutIn: (seconds: number) => void
+}
+
+/** いま ながれて いる BGM（ながれて いなければ null）。 */
+let currentBgm: BgmControl | null = null
+
+/** わざを ためて いる あいだ、スネアの ロール「ドロロロ」で もりあげる。 */
+export function bgmWindup(seconds: number) {
+  currentBgm?.windup(seconds)
+}
+
+/** わざが きまった ときは BGM を いっしゅん ひっこめて「ドカッ」を きかせる。big なら シンバルも。 */
+export function bgmHit(big: boolean) {
+  currentBgm?.hit(big)
+}
+
+/**
+ * カットインの あいだは じかんが とまった ように BGM を こもらせて ちいさく し、
+ * あけたら「ジャーン！」と もりあがる ところから、てんちょうして はやい きざみで つづける。
+ */
+export function bgmCutIn(seconds: number) {
+  currentBgm?.cutIn(seconds)
+}
+
 /** たたかい ちゅうの BGM を ながす。とめる かんすうを かえす。 */
 export function startBgm(): () => void {
   const ctx = sfx()
   if (!ctx) return () => {}
   const out = getSoundOutput(ctx)
+  // おとは master → muffle（こもらせる）→ duck（ひっこめる）→ スピーカー の じゅんに とおる。
   const master = ctx.createGain()
-  master.gain.value = .42
-  master.connect(out)
+  master.gain.value = BGM_VOLUME
+  // サンプリングの はんぶんより うえは せっていできないので、そこで おさえる。
+  const openHz = Math.min(BGM_OPEN_HZ, ctx.sampleRate / 2)
+  const muffle = ctx.createBiquadFilter()
+  muffle.type = 'lowpass'
+  muffle.Q.value = .7
+  muffle.frequency.value = openHz
+  const duck = ctx.createGain()
+  master.connect(muffle).connect(duck).connect(out)
+  // わざに あわせた シンバルは ひっこめずに ならす。
+  const accent = ctx.createGain()
+  accent.gain.value = BGM_VOLUME
+  accent.connect(out)
   // スーファミ らしい ひびき（エコー）。
   const echo = ctx.createDelay(1)
   const echoTone = ctx.createBiquadFilter()
@@ -355,15 +417,42 @@ export function startBgm(): () => void {
   echoTone.frequency.value = 2400
   feedback.gain.value = .32
   echoOut.gain.value = .35
-  master.connect(echo).connect(echoTone).connect(feedback).connect(echo)
+  duck.connect(echo).connect(echoTone).connect(feedback).connect(echo)
   echoTone.connect(echoOut).connect(out)
 
   const step = 60 / BGM_BPM / 2
   const lead = 440, low = 110
   let index = 0
   let next = ctx.currentTime + .1
+  /** てんちょう した はんおんの かず。 */
+  let key = 0
+  /** カットインの あとの もりあがり（きざみを こまかく する）。 */
+  let climax = false
+  /** カットインが あける じこく（その あとの はくから もりあがる）。 */
+  let climaxAt: number | null = null
+
+  /** duck を level まで さげて、hold びょう まって、release びょうで もどす。 */
+  const duckTo = (level: number, hold: number, release: number) => {
+    const t = ctx.currentTime
+    const g = duck.gain
+    g.cancelScheduledValues(t)
+    g.setValueAtTime(g.value, t)
+    g.linearRampToValueAtTime(level, t + .02)
+    g.setValueAtTime(level, t + .02 + hold)
+    g.linearRampToValueAtTime(1, t + .02 + hold + release)
+  }
+
   const schedule = () => {
     while (next < ctx.currentTime + .25) {
+      if (climaxAt !== null && next >= climaxAt - step / 2) {
+        // カットインが あけたら「ジャーン！」。もりあがる ところへ とんで、てんちょうする。
+        climaxAt = null
+        climax = true
+        key = BGM_CLIMAX_KEY
+        index = BGM_CHORUS
+        crash(ctx, master, next, .12)
+        for (const n of BGM_CHORDS[BGM_CHORUS / 8]) brass(ctx, master, semi(lead / 2, n + 12 + key), next, step * 1.6, .02)
+      }
       const i = index % BGM_MELODY.length
       const bar = Math.floor(i / 8), beat = i % 8
       const chord = BGM_CHORDS[bar]
@@ -371,38 +460,77 @@ export function startBgm(): () => void {
       if (s !== '-' && s !== '.') {
         let len = 1
         while (BGM_MELODY[(i + len) % BGM_MELODY.length] === '-' && len < 8) len++
-        brass(ctx, master, semi(lead, Number(s)), next, len * step * .92, .05)
+        brass(ctx, master, semi(lead, Number(s) + key), next, len * step * .92, .05)
         // 1オクターブ したで うすく かさねて あつみを だす。
-        tone(ctx, semi(lead / 2, Number(s)), next, len * step * .9, .018, 'pulse', master)
+        tone(ctx, semi(lead / 2, Number(s) + key), next, len * step * .9, .018, 'pulse', master)
       }
       // ベースは オクターブで かけまわる。
-      bassNote(ctx, master, semi(low, chord[0] + (beat % 2 ? 12 : 0)), next, step * .8, .09)
+      bassNote(ctx, master, semi(low, chord[0] + key + (beat % 2 ? 12 : 0)), next, step * .8, .09)
       // うらで コードを きざむ。
-      if (beat % 2 === 1) for (const n of chord) tone(ctx, semi(lead / 2, n + 12), next, step * .45, .012, 'square', master)
+      if (beat % 2 === 1) for (const n of chord) tone(ctx, semi(lead / 2, n + 12 + key), next, step * .45, .012, 'square', master)
       // ドラム（キック・スネア・ハイハット）。さいごの しょうせつの おわりは フィルイン。
+      // もりあがって いる ときは キックを まいはく、ハイハットを 16ぶで きざむ。
       const fill = bar === 7 && beat >= 6
-      if (beat === 0 || beat === 3 || beat === 4) slide(ctx, 160, 45, next, .18, .28, 'sine', master)
-      if (beat === 2 || beat === 6 || fill) {
-        noise(ctx, next, .12, .14, 'bandpass', 1800, undefined, master)
-        slide(ctx, 260, 160, next, .07, .07, 'triangle', master)
-      }
+      if (beat === 0 || beat === 3 || beat === 4 || (climax && beat % 2 === 0)) slide(ctx, 160, 45, next, .18, .28, 'sine', master)
+      if (beat === 2 || beat === 6 || fill) snare(ctx, master, next, .14)
       if (fill) noise(ctx, next + step / 2, .1, .12, 'bandpass', 1500, undefined, master)
-      else noise(ctx, next, .03, beat % 2 ? .035 : .05, 'highpass', 7500, undefined, master)
+      else {
+        noise(ctx, next, .03, beat % 2 ? .035 : .05, 'highpass', 7500, undefined, master)
+        if (climax) noise(ctx, next + step / 2, .02, .025, 'highpass', 8000, undefined, master)
+      }
       index++
       next += step
     }
   }
+
+  const control: BgmControl = {
+    windup(seconds) {
+      if (climaxAt !== null) return
+      // 16ぶの きざみに あわせて、だんだん つよく たたく。
+      const t = ctx.currentTime
+      const grid = step / 2
+      const first = next - Math.floor((next - t) / grid) * grid
+      const count = Math.max(2, Math.min(8, Math.round(seconds / grid)))
+      for (let k = 0; k < count; k++) snare(ctx, master, first + k * grid, .04 + .08 * (k + 1) / count)
+    },
+    hit(big) {
+      if (climaxAt !== null) return
+      duckTo(big ? .35 : .55, big ? .12 : .05, .45)
+      if (big) crash(ctx, accent, ctx.currentTime + .03, .1)
+    },
+    cutIn(seconds) {
+      const t = ctx.currentTime
+      const end = t + Math.max(.3, seconds)
+      climaxAt = end
+      const g = duck.gain
+      g.cancelScheduledValues(t)
+      g.setValueAtTime(g.value, t)
+      g.linearRampToValueAtTime(.5, t + .1)
+      g.setValueAtTime(.5, end - .12)
+      g.linearRampToValueAtTime(1, end)
+      const f = muffle.frequency
+      f.cancelScheduledValues(t)
+      f.setValueAtTime(openHz, t)
+      f.exponentialRampToValueAtTime(BGM_MUFFLED_HZ, t + .15)
+      f.setValueAtTime(BGM_MUFFLED_HZ, end - .12)
+      f.exponentialRampToValueAtTime(openHz, end)
+    },
+  }
+  currentBgm = control
   schedule()
   const timer = setInterval(schedule, 60)
   return () => {
     clearInterval(timer)
+    if (currentBgm === control) currentBgm = null
     try {
       const t = ctx.currentTime
-      master.gain.setValueAtTime(master.gain.value, t)
-      master.gain.linearRampToValueAtTime(0, t + .25)
+      for (const g of [master.gain, accent.gain]) {
+        g.setValueAtTime(g.value, t)
+        g.linearRampToValueAtTime(0, t + .25)
+      }
       // エコーが きえるのを まってから きりはなす。
       setTimeout(() => {
-        try { master.disconnect(); feedback.disconnect(); echoOut.disconnect() } catch { /* もう きれている */ }
+        try { master.disconnect(); duck.disconnect(); accent.disconnect(); feedback.disconnect(); echoOut.disconnect() } catch { /* もう きれている */ }
       }, 1500)
     } catch {
       // とめられなくても たたかいは つづく。

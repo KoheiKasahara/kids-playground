@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import KabukuwaBattlePlay from './KabukuwaBattlePlay'
 import type { Battle } from './battle'
 import { SPECIES } from './species'
-import { moveRepertoire, techniqueFor } from './techniques'
-import { playBuzz, playCutIn, playGo, playHit, playReady, playWindup, playWin, startBgm } from './sounds'
+import { moveRepertoire, techniqueFor, windupDuration } from './techniques'
+import { bgmCutIn, bgmHit, bgmWindup, playBuzz, playCutIn, playGo, playHit, playReady, playWindup, playWin, startBgm } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -87,11 +87,14 @@ describe('カブクワ バトル', () => {
     expect(screen.getByRole('status')).toHaveTextContent(`ヘラクレスの ${technique.name}！`)
     expect(screen.getByLabelText('ヘラクレスの わざ')).toHaveTextContent(technique.name)
     expect(playWindup).toHaveBeenCalled()
+    // BGM も わざに あわせて ためる（ロール）。
+    expect(bgmWindup).toHaveBeenCalledWith(windupDuration(b.f[0].sp, move))
     act(() => { b.events.push({ type: 'hit', side: 0, move, u: 0, v: 0, z: 10, big: false }) })
     advance(.05)
     expect(screen.getByRole('status')).toHaveTextContent(action)
     expect(screen.getByRole('status')).toHaveTextContent(technique.name)
     expect(playHit).toHaveBeenCalledWith(false)
+    expect(bgmHit).toHaveBeenCalledWith(false)
     advance(1.6)
     expect(screen.getByLabelText('ヘラクレスの わざ')).toBeEmptyDOMElement()
   })
@@ -295,6 +298,9 @@ describe('カブクワ バトル', () => {
     expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('ウオリャア')
     expect(screen.getByRole('status')).toHaveTextContent('ヘラクレスの ぎゃくてん！')
     expect(playCutIn).toHaveBeenCalledTimes(1)
+    // BGM も カットインの あいだ こもらせて、あけたら もりあげる。
+    expect(bgmCutIn).toHaveBeenCalledTimes(1)
+    expect(bgmCutIn).toHaveBeenCalledWith(1.8)
     // カットインの あいだは とまって いる。
     const t = battle()!.stateT
     advance(1)
@@ -356,6 +362,10 @@ describe('カブクワ バトル', () => {
     for (let i = 0; i < 400 && !screen.queryByTestId('kabukuwa-cut-in'); i++) advance(.1)
     expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('ぎゃくてん！')
     expect(playCutIn).toHaveBeenCalledTimes(1)
+    // きめての なげで BGM が ひっこみ、つづけて カットインで こもる。
+    expect(bgmHit).toHaveBeenCalled()
+    expect(bgmCutIn).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(bgmHit).mock.invocationCallOrder.at(-1)).toBeLessThan(vi.mocked(bgmCutIn).mock.invocationCallOrder[0])
     // まだ おちて いない（とんで いく まえ）で、カットインの あいだは とまって いる。
     expect(battle()?.state).toBe('fight')
     expect(battle()?.f[1].state).toBe('thrown')
