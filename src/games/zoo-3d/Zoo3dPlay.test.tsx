@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import Zoo3dPlay from './Zoo3dPlay'
 import { SPECIES } from './species'
@@ -154,6 +154,23 @@ describe('3Dどうぶつえんの画面', () => {
     expect(screen.getByRole('button', { name: /いまは もうじゅうの もり/ })).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'どうぶつを えらぶ' })).getByRole('button', { name: 'ライオンを みる' })).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem('zoo-3d-v1')!).area).toBe('wild')
+  })
+
+  test('ちずから どうぶつレースじょうへ 行ける', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/games/zoo-3d']}>
+        <Routes>
+          <Route path="/games/zoo-3d" element={<Zoo3dPlay />} />
+          <Route path="/games/zoo-3d/race" element={<p>レースじょうの がめん</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    ready()
+    await user.click(screen.getByRole('button', { name: /ちずを ひらく/ }))
+    const dialog = screen.getByRole('dialog', { name: 'どこへ いく？' })
+    await user.click(within(dialog).getByRole('button', { name: /どうぶつレースじょう/ }))
+    expect(screen.getByText('レースじょうの がめん')).toBeInTheDocument()
   })
 
   test('保存したエリアから はじまる', () => {

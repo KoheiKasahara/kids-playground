@@ -157,6 +157,7 @@
 | `src/games/zoo-3d/effects.ts` | 新しいえさの形が必要なら `FoodKind` と `createFood` に追加する |
 | `src/games/zoo-3d/scenery.ts` | 新しい木の種類が必要なら追加する（カメラがよける球も登録する） |
 | `src/games/zoo-3d/sounds.ts` | 鳴き声が必要なら追加し、`src/test/audio/gameSoundSamples.ts` に代表音として登録する |
+| `src/games/zoo-3d/race/athletes.ts`・`race/races.ts` | どうぶつレースの運動の力（だいたいの最高速度・持久力・泳ぎ・ジャンプなど）と「よりみち」に使う固有アクションを決め、出る種目（生き物の なかまが近い種目）に加える。種目は 5〜6頭まで。勝ちやすさが かたよりすぎないことを `race/raceSim.test.ts` が、全動物が1回ずつ出ることを `race/races.test.ts` が検査 |
 | `docs/credits.md` | 出典（Mesh2Motion を使ったらファイル名） |
 
 - **行動 AI**（`behavior.ts`）は全動物で共通です。動物ごとの違いは、`species.ts` の `mood`（待機時間・歩く・走る・食べる・固有アクション・眠る・人を見に来る `curious` の重み）と、モーション情報の速さで表します。

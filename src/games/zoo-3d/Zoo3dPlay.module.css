@@ -675,6 +675,13 @@
   border-color: #ff9f43;
 }
 
+/* どうぶつレースじょう（エリアとは別の画面） */
+.raceArea {
+  border-style: dashed;
+  border-color: #e8463c;
+  background: repeating-linear-gradient(45deg, #ffe3b8 0 14px, #fff1d8 14px 28px);
+}
+
 .areaCard b {
   grid-area: name;
   font-size: 19px;

@@ -59,8 +59,8 @@ export class AnimalAnimator {
     return action
   }
 
-  /** 毎フレーム呼ぶ。visible が false（画面外）のときは呼び出し側で間引いてよい。 */
-  update(dt: number, a: AnimalState): void {
+  /** 毎フレーム呼ぶ。visible が false（画面外）のときは呼び出し側で間引いてよい。レース（race/）は行動の状態のうち再生に使う分だけを渡す。 */
+  update(dt: number, a: Pick<AnimalState, 'clip' | 'clipToken' | 'speed' | 'turnRate' | 'mode'>): void {
     const targets = new Map<string, number>()
     const clip = a.clip
     if (clip === 'Walk' || clip === 'Run') {

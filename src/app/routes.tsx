@@ -20,6 +20,7 @@ import PrefectureQuizStart from '../games/prefecture-quiz/PrefectureQuizStart'
 import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
 import PrefecturePuzzleStart from '../games/prefecture-quiz/PrefecturePuzzleStart'
 import { colorMixQuizRoutes } from '../games/color-mix-quiz/routes'
+import { zoo3dRoutes } from '../games/zoo-3d/routes'
 import { FlagQuizPlay, PanelFlagQuizPlay, WorkingVehicleQuizPlay, PrefectureQuizPlay, PrefecturePuzzlePlay } from './quizRouteComponents'
 
 // 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
@@ -95,7 +96,8 @@ export const routes: RouteObject[] = [
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotAdventurePlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-adventure', element: lazyRoute(() => import('../games/dot-adventure/DotAdventurePlay')) },
-  { path: '/games/zoo-3d', element: lazyRoute(() => import('../games/zoo-3d/Zoo3dPlay')) },
+  // どうぶつえん（エリア）と どうぶつレースじょうが 別のURL。どちらもプレイ面はゲーム内で包む。
+  { path: '/games/zoo-3d', children: zoo3dRoutes },
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotZooPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-zoo', element: lazyRoute(() => import('../games/dot-zoo/DotZooPlay')) },
