@@ -626,6 +626,24 @@
   animation: plop .35s cubic-bezier(.3, 1.6, .5, 1);
 }
 
+.collectionCard {
+  overflow: hidden;
+}
+
+.collectionCard > h2,
+.collectionCard > button {
+  flex: none;
+}
+
+.collectionBody {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .cardKicker {
   margin: 0;
   padding: 2px 12px;

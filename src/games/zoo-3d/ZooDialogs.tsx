@@ -9,7 +9,9 @@ import { RACES } from './race/races'
 import styles from './Zoo3dPlay.module.css'
 
 /** ダイアログの外側（背景）をタップすると閉じる。Escape でも閉じる。 */
-function Backdrop({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+function Backdrop({ label, onClose, children, actions }: {
+  label: string; onClose: () => void; children: ReactNode; actions?: ReactNode
+}) {
   const box = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -19,8 +21,13 @@ function Backdrop({ label, onClose, children }: { label: string; onClose: () => 
   }, [onClose])
   return (
     <div className={styles.infoBackdrop} onClick={onClose}>
-      <div ref={box} className={styles.dialog} role="dialog" aria-modal="true" aria-label={label} onClick={e => e.stopPropagation()}>
-        {children}
+      <div ref={box} className={actions ? [styles.dialog, styles.dialogPinned].join(' ') : styles.dialog} role="dialog" aria-modal="true" aria-label={label} onClick={e => e.stopPropagation()}>
+        {actions ? (
+          <>
+            <div className={styles.dialogBody}>{children}</div>
+            {actions}
+          </>
+        ) : children}
       </div>
     </div>
   )
@@ -30,7 +37,9 @@ export function AreaMapDialog({ current, zukan, onGo, onRace, onClose }: {
   current: AreaId; zukan: Zukan; onGo: (area: AreaId) => void; onRace: () => void; onClose: () => void
 }) {
   return (
-    <Backdrop label="どこへ いく？" onClose={onClose}>
+    <Backdrop label="どこへ いく？" onClose={onClose} actions={
+      <button type="button" className={styles.dialogClose} onClick={onClose}>とじる</button>
+    }>
       <h2 className={styles.dialogTitle}><span aria-hidden="true">🗺️</span> どこへ いく？</h2>
       <div className={styles.areaList}>
         {AREAS.map(a => {
@@ -58,7 +67,6 @@ export function AreaMapDialog({ current, zukan, onGo, onRace, onClose }: {
           <span className={styles.areaStamps} aria-hidden="true">かけっこを みよう</span>
         </button>
       </div>
-      <button type="button" className={styles.dialogClose} onClick={onClose}>とじる</button>
     </Backdrop>
   )
 }
@@ -82,7 +90,12 @@ export function ZukanDialog({ zukan, focus, area, onFocus, onClose }: {
     const known = discovered(zukan, focus)
     const home = homeOf(focus).area
     return (
-      <Backdrop label={known ? s.name : 'まだ みつけて いない どうぶつ'} onClose={onClose}>
+      <Backdrop label={known ? s.name : 'まだ みつけて いない どうぶつ'} onClose={onClose} actions={
+        <div className={styles.dialogButtons}>
+          <button type="button" className={styles.dialogClose} onClick={() => onFocus(null)}>もどる</button>
+          <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>とじる</button>
+        </div>
+      }>
         <span className={styles.infoEmoji} aria-hidden="true" data-known={known}>{s.emoji}</span>
         <h2 className={styles.dialogTitle}>{known ? s.name : '？？？'}</h2>
         <p className={styles.where}><span aria-hidden="true">{home.emoji}</span> {home.name}に いるよ</p>
@@ -103,10 +116,6 @@ export function ZukanDialog({ zukan, focus, area, onFocus, onClose }: {
             )
           })}
         </ul>
-        <div className={styles.dialogButtons}>
-          <button type="button" className={styles.dialogClose} onClick={() => onFocus(null)}>もどる</button>
-          <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>とじる</button>
-        </div>
       </Backdrop>
     )
   }
@@ -115,7 +124,9 @@ export function ZukanDialog({ zukan, focus, area, onFocus, onClose }: {
   // いまのエリアを先に並べる
   const ordered = [...AREAS].sort((a, b) => (a.id === area ? -1 : b.id === area ? 1 : 0))
   return (
-    <Backdrop label="どうぶつ ずかん" onClose={onClose}>
+    <Backdrop label="どうぶつ ずかん" onClose={onClose} actions={
+      <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>とじる</button>
+    }>
       <h2 className={styles.dialogTitle}><span aria-hidden="true">📖</span> どうぶつ ずかん</h2>
       <p className={styles.where}>スタンプ {got} / {total}</p>
       <ul className={styles.howTo}>
@@ -124,7 +135,7 @@ export function ZukanDialog({ zukan, focus, area, onFocus, onClose }: {
         <li><span aria-hidden="true">💤</span> ねがお</li>
         <li><span aria-hidden="true">✨</span> とくいわざ</li>
       </ul>
-      <div className={styles.zukanScroll}>
+      <div className={styles.zukanList}>
         {ordered.map(a => (
           <section key={a.id} aria-label={a.name}>
             <h3 className={styles.zukanArea}><span aria-hidden="true">{a.emoji}</span> {a.name}</h3>
@@ -146,7 +157,6 @@ export function ZukanDialog({ zukan, focus, area, onFocus, onClose }: {
           </section>
         ))}
       </div>
-      <button type="button" className={styles.dialogClose} onClick={onClose} data-autofocus>とじる</button>
     </Backdrop>
   )
 }
