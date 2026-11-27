@@ -473,20 +473,22 @@ export default function KaitenSushiPlay() {
 
       {collection ? (
         <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="collection-title" onClick={() => setCollection(false)}>
-          <div className={styles.card} onClick={e => e.stopPropagation()}>
+          <div className={[styles.card, styles.collectionCard].join(' ')} onClick={e => e.stopPropagation()}>
             <h2 id="collection-title" className={styles.cardTitle}>たからもの {prizes.length}/{PRIZES.length}</h2>
-            <p className={styles.cardText}>おさらを {PLATES_PER_GACHA}まい たべてもらうと ガチャが まわせるよ</p>
-            <ul className={styles.prizeGrid}>
-              {PRIZES.map(p => {
-                const got = prizes.includes(p.id)
-                return (
-                  <li key={p.id} className={got ? styles.prizeGot : styles.prizeMissing} aria-label={got ? p.name : 'まだ'}>
-                    <Pixel src={spriteUrl(`prize:${p.id}:${got}`, () => (got ? drawPrize(p.id) : silhouette(drawPrize(p.id))))} fallback={got ? '🎁' : '？'} />
-                    <span aria-hidden="true">{got ? p.name : '？'}</span>
-                  </li>
-                )
-              })}
-            </ul>
+            <div className={styles.collectionBody}>
+              <p className={styles.cardText}>おさらを {PLATES_PER_GACHA}まい たべてもらうと ガチャが まわせるよ</p>
+              <ul className={styles.prizeGrid}>
+                {PRIZES.map(p => {
+                  const got = prizes.includes(p.id)
+                  return (
+                    <li key={p.id} className={got ? styles.prizeGot : styles.prizeMissing} aria-label={got ? p.name : 'まだ'}>
+                      <Pixel src={spriteUrl(`prize:${p.id}:${got}`, () => (got ? drawPrize(p.id) : silhouette(drawPrize(p.id))))} fallback={got ? '🎁' : '？'} />
+                      <span aria-hidden="true">{got ? p.name : '？'}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
             <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setCollection(false)} autoFocus>とじる</button>
           </div>
         </div>
