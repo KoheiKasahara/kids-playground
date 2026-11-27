@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-26T02:24:22.440Z",
+  "updatedAt": "2026-11-27T02:39:45.983Z",
   "entries": [
     {
       "date": "2026-09-13",
@@ -2035,7 +2035,6 @@
       "precacheEntries": 661,
       "lighthousePerformance": 97,
       "accessibility": 96,
-      "lighthouseTarget": "ホーム画面",
       "vulnerabilities": 3,
       "vulnerabilitiesCritical": 0,
       "vulnerabilitiesHigh": 0,
@@ -2046,10 +2045,43 @@
       "deploy": "success",
       "recordedAt": "2026-11-26T02:24:22.440Z",
       "runId": "45737640109",
+      "lighthouseTarget": "ホーム画面",
       "sourceSha": "eea055991d9b315273a930e7e88b2db409f4dec0",
       "publishedSha": "eea055991d9b315273a930e7e88b2db409f4dec0",
       "publishedRunId": "45733729204",
       "publishedAt": "2026-11-26T01:17:11Z"
+    },
+    {
+      "date": "2026-11-27",
+      "games": 81,
+      "unitTests": 9720,
+      "unitTestsPassed": 9720,
+      "e2eSmokePassed": 587,
+      "e2eSmokeTotal": 588,
+      "e2eSmokeFlaky": 1,
+      "e2eSmokeSkipped": 0,
+      "bundleKb": 9230,
+      "initialJsGzipKb": 133.1484375,
+      "initialCssGzipKb": 8.61328125,
+      "precacheKb": 42470.53125,
+      "precacheEntries": 661,
+      "lighthousePerformance": 95,
+      "accessibility": 96,
+      "lighthouseTarget": "ホーム画面",
+      "vulnerabilities": 3,
+      "vulnerabilitiesCritical": 0,
+      "vulnerabilitiesHigh": 0,
+      "vulnerabilitiesModerate": 3,
+      "vulnerabilitiesLow": 0,
+      "vulnerabilitiesInfo": 0,
+      "nightly": "failure",
+      "deploy": "success",
+      "recordedAt": "2026-11-27T02:39:45.983Z",
+      "runId": "45923651243",
+      "sourceSha": "0c95e38ca8d72d11c7492fef04a0008f56f38995",
+      "publishedSha": "0c95e38ca8d72d11c7492fef04a0008f56f38995",
+      "publishedRunId": "45755528822",
+      "publishedAt": "2026-11-26T04:37:37Z"
     }
   ]
 }
