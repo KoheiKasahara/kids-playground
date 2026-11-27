@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import {
-  clampTarget, DEBRIS_PER_BLAST, FIREWORK_SPARKS, FLAME_SPARKS, headingFromYaw, MAX_DEBRIS, MAX_LIT, MAX_SPARKS, ROCKET_LIFE, useCraftScene, type CraftSceneOptions,
+  clampTarget, DEBRIS_PER_BLAST, FIREWORK_SPARKS, FLAME_SPARKS, headingFromYaw, MAX_DEBRIS, MAX_LIT, MAX_SPARKS, ROCKET_LIFE, SPARKLE_SPARKS, useCraftScene, type CraftSceneOptions,
 } from './useCraftScene'
 import { ANIMAL_SPAWNS, herdFrom } from './animals'
 import { FACED } from './textures'
@@ -354,6 +354,40 @@ it('launches fireworks that rise, open into colored sparks and fade away', () =>
   act(() => { for (let i = 0; i < 20; i++) view.result.current.api.current!.fireworks(launch) })
   act(() => { for (const end = time + ROCKET_LIFE * 1000 + 200; time < end; time += 16) frames.run(time) })
   expect(sparks.count).toBe(MAX_SPARKS)
+  view.unmount()
+})
+
+it('sparkles up from a block, or lets snow fall around it, and then clears', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  const view = renderHook(next => useCraftScene(next), { initialProps: options() })
+  act(() => view.result.current.setContainer(document.createElement('div')))
+  const [scene] = resources.render.mock.lastCall as [THREE.Scene]
+  const sparks = scene.getObjectByName('sparks') as THREE.InstancedMesh
+  const at = { x: 5, y: 3, z: 5 }
+  const matrix = new THREE.Matrix4()
+  const heights = () => Array.from({ length: sparks.count }, (_, i) => { sparks.getMatrixAt(i, matrix); return matrix.elements[13] })
+  let time = 16
+  const run = (ms: number) => act(() => { for (const end = time + ms; time < end; time += 16) frames.run(time) })
+  // きらきらは ブロックの うえへ まいあがる
+  act(() => view.result.current.api.current!.sparkle(at, 'twinkle'))
+  run(300)
+  expect(sparks.count).toBe(SPARKLE_SPARKS)
+  expect(heights().every(y => y > at.y + 0.4)).toBe(true)
+  expect(hexes(sparks).every(hex => ['ffd23f', 'ff8fc7', '7fe3ff', 'fff6b0'].includes(hex))).toBe(true)
+  run(1600)
+  expect(sparks.count).toBe(0)
+  // ゆきは あたまの うえから しろい つぶが ふってくる
+  act(() => view.result.current.api.current!.sparkle(at, 'snow'))
+  run(32)
+  const start = heights()
+  expect(sparks.count).toBe(SPARKLE_SPARKS)
+  expect(start.every(y => y > at.y + 1.4)).toBe(true)
+  expect(hexes(sparks).every(hex => ['ffffff', 'e3f2ff', 'cfe8ff'].includes(hex))).toBe(true)
+  run(600)
+  expect(heights().every((y, i) => y < start[i])).toBe(true)
+  run(2400)
+  expect(sparks.count).toBe(0)
   view.unmount()
 })
 

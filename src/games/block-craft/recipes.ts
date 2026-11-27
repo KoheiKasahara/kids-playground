@@ -19,6 +19,14 @@ export const RECIPES = [
   { result: 'dragon_egg', ingredients: ['lava', 'torch', 'lava'] },
   { result: 'portal', ingredients: ['obsidian', 'crystal', 'obsidian'] },
   { result: 'fireworks', ingredients: ['bomb', 'lamp', 'crystal'] },
+  { result: 'snowman', ingredients: ['snow', 'snow', 'snow'] },
+  { result: 'bell', ingredients: ['gold', 'gold', 'wood'] },
+  // おんぷ ブロックに ダイヤを はめると、きょくを ならす はこに なる
+  { result: 'musicbox', ingredients: ['plank', 'note', 'diamond'] },
+  { result: 'gift', ingredients: ['plank', 'plank', 'gold'] },
+  // はちみつの ろうに たいまつで ひを つける
+  { result: 'candle', ingredients: ['honey', 'torch'] },
+  { result: 'cookie', ingredients: ['chocolate', 'honey'] },
 ] as const satisfies readonly Recipe[]
 
 /** クラフトだいに ならべられる かず。 */

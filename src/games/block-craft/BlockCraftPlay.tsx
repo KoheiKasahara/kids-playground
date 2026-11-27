@@ -8,14 +8,14 @@ import { feedAnimal, hatchDragon, shearSheep, type Animal, type Cell, type FeedR
 import { biome, BIOMES } from './biomes'
 import { MAX_WHEAT, newGame, readCrafted, readGame, readWool, writeCrafted, writeGame, writeWool, type Game } from './save'
 import {
-  arriveAt, blockAt, brushCells, eatCake, editWorld, explode, growTree, isCrop, key, materialCode, materialDef, netMaterialChange, nextPortal, PALETTE, pickAs,
-  settleWalker, stairsToward, startWalker, tendCrops, toggleDoor, topBlock, undoChanges, walk, wheatAt, woolMaterial,
+  arriveAt, blockAt, brushCells, eatFood, editWorld, explode, GIFT_SURPRISES, growTree, isCrop, key, materialCode, materialDef, netMaterialChange, nextPortal,
+  openGift, PALETTE, pickAs, settleWalker, stairsToward, startWalker, tendCrops, toggleDoor, topBlock, undoChanges, walk, wheatAt, woolMaterial,
   type Changes, type EditMode, type Material, type Position, type WoolColor, type World,
 } from './world'
-import { useCraftScene, type SceneApi } from './useCraftScene'
+import { useCraftScene, type SceneApi, type Sparkle } from './useCraftScene'
 import CraftMap from './CraftMap'
 import CraftPanel from './CraftPanel'
-import { isCrafted, type CraftedMaterial } from './recipes'
+import { CRAFTED, isCrafted, type CraftedMaterial } from './recipes'
 import { NOTE_NAMES, noteStep, playCraftSound, playNote, type CraftSound } from './sounds'
 import styles from './BlockCraftPlay.module.css'
 
@@ -27,6 +27,12 @@ const FEED_MESSAGES: Record<FeedResult, string> = {
   wool: '🐑 けが はえてきた！',
   love: '💕 なかよしに なった！',
   baby: '🐣 あかちゃんが うまれた！',
+}
+/** タッチすると あいさつしたり おとが なったり する ブロック（せかいは かわらない）。 */
+const CHIMES: Record<'snowman' | 'bell' | 'musicbox', { message: string; sparkle: Sparkle }> = {
+  snowman: { message: '⛄ こんにちは！', sparkle: 'snow' },
+  bell: { message: '🔔 カラーン！', sparkle: 'twinkle' },
+  musicbox: { message: '🎶 ♪〜 ♪〜', sparkle: 'twinkle' },
 }
 type HistoryEntry = { farm: Farm } & ({ changes: Changes } | { world: World })
 const OBSIDIAN = materialCode('obsidian')
@@ -230,8 +236,27 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
         return
       case 'cake':
       case 'cake_half':
-        commit(eatCake(world, position), farm, 'eat', touched === 'cake' ? '😋 おいしい！' : '😋 ぜんぶ たべた！')
+      case 'cookie':
+        commit(eatFood(world, position), farm, 'eat', touched === 'cake' ? '😋 おいしい！' : touched === 'cookie' ? '😋 サクサク！' : '😋 ぜんぶ たべた！')
         return
+      case 'gift': {
+        // あける たびに なにが でるか かわる（もどすと また あけられる）
+        const surprise = GIFT_SURPRISES[Math.floor(Math.random() * GIFT_SURPRISES.length)]
+        const inside = materialDef(surprise)
+        sceneApi.current()?.sparkle(position, 'twinkle')
+        commit(openGift(world, position, surprise), farm, 'gift', `🎁 ${inside.emoji} ${inside.label}が でてきた！`)
+        return
+      }
+      case 'snowman':
+      case 'bell':
+      case 'musicbox': {
+        const { message, sparkle } = CHIMES[touched]
+        sceneApi.current()?.sparkle(position, sparkle)
+        setToast(message)
+        playCraftSound(touched)
+        vibrate('tap')
+        return
+      }
       case 'dragon_egg': {
         const herd = hatchDragon(farm.herd, position)
         if (!herd) {
@@ -284,17 +309,18 @@ function Craft({ initial, onBack }: { initial: Game; onBack: () => void }) {
     playCraftSound('select')
     vibrate('tap')
   }, [world, unlockWool, unlockCrafted])
-  /** クラフトだいで つくった ブロックを えらぶ（はじめて なら パレットに ふえる）。 */
+  /** クラフトだいで つくった ブロックを えらぶ（はじめて なら パレットに ふえる。さいごの 1つは おいわい）。 */
   const craft = (made: CraftedMaterial) => {
     const fresh = !crafted.includes(made)
+    const all = fresh && crafted.length + 1 === CRAFTED.length
     unlockCrafted(made)
     setMaterial(made)
     setMode(placeOrPaint)
     closeCrafting()
     const def = materialDef(made)
-    setToast(fresh ? `${def.emoji} ${def.label}が できた！` : `${def.emoji} ${def.label}を えらんだよ`)
-    playCraftSound(fresh ? 'craft' : 'select')
-    vibrate(fresh ? 'success' : 'tap')
+    setToast(all ? `🏆 ${def.emoji} ${def.label}で ぜんぶ つくれた！` : fresh ? `${def.emoji} ${def.label}が できた！` : `${def.emoji} ${def.label}を えらんだよ`)
+    playCraftSound(all ? 'complete' : fresh ? 'craft' : 'select')
+    vibrate(all ? 'celebrate' : fresh ? 'success' : 'tap')
   }
   /** こわす で ひつじに さわると けいとが とれ、こむぎが あれば えさを あげる。 */
   const touchAnimal = useCallback((animal: Animal, cell: Cell) => {
@@ -537,6 +563,6 @@ export default function BlockCraftPlay() {
       </button>)}
     </div>
     {saved && <button className={styles.start} onClick={() => begin(saved)}>💾 つづきから あそぶ</button>}
-    <p className={styles.tips}>👆 タッチで ブロックを おく<br />👉 ドラッグで まわりを みる<br />✌️ 2ほんゆびで いどう・ちかづく<br />✋ ながおしで その ブロックを えらぶ<br />🚶 あるいて たんけん（おしっぱなしで すすむ）<br />🗺️ ちずを タッチすると そこへ とべるよ<br />⛏️ ちずの ✖ を ほると たからが あるよ<br />🌿 なえぎ・🌾 たねは タッチで そだつよ<br />🐑 こむぎを あげると どうぶつと なかよしに<br />🛠️ クラフトだいを タッチして あたらしい ブロックを つくろう<br />🛏️ よるは ベッドで ねると あさに なるよ<br />💣 ばくだんを タッチすると ドカーン！<br />🌋🔥🌋 で できる たまごを タッチすると…？<br />🌀 ワープを 2つ おくと タッチで とべるよ<br />🎆 はなびを タッチすると そらに あがるよ<br />🖌️「ぬる」で ブロックを べつの ブロックに かえられるよ<br />💾 おわる まえに「ほぞん」を おしてね</p>
+    <p className={styles.tips}>👆 タッチで ブロックを おく<br />👉 ドラッグで まわりを みる<br />✌️ 2ほんゆびで いどう・ちかづく<br />✋ ながおしで その ブロックを えらぶ<br />🚶 あるいて たんけん（おしっぱなしで すすむ）<br />🗺️ ちずを タッチすると そこへ とべるよ<br />⛏️ ちずの ✖ を ほると たからが あるよ<br />🌿 なえぎ・🌾 たねは タッチで そだつよ<br />🐑 こむぎを あげると どうぶつと なかよしに<br />🛠️ クラフトだいを タッチして あたらしい ブロックを つくろう<br />🛏️ よるは ベッドで ねると あさに なるよ<br />💣 ばくだんを タッチすると ドカーン！<br />🌋🔥🌋 で できる たまごを タッチすると…？<br />🌀 ワープを 2つ おくと タッチで とべるよ<br />🎆 はなびを タッチすると そらに あがるよ<br />🎁 プレゼントを タッチすると なにが でるかな？<br />🔔 ベルや 🎶 オルゴールを タッチすると おとが なるよ<br />🖌️「ぬる」で ブロックを べつの ブロックに かえられるよ<br />💾 おわる まえに「ほぞん」を おしてね</p>
   </div>
 }

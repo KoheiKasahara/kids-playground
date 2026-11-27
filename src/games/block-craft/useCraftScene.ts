@@ -23,6 +23,8 @@ export type SceneApi = {
   burst: (at: readonly Position[]) => void
   /** はなびを その ブロックから うちあげる。 */
   fireworks: (at: Position) => void
+  /** その ブロックから きらきらが まいあがる（twinkle）か、まわりに ゆきが ふる（snow）。 */
+  sparkle: (at: Position, kind: Sparkle) => void
 }
 export type CraftSceneOptions = {
   world: World
@@ -66,6 +68,13 @@ export const FIREWORK_SPARKS = 40
 export const ROCKET_LIFE = 0.85
 /** ドラゴンが 1かいに はく ひの つぶの かず。 */
 export const FLAME_SPARKS = 14
+export type Sparkle = 'twinkle' | 'snow'
+/** プレゼント・ベル・オルゴールの きらきらや、ゆきだるまの ゆきの つぶの かず。 */
+export const SPARKLE_SPARKS = 18
+const SPARKLE_COLORS: Record<Sparkle, readonly THREE.Color[]> = {
+  twinkle: ['#ffd23f', '#ff8fc7', '#7fe3ff', '#fff6b0'].map(color => new THREE.Color(color)),
+  snow: ['#ffffff', '#e3f2ff', '#cfe8ff'].map(color => new THREE.Color(color)),
+}
 // ひるの そらでも みえる こい いろ
 const FIREWORK_COLORS = ['#ff3d7f', '#ffcc00', '#00c2e0', '#3ddc4a', '#a463ff', '#ff7a00', '#ff2e2e'].map(color => new THREE.Color(color))
 const FLAME_COLORS = ['#ff3b1f', '#ff7a1a', '#ffb020', '#ffe066'].map(color => new THREE.Color(color))
@@ -829,6 +838,32 @@ export function useCraftScene(options: CraftSceneOptions) {
           vx: (Math.random() - 0.5) * 0.8, vy: 11, vz: (Math.random() - 0.5) * 0.8,
           life: ROCKET_LIFE, max: ROCKET_LIFE, size: 0.26, color: colors[0], gravity: 6, drag: 0, burst: colors,
         }])
+        if (!frame) render()
+      },
+      sparkle: (at, kind) => {
+        const added: Spark[] = []
+        for (let i = 0; i < SPARKLE_SPARKS; i++) {
+          const around = Math.random() * Math.PI * 2
+          const color = randomOf(SPARKLE_COLORS[kind])
+          if (kind === 'snow') {
+            // あたまの うえから まわりに ゆっくり ふる
+            const reach = 0.3 + Math.random() * 1.2
+            const life = 1.6 + Math.random() * 0.6
+            added.push({
+              x: at.x + Math.cos(around) * reach, y: at.y + 1.6 + Math.random() * 0.8, z: at.z + Math.sin(around) * reach,
+              vx: 0, vy: -0.5, vz: 0, life, max: life, size: 0.1 + Math.random() * 0.06, color, gravity: 0.3, drag: 0.6,
+            })
+            continue
+          }
+          // ブロックの うえから ふわっと まいあがる
+          const speed = 0.6 + Math.random() * 0.9
+          const life = 0.8 + Math.random() * 0.5
+          added.push({
+            x: at.x, y: at.y + 0.4, z: at.z, vx: Math.cos(around) * speed, vy: 2.2 + Math.random() * 1.4, vz: Math.sin(around) * speed,
+            life, max: life, size: 0.12 + Math.random() * 0.08, color, gravity: 1.2, drag: 1.2,
+          })
+        }
+        addSparks(added)
         if (!frame) render()
       },
     }

@@ -4,6 +4,7 @@ export type CraftSound = 'place' | 'remove' | 'select' | 'grow' | 'treasure' | '
   | 'cool' | 'harvest' | 'feed' | 'baby' | 'shear'
   | 'craft' | 'door' | 'fuse' | 'boom' | 'sleep' | 'morning' | 'eat'
   | 'paint' | 'hatch' | 'flame' | 'warp' | 'firework'
+  | 'snowman' | 'bell' | 'musicbox' | 'gift'
 
 /** ふくすうの おとを じゅんばんに ならす（ドレミの ような みじかい フレーズ）。 */
 const PHRASES: Partial<Record<CraftSound, readonly number[]>> = {
@@ -26,8 +27,12 @@ const PHRASES: Partial<Record<CraftSound, readonly number[]>> = {
   eat: [440, 587],
   // ぬりかえる「ぺたっ」
   paint: [698, 932],
+  // ゆきだるまの「こんにちは」
+  snowman: [784, 1047, 880],
 }
-const SOFT: readonly CraftSound[] = ['pet', 'feed', 'baby', 'sleep', 'eat']
+const SOFT: readonly CraftSound[] = ['pet', 'feed', 'baby', 'sleep', 'eat', 'snowman']
+/** オルゴールの きょく（ソ ミ ソ ド ラ ソ ミ ド）。 */
+export const MUSIC_BOX_MELODY = [784, 659, 784, 1047, 880, 784, 659, 523] as const
 
 /** おんぷ ブロックの おと（ド レ ミ ファ ソ ラ シ ド）。 */
 export const NOTE_NAMES = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', 'ド'] as const
@@ -91,6 +96,30 @@ export function playCraftSound(action: CraftSound) {
     playNoiseBurst(ctx, ctx.currentTime + 0.55, 0.5, 0.3, 'lowpass', 900)
     playTone(ctx, 110, ctx.currentTime + 0.55, 0.35, 0.15, 'sine')
     playNoiseBurst(ctx, ctx.currentTime + 0.75, 0.4, 0.05, 'highpass', 5000)
+    return
+  }
+  if (action === 'bell') {
+    // 「カラーン」：たかい おとに、すこし ずれた うわおとを かさねて 2かい
+    ;[1047, 784].forEach((frequency, i) => {
+      const at = ctx.currentTime + i * 0.32
+      playTone(ctx, frequency, at, 0.3, 0.07, 'sine')
+      playTone(ctx, frequency * 2.4, at, 0.18, 0.02, 'sine')
+    })
+    return
+  }
+  if (action === 'musicbox') {
+    // オルゴールの ような おと（もとの おとと 1オクターブ うえを かさねて、つぎの おとと かさならない ように）
+    MUSIC_BOX_MELODY.forEach((frequency, i) => {
+      const at = ctx.currentTime + i * 0.2
+      playTone(ctx, frequency, at, 0.19, 0.065, 'sine')
+      playTone(ctx, frequency * 2, at, 0.12, 0.02, 'sine')
+    })
+    return
+  }
+  if (action === 'gift') {
+    // ふたが「ぱかっ」と あいて、きらきら
+    playNoiseBurst(ctx, ctx.currentTime, 0.07, 0.08, 'highpass', 2000)
+    ;[1319, 1568, 2093].forEach((frequency, i) => playTone(ctx, frequency, ctx.currentTime + 0.1 + i * 0.09, 0.09, 0.05, 'sine'))
     return
   }
   if (action === 'step') {

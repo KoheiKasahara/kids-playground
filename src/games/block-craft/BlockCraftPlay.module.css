@@ -83,7 +83,8 @@
 .craftRecipeColumn { flex: 1 0 min(116px, 35dvh); min-height: 0; }
 .craftPanel p { margin: 0; font-weight: 800; }
 .craftTitle { font-size: clamp(15px, 4.4vw, 19px); }
-.craftHint { font-size: 13px; }
+.craftHint { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.craftCount { padding: 0 6px; border-radius: 999px; background: #def4d3; color: #1f5e41; }
 .craftTable { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px; border: 3px solid #b07a43; border-radius: 16px; background: #e9c48f; box-sizing: border-box; }
 .slot { display: grid; place-items: center; box-sizing: border-box; width: 52px; height: 52px; border: 3px solid #8a5a2b; border-radius: 10px; background: #f7e3c2; }
 .game .slot { min-height: 0; padding: 0; border-color: #8a5a2b; background: #f7e3c2; }
@@ -119,8 +120,13 @@
   .craftBody { flex-direction: row; align-items: stretch; justify-content: center; gap: 10px; }
   .craftColumn { width: auto; flex: 1 1 0; max-width: 420px; min-width: 0; }
   .craftTitle { font-size: 15px; }
-  .ingredients { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
-  .game .ingredients button { min-height: 0; padding-block: 2px; }
+  /* ひくい がめんでも ざいりょうが 4だんまで スクロールなしで みえるよう、だいと ざいりょうを つめる */
+  .craftTable { padding-block: 3px; }
+  .slot { width: 46px; height: 46px; }
+  .game .craftResult { min-height: 50px; padding-block: 2px; }
+  .ingredients { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 4px; }
+  .game .ingredients button { min-height: 0; padding-block: 2px; line-height: 1.2; }
+  .ingredients .swatch { width: 24px; height: 24px; margin-bottom: 1px; font-size: 15px; }
   .recipes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .game .recipes button { min-height: 36px; font-size: 15px; padding-inline: 2px; }
 }

@@ -13,7 +13,7 @@ import { NEW_WORLD } from './terrain'
 import type { CraftSceneOptions, SceneApi } from './useCraftScene'
 import { noteStep, playCraftSound, playNote } from './sounds'
 import { decodeGame, SAVE_KEY } from './save'
-import { blockAt, createWorld, DEFAULT_WORLD, editWorld, PALETTE, startWalker, TREASURES, type Position, type World } from './world'
+import { blockAt, createWorld, DEFAULT_WORLD, editWorld, GIFT_SURPRISES, materialDef, PALETTE, startWalker, TREASURES, type Position, type World } from './world'
 
 const scene = vi.hoisted(() => ({ options: null as unknown as CraftSceneOptions, api: { current: null as SceneApi | null } }))
 vi.mock('./useCraftScene', () => ({ useCraftScene: (options: CraftSceneOptions) => { scene.options = options; return { setContainer: () => {}, failed: false, api: scene.api } } }))
@@ -39,7 +39,7 @@ async function startNew(name = 'くさはら') {
   await user.click(screen.getByRole('button', { name }))
   return { user, view }
 }
-const api = (): SceneApi => ({ heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter: vi.fn(), focus: vi.fn(), burst: vi.fn(), fireworks: vi.fn() })
+const api = (): SceneApi => ({ heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter: vi.fn(), focus: vi.fn(), burst: vi.fn(), fireworks: vi.fn(), sparkle: vi.fn() })
 const tap = (position: Position, normal: Position = { x: 0, y: 1, z: 0 }, direction: Position = { x: 0, y: -1, z: 1 }) => act(() => scene.options.onPick(position, normal, direction))
 
 it('shows only the essential controls', async () => {
@@ -514,9 +514,10 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   expect(within(panel).getByRole('button', { name: 'まだ できない' })).toBeDisabled()
   await user.click(within(panel).getByRole('button', { name: 'きを ならべる' }))
   await user.click(within(panel).getByRole('button', { name: 'ひかりを ならべる' }))
-  // ランタンに つかう たいまつ・はなびに つかう ばくだんは まだ つくって いない
+  // ランタンに つかう たいまつ・はなびに つかう ばくだん・オルゴールに つかう おんぷは まだ つくって いない
   expect(within(panel).getByRole('button', { name: 'ランタンの レシピ' })).toBeDisabled()
-  expect(within(panel).getAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(2)
+  expect(within(panel).getAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(3)
+  expect(within(panel).getByLabelText(`つくった ブロック 0こ（ぜんぶで ${CRAFTED.length}こ）`)).toHaveTextContent(`✓ 0/${CRAFTED.length}`)
   await user.click(within(panel).getByRole('button', { name: 'たいまつを つくる' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('status')).toHaveTextContent('たいまつが できた')
@@ -529,6 +530,7 @@ it('crafts new blocks at the crafting table and keeps them unlocked in other wor
   tap({ x: 8, y: 3, z: 8 })
   panel = screen.getByRole('dialog', { name: 'クラフトだい' })
   expect(within(panel).getByRole('button', { name: 'たいまつの レシピ（つくった）' })).toBeEnabled()
+  expect(within(panel).getByLabelText(`つくった ブロック 1こ（ぜんぶで ${CRAFTED.length}こ）`)).toBeInTheDocument()
   await user.click(within(panel).getByRole('button', { name: 'ランタンの レシピ' }))
   expect(within(panel).getByRole('button', { name: 'ランタンを つくる' })).toBeEnabled()
   await user.click(within(panel).getByRole('button', { name: 'かぼちゃを とりだす' }))
@@ -725,6 +727,85 @@ it('eats a cake in two bites', async () => {
   tap(cake)
   expect(blockAt(world(), cake)).toBeUndefined()
   expect(screen.getByRole('status')).toHaveTextContent('ぜんぶ たべた')
+  // クッキーは ひとくちで なくなり、もどすと また たべられる
+  await user.click(screen.getByRole('button', { name: 'クッキー' }))
+  const cookie = { x: 9, y: 3, z: 8 }
+  tap({ x: 9, y: 2, z: 8 })
+  tap(cookie)
+  expect(blockAt(world(), cookie)).toBeUndefined()
+  expect(screen.getByRole('status')).toHaveTextContent('サクサク')
+  expect(playCraftSound).toHaveBeenLastCalledWith('eat')
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(blockAt(world(), cookie)?.material).toBe('cookie')
+})
+
+it('rings a bell, plays a music box and greets from a snowman by touch, without changing the world', async () => {
+  const user = await startCrafted()
+  scene.api.current = api()
+  const spots = [['ベル', 'bell', 'カラーン', 'twinkle'], ['オルゴール', 'musicbox', '♪', 'twinkle'], ['ゆきだるま', 'snowman', 'こんにちは', 'snow']] as const
+  for (const [index, [label, material, message, sparkle]] of spots.entries()) {
+    await user.click(screen.getByRole('button', { name: label }))
+    const at = { x: 6 + index, y: 3, z: 8 }
+    tap({ ...at, y: 2 })
+    expect(blockAt(world(), at)?.material).toBe(material)
+    const built = blocks()
+    tap(at)
+    expect(blocks()).toEqual(built)
+    expect(screen.getByRole('status')).toHaveTextContent(message)
+    expect(playCraftSound).toHaveBeenLastCalledWith(material)
+    expect(scene.api.current!.sparkle).toHaveBeenLastCalledWith(at, sparkle)
+  }
+  // ならしても もどす きろくは ふえない（もどすと さいごに おいた ゆきだるまが きえる）
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(blockAt(world(), { x: 8, y: 3, z: 8 })).toBeUndefined()
+  expect(blockAt(world(), { x: 7, y: 3, z: 8 })?.material).toBe('musicbox')
+})
+
+it('opens a gift into a surprise block, which can be undone back into the gift', async () => {
+  const user = await startCrafted()
+  scene.api.current = api()
+  await user.click(screen.getByRole('button', { name: 'プレゼント' }))
+  const gift = { x: 8, y: 3, z: 8 }
+  tap({ ...gift, y: 2 })
+  expect(blockAt(world(), gift)?.material).toBe('gift')
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+  try {
+    tap(gift)
+    expect(blockAt(world(), gift)?.material).toBe(GIFT_SURPRISES[0])
+    expect(screen.getByRole('status')).toHaveTextContent(`${materialDef(GIFT_SURPRISES[0]).label}が でてきた`)
+    expect(playCraftSound).toHaveBeenLastCalledWith('gift')
+    expect(scene.api.current!.sparkle).toHaveBeenLastCalledWith(gift, 'twinkle')
+    await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+    expect(blockAt(world(), gift)?.material).toBe('gift')
+    // もういちど あけると ちがう ものが でることも ある
+    random.mockReturnValue(0.99)
+    tap(gift)
+    expect(blockAt(world(), gift)?.material).toBe(GIFT_SURPRISES.at(-1))
+  } finally { random.mockRestore() }
+})
+
+it('counts crafted blocks at the table and celebrates the last new one', async () => {
+  const [last, ...rest] = [...CRAFTED].reverse()
+  localStorage.setItem(CRAFTED_KEY, JSON.stringify(rest))
+  const placed = createWorld()
+  editWorld(placed, { x: 8, y: 3, z: 8 }, 'workbench', 'place')
+  const user = await start(placed)
+  tap({ x: 8, y: 3, z: 8 })
+  let panel = screen.getByRole('dialog', { name: 'クラフトだい' })
+  expect(within(panel).getByLabelText(`つくった ブロック ${rest.length}こ（ぜんぶで ${CRAFTED.length}こ）`)).toHaveTextContent(`✓ ${rest.length}/${CRAFTED.length}`)
+  await user.click(within(panel).getByRole('button', { name: `${materialDef(last).label}の レシピ` }))
+  await user.click(within(panel).getByRole('button', { name: `${materialDef(last).label}を つくる` }))
+  expect(screen.getByRole('status')).toHaveTextContent('ぜんぶ つくれた')
+  expect(playCraftSound).toHaveBeenLastCalledWith('complete')
+  expect(screen.queryAllByRole('button', { name: LOCKED_CRAFT })).toHaveLength(0)
+  tap({ x: 8, y: 3, z: 8 })
+  panel = screen.getByRole('dialog', { name: 'クラフトだい' })
+  expect(within(panel).getByLabelText(`つくった ブロック ${CRAFTED.length}こ（ぜんぶで ${CRAFTED.length}こ）`)).toHaveTextContent(`🏆 ${CRAFTED.length}/${CRAFTED.length}`)
+  // つくった ものを えらびなおしても、もう おいわいは しない
+  await user.click(within(panel).getByRole('button', { name: `${materialDef(last).label}の レシピ（つくった）` }))
+  await user.click(within(panel).getByRole('button', { name: `${materialDef(last).label}を つくる` }))
+  expect(screen.getByRole('status')).toHaveTextContent('えらんだよ')
+  expect(playCraftSound).toHaveBeenLastCalledWith('select')
 })
 
 it('places stairs that climb the way the player looks, and copies them by a long press in any direction', async () => {

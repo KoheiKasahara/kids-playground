@@ -115,6 +115,8 @@ function pattern(material: Material, x: number, y: number, noise: number): numbe
     }
     // つつに まいた かみと、ちいさな ほし
     case 'fireworks': return noise > 0.92 ? 0.85 : y % 5 === 2 ? 0.5 : n
+    // かねの ふちと、ひかりの すじ
+    case 'bell': return y === 2 || y === 3 || y === 12 ? -0.3 : x === 4 || x === 5 ? 0.45 : n
     default: return n
   }
 }
@@ -139,6 +141,12 @@ const DIRT = hex('#ae7950')
 const PLANK = hex('#e0b46c')
 const PUMPKIN = hex('#ef8a1f')
 const MUSHROOM_STEM = hex('#f2e6d0')
+const COAL = hex('#2f3440')
+const CARROT = hex('#f28a2e')
+const DIAMOND = hex('#5ee3e0')
+const RIBBON = hex('#ffd23f')
+const FLAME = hex('#ffb347')
+const CHOCOLATE = hex('#6b3f26')
 
 /**
  * ばってんに えがく くさばなの え（y が おおきい ほうが うえ）。
@@ -177,7 +185,7 @@ function sprite(material: Material, x: number, y: number, noise: number, base: R
 }
 
 /** うえと よこで もようが ちがう ブロック（くさは うえが みどりで よこが つち、きは うえに ねんりん）。 */
-export const FACED: readonly Material[] = ['grass', 'wood', 'pumpkin', 'jack', 'cactus', 'workbench', 'bomb', 'melon', 'sandstone', 'bookshelf', 'hay']
+export const FACED: readonly Material[] = ['grass', 'wood', 'pumpkin', 'jack', 'cactus', 'workbench', 'bomb', 'melon', 'sandstone', 'bookshelf', 'hay', 'gift', 'cookie']
 export type Face = 'side' | 'top' | 'bottom'
 const FACE_SEEDS: Record<Face, number> = { side: 0, top: 101, bottom: 211 }
 
@@ -198,6 +206,18 @@ function cap(material: Material, face: Face, x: number, y: number, noise: number
     case 'bookshelf': return shade(PLANK, y % 4 === 3 ? -0.3 : n)
     // たばねた わらの きりくち
     case 'hay': return shade(base, ring > 6.5 ? -0.25 : (x * 3 + y * 5) % 7 === 0 ? -0.3 : 0.1 + n)
+    // うえは じゅうじの リボンと まんなかの ちょうちょ むすび、したは はこの いろ
+    case 'gift': {
+      if (face === 'bottom') return shade(base, -0.15 + n)
+      if (ring < 2) return shade(RIBBON, ring < 1 ? -0.2 : 0.15)
+      return x === 7 || x === 8 || y === 7 || y === 8 ? shade(RIBBON, n) : shade(base, n)
+    }
+    // うえに チョコの つぶ、したは こんがり
+    case 'cookie': {
+      if (face === 'bottom') return shade(base, -0.25 + n)
+      if (ring > 6.5) return shade(base, -0.2 + n)
+      return noise > 0.86 ? shade(CHOCOLATE, n) : shade(base, 0.08 + n)
+    }
     default: return shade(base, pattern(material, x, y, noise))
   }
 }
@@ -212,6 +232,32 @@ function side(material: Material, x: number, y: number, noise: number, base: Rgb
     case 'workbench': {
       const tool = (x >= 3 && x <= 4 && y >= 3 && y <= 11) || (x >= 2 && x <= 5 && y >= 10 && y <= 12) || (x >= 9 && x <= 13 && y >= 5 && y <= 9 && x - 9 <= y - 5)
       return tool ? shade(base, -0.55) : shade(PLANK, y % 4 === 3 ? -0.3 : (noise - 0.5) * 0.16)
+    }
+    // ゆきだるま：うえの たまに め・はな、したの たまに ボタン。あいだは くびれの かげ
+    case 'snowman': {
+      const n = (noise - 0.5) * 0.06
+      if (y === 7 || y === 8) return shade(base, -0.14 + n)
+      if (y >= 11 && y <= 12 && (x === 5 || x === 10)) return shade(COAL, n)
+      if (y === 10 && x >= 7 && x <= 9) return shade(CARROT, n)
+      if (y <= 5 && y % 3 === 1 && (x === 7 || x === 8)) return shade(COAL, n)
+      return shade(base, n)
+    }
+    // きの はこの まんなかに ダイヤが はまっている
+    case 'musicbox': {
+      const n = (noise - 0.5) * 0.16
+      if (x === 0 || y === 0 || x === TEXTURE_SIZE - 1 || y === TEXTURE_SIZE - 1) return shade(base, -0.4)
+      const gem = Math.abs(x - 7.5) + Math.abs(y - 7.5)
+      if (gem < 3.5) return shade(DIAMOND, gem < 1.5 ? 0.4 : n)
+      return shade(base, y % 4 === 3 ? -0.2 : n)
+    }
+    // たての リボン
+    case 'gift': return shade(x === 7 || x === 8 ? RIBBON : base, (noise - 0.5) * 0.12)
+    // うえに ほのお、その したに しん、のこりは ろう
+    case 'candle': {
+      const n = (noise - 0.5) * 0.12
+      if (y >= 12) return shade(FLAME, (x === 7 || x === 8) && y <= 13 ? 0.6 : n)
+      if (y === 11) return shade(COAL, n)
+      return shade(base, y === 10 && x % 5 === 2 ? -0.15 : n)
     }
     // にじは だんごとに いろを かえる
     case 'rainbow': return shade(RAINBOW[Math.floor((TEXTURE_SIZE - 1 - y) * RAINBOW.length / TEXTURE_SIZE)], (noise - 0.5) * 0.1)
