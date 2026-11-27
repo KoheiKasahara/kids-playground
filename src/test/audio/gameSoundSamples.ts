@@ -17,6 +17,7 @@ import { playParadeSound } from '../../games/kazoete-parade/sounds'
 import { playGardenSound } from '../../games/pixel-garden/sounds'
 import { playJellySound } from '../../games/jelly-merge/sounds'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
+import { playFrog, playPondTap } from '../../games/frog-chorus/sounds'
 import * as gochiso from '../../games/gochiso-race/sounds'
 import { playDerbySound } from '../../games/homerun-derby/sounds'
 import * as house from '../../games/house-builder/sounds'
@@ -108,6 +109,12 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'frog-chorus': [
+    sample('みどりの かえる', () => playFrog('meadow')),
+    sample('きいろの かえる', () => playFrog('sunny')),
+    sample('あおの かえる', () => playFrog('sky')),
+    sample('タップ', playPondTap),
+  ],
   'bee-garden': [sample('とぶ', () => playBeeSound()), sample('クリア', () => playBeeSound(true))],
   'block-craft': [
     sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select')),
