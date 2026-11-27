@@ -60,7 +60,21 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       await expectLiveApp(page)
       const lands = page.getByRole('group', { name: 'あたらしい せかいを えらぶ' }).getByRole('button')
       await expect(lands).toHaveCount(10)
-      await page.getByRole('button', { name: 'だいぼうけん', exact: true }).click()
+      const adventure = page.getByRole('button', { name: 'だいぼうけん', exact: true })
+      // タップ先が作物やどうぶつで変わると配置テストにならない。
+      // せかいを作るときの1回だけ固定し、通常の「だいぼうけん」操作は維持する。
+      const seed = 123456
+      await adventure.evaluate((button, seed) => {
+        button.addEventListener('click', () => {
+          const random = Math.random
+          Math.random = () => {
+            Math.random = random
+            return (seed + 0.5) / 1_000_000
+          }
+          setTimeout(() => { Math.random = random }, 0)
+        }, { capture: true, once: true })
+      }, seed)
+      await adventure.click()
       const scene = page.getByRole('application')
       const canvas = scene.locator('canvas')
       await expect(canvas).toBeVisible()
@@ -82,7 +96,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
 
       // せかいを タッチして ブロックを おく
       const undo = name(/もどす/)
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+      await canvas.tap()
       await expect(undo).toBeEnabled()
 
       // ちずを ひらき、タッチした ばしょへ とぶ
@@ -114,7 +128,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       await name('あるく').tap()
       await expect(name('まえへ すすむ')).toHaveCount(0)
 
-      // クラフトだいを おいて タッチすると、スクロールなしで ブロックを つくれる
+      // クラフトだいを おいて つくれる。レシピを スクロールしても「とじる」と作成操作は使える
       const table = page.getByRole('button', { name: 'クラフト', exact: true })
       await table.scrollIntoViewIfNeeded()
       await table.tap()
@@ -123,9 +137,13 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       const craft = page.getByRole('dialog', { name: 'クラフトだい' })
       await craft.getByRole('button', { name: /^ドアの レシピ/ }).tap()
       const make = craft.getByRole('button', { name: 'ドアを つくる' })
-      for (const control of [make, craft.getByRole('button', { name: 'とじる' }), craft.getByRole('button', { name: /^ランタンの レシピ/ })]) {
-        await expect(control).toBeInViewport({ ratio: 1 })
-      }
+      const close = craft.getByRole('button', { name: 'とじる' })
+      await expect(close).toBeInViewport({ ratio: 1 })
+      const lantern = craft.getByRole('button', { name: /^ランタンの レシピ/ })
+      await lantern.scrollIntoViewIfNeeded()
+      await expect(lantern).toBeInViewport({ ratio: 1 })
+      await expect(close).toBeInViewport({ ratio: 1 })
+      await expect(make).toBeInViewport({ ratio: 1 })
       await make.tap()
       await expect(craft).toHaveCount(0)
       await expect(page.getByRole('button', { name: 'ドア', exact: true })).toHaveAttribute('aria-pressed', 'true')
@@ -134,6 +152,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       const saved = decodeGame(await page.evaluate(key => localStorage.getItem(key), SAVE_KEY))!
       expect(saved.world.size).toBe(96)
       expect(saved.biome).toBe('adventure')
+      expect(saved.seed).toBe(seed)
       expect([...saved.world.blocks()].some(b => b.material === 'honey')).toBe(true)
       expect(pageErrors).toEqual([])
     })

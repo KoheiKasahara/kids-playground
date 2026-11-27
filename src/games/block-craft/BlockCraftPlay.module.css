@@ -68,13 +68,19 @@
 
 /* クラフトだい（ほかの ゲームの まどと おなじく「もどる」より てまえ。「とじる」で もどる） */
 .craftPanel {
-  position: absolute; inset: 0; z-index: 1100; box-sizing: border-box; overflow: hidden auto; overscroll-behavior: contain;
+  position: absolute; inset: 0; z-index: 1100; box-sizing: border-box; overflow: hidden; overscroll-behavior: contain;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   background: #fff9dff5; text-align: center;
 }
 .craftPanel:focus { outline: none; }
+/* 「けす」「とじる」はスクロールさせない。さらに低い画面では道具側もスクロールできる。 */
+.craftBody {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 100%; flex: 1 1 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
+}
 .craftColumn { display: flex; flex-direction: column; gap: 6px; width: min(100%, 520px); flex: none; }
+.craftRecipeColumn { flex: 1 0 min(116px, 35dvh); min-height: 0; }
 .craftPanel p { margin: 0; font-weight: 800; }
 .craftTitle { font-size: clamp(15px, 4.4vw, 19px); }
 .craftHint { font-size: 13px; }
@@ -88,7 +94,8 @@
 .slotEmpty { font-size: 26px; color: #8a5a2b; }
 .ingredients { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 5px; }
 .game .ingredients button { min-height: 0; padding: 3px 0; font-size: 11px; letter-spacing: -.07em; white-space: nowrap; overflow: hidden; border-radius: 10px; }
-.recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 5px; }
+.recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 5px; align-content: start; min-height: 0; overflow-y: auto; }
+.game .recipes button:focus-visible { outline-offset: -3px; }
 .game .recipes button { position: relative; min-height: 38px; padding: 2px; font-size: 13px; white-space: nowrap; }
 .sign { font-size: 10px; color: #6b5a3a; }
 /* はばに よゆうが あれば レシピの えを おおきく */
@@ -97,7 +104,7 @@
   .game .recipes button { font-size: 16px; }
 }
 .done { position: absolute; right: 2px; top: 0; color: #267652; font-size: 11px; font-weight: 900; }
-.craftActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.craftActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: min(100%, 520px); flex: none; }
 
 /* ベッドで ねている */
 .sleep {
@@ -109,7 +116,7 @@
 
 /* よこむきの スマホ：ひだりで ならべて、みぎに レシピ */
 @media (orientation: landscape) and (max-height: 560px) {
-  .craftPanel { flex-direction: row; align-items: flex-start; justify-content: center; gap: 10px; }
+  .craftBody { flex-direction: row; align-items: stretch; justify-content: center; gap: 10px; }
   .craftColumn { width: auto; flex: 1 1 0; max-width: 420px; min-width: 0; }
   .craftTitle { font-size: 15px; }
   .ingredients { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
