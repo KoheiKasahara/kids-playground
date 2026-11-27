@@ -299,5 +299,6 @@ export const routes: RouteObject[] = [
   { path: '/games/sea-breeze-fleet', element: lazyRoute(() => import('../games/sea-breeze-fleet/FleetGame')) },
   { path: '/games/star-parade', element: lazyRoute(() => import('../games/star-parade/StarParadeGame')) },
   { path: '/games/stripe-rally', element: lazyRoute(() => import('../games/stripe-rally/StripeRally')) },
+  { path: '/games/frog-chorus', element: playRoute(lazyRoute(() => import('../games/frog-chorus/FrogChorusGame'))) },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

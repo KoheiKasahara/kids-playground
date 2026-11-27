@@ -43,6 +43,7 @@ function isPlayRoutePath(route: RouteObject & { path: string }): boolean {
     '/games/bento-builder',
     '/games/puni-slime',
     '/games/piano-play',
+    '/games/frog-chorus',
     '/games/color-paint-puzzle',
     '/games/pukupuka-rescue',
     '/games/oekaki-korokoro',

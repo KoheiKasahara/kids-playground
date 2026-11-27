@@ -36,6 +36,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'earth-globe': 13,
   'fishing-pond': 5,
   'forest-delivery': 11,
+  'frog-chorus': 4.5,
   'gochiso-race': 5,
   'homerun-derby': 2.5,
   'hoshi-tsunagi': 2.5,

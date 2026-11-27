@@ -35,6 +35,8 @@ const REPRESENTATIVE_CASES: RepresentativeCase[] = [
   { slug: 'rail-builder', layoutNote: '3D+オーバーレイUI' },
 ]
 
+const IMMEDIATE_PLAY_SLUGS = ['puni-slime', 'marble-course', 'frog-chorus']
+
 describe('GameIntro（代表ゲームでの詳細確認）', () => {
   for (const { slug, layoutNote } of REPRESENTATIVE_CASES) {
     describe(`${slug}（${layoutNote}）`, () => {
@@ -78,7 +80,7 @@ describe('GameIntro（代表ゲームでの詳細確認）', () => {
 // 描画したはずの文言だけを確認する。
 describe('GameIntro（全ゲームへの横展開スモークテスト）', () => {
   // 開始画面を挟まず即プレイするゲームは、操作を妨げる説明を隠す。
-  test.each(GAME_CATALOG.filter((entry) => !['puni-slime', 'marble-course'].includes(entry.slug)))('$slug: descriptionとhowToPlayの全行が出る', async (entry) => {
+  test.each(GAME_CATALOG.filter((entry) => !IMMEDIATE_PLAY_SLUGS.includes(entry.slug)))('$slug: descriptionとhowToPlayの全行が出る', async (entry) => {
     renderAt(gameRoutePath(entry.slug))
     expect(await screen.findByText(entry.seo.description, undefined, FIND)).toBeInTheDocument()
     for (const line of entry.intro.howToPlay) {
@@ -88,7 +90,7 @@ describe('GameIntro（全ゲームへの横展開スモークテスト）', () =
 })
 
 describe('GameIntro（表示しないURL）', () => {
-  test.each(['puni-slime', 'marble-course'])('%sは即プレイ中の説明を隠し、別ゲームへ戻ると説明を復元する', async (slug) => {
+  test.each(IMMEDIATE_PLAY_SLUGS)('%sは即プレイ中の説明を隠し、別ゲームへ戻ると説明を復元する', async (slug) => {
     renderAt(`/games/${slug}`)
     await screen.findByRole('heading', { level: 1, name: findGameBySlug(slug)!.title }, FIND)
     expect(screen.queryByRole('heading', { name: 'このゲームについて' })).not.toBeInTheDocument()

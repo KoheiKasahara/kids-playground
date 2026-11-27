@@ -1505,6 +1505,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       howToPlay: ['タッチした ところに ほしが うごくよ', '「＋」や「×2」で なかまを ふやそう', 'いんせきは よけるか ジャンプで とびこえよう'],
     },
   },
+  {
+    id: 'frog-chorus',
+    slug: 'frog-chorus',
+    title: 'かえるの がっしょういけ',
+    emoji: '🐸',
+    category: 'learning',
+    seo: {
+      headline: 'かえるの がっしょういけ｜葉っぱにカエルを並べてリズムあそび',
+      description: '池の葉っぱにカエルを並べると、ホタルが通った順にケロッと歌う幼児向けの音楽あそびです。3種類の鳴き声を選び、葉っぱの間隔や演奏の速さを変えて、自分だけのリズムを作れます。',
+    },
+    intro: {
+      howToPlay: [
+        'かえるを えらんで はっぱを タップしよう',
+        'ほたるが きたら そこに いる かえるが うたうよ',
+        'はっぱを あけると ひとやすみ。ならべかえて きいてみよう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
