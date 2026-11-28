@@ -14,7 +14,7 @@ const water = materialCode('water') - 1
 const lava = materialCode('lava') - 1
 const portal = materialCode('portal') - 1
 /** よるに ゆらめく あかり。 */
-const lights = (['lamp', 'torch', 'jack'] as const).map(id => materialCode(id) - 1)
+const lights = (['lamp', 'torch', 'jack', 'candle'] as const).map(id => materialCode(id) - 1)
 
 /** まわりを すきまなく かくす ブロック（くさばな・すける ブロック・すきまの ある ブロック・ちいさな ブロックは かくさない）。 */
 const SOLID = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!m.plant && !m.passable && !m.cutout

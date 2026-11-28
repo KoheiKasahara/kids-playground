@@ -37,6 +37,7 @@ export default function CraftPanel({ crafted, onCraft, onClose, onSelect }: Prop
     nextFocus.focus({ preventScroll: true })
   }, [slots])
   const result = craftResult(slots)
+  const madeCount = RECIPES.filter(r => crafted.includes(r.result)).length
   const usable = (material: Material) => !isCrafted(material) || crafted.includes(material)
   const update = (next: Material[]) => {
     const dialog = panel.current
@@ -73,7 +74,13 @@ export default function CraftPanel({ crafted, onCraft, onClose, onSelect }: Prop
         </div>
       </div>
       <div className={`${styles.craftColumn} ${styles.craftRecipeColumn}`}>
-        <p className={styles.craftHint}>📖 レシピ（タッチすると ならべるよ）</p>
+        <p className={styles.craftHint}>
+          📖 レシピ（タッチで ならべるよ）
+          {/* つくった かず。ぜんぶ つくると トロフィー */}
+          <span className={styles.craftCount} aria-label={`つくった ブロック ${madeCount}こ（ぜんぶで ${RECIPES.length}こ）`}>
+            {madeCount === RECIPES.length ? '🏆' : '✓'} {madeCount}/{RECIPES.length}
+          </span>
+        </p>
         <div className={styles.recipes} role="group" aria-label="レシピ">
           {RECIPES.map(({ result: made, ingredients }) => {
             const done = crafted.includes(made)

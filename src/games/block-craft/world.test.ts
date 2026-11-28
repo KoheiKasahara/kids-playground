@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  arriveAt, blockAt, brushCells, createWorld, DEFAULT_WORLD, eatCake, editWorld as mutateWorld, explode, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key,
-  materialCode, MAX_BLAST_CHAIN, netMaterialChange, nextPortal, PALETTE, pickAs, portalGates, SPONGE_LIMIT, tendCrops as mutateCrops, toggleDoor, undoChanges, wheatAt,
+  arriveAt, blockAt, brushCells, createWorld, DEFAULT_WORLD, eatFood, editWorld as mutateWorld, explode, GIFT_SURPRISES, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree as mutateTree, inside, isStable, key,
+  materialCode, MAX_BLAST_CHAIN, netMaterialChange, nextPortal, openGift, PALETTE, pickAs, portalGates, SPONGE_LIMIT, tendCrops as mutateCrops, toggleDoor, undoChanges, wheatAt,
   settleWalker, stairsToward, startWalker, surfaceOf, topBlock, TREASURES, walk, World, type Block, type Material, type Position,
 } from './world'
 
+import { CRAFTED } from './recipes'
 import { decodeLegacyWorld as decodeWorld } from './saveCodec'
 
 const { size: SIZE, height: HEIGHT } = DEFAULT_WORLD
@@ -357,16 +358,42 @@ describe('blocks made at the crafting table', () => {
     for (let x = 1; x < SIZE - 1; x++) mutateWorld(field, { x, y: 3, z: 8 }, 'bomb', 'place')
     expect(explode(field, { x: 1, y: 3, z: 8 }).bombs).toHaveLength(MAX_BLAST_CHAIN)
   })
-  it('eats a cake in two bites', () => {
+  it('eats a cake in two bites and a cookie in one, but nothing else', () => {
     const world = createWorld()
-    const cake = { x: 8, y: 3, z: 8 }
+    const cake = { x: 8, y: 3, z: 8 }, cookie = { x: 9, y: 3, z: 8 }
     mutateWorld(world, cake, 'cake', 'place')
-    expect(eatCake(world, cake)).toHaveLength(1)
+    mutateWorld(world, cookie, 'cookie', 'place')
+    expect(eatFood(world, cake)).toHaveLength(1)
     expect(world.materialAt(cake)).toBe('cake_half')
     expect(pickAs('cake_half')).toBe('cake')
-    eatCake(world, cake)
+    eatFood(world, cake)
     expect(world.materialAt(cake)).toBeUndefined()
-    expect(eatCake(world, cake)).toEqual([])
+    expect(eatFood(world, cake)).toEqual([])
+    expect(eatFood(world, cookie)).toHaveLength(1)
+    expect(world.materialAt(cookie)).toBeUndefined()
+    expect(eatFood(world, { x: 8, y: 2, z: 8 })).toEqual([])
+    expect(world.materialAt({ x: 8, y: 2, z: 8 })).toBe('grass')
+  })
+  it('opens a gift into the block inside, and puts the gift back when undone', () => {
+    const world = createWorld()
+    const gift = { x: 8, y: 3, z: 8 }
+    mutateWorld(world, gift, 'gift', 'place')
+    const changes = openGift(world, gift, 'diamond')
+    expect(changes).toEqual([{ ...gift, before: materialCode('gift'), after: materialCode('diamond') }])
+    expect(world.materialAt(gift)).toBe('diamond')
+    // あいた あとは もう あかない。プレゼントで なければ なにも おきない
+    expect(openGift(world, gift, 'gold')).toEqual([])
+    expect(openGift(world, { x: 8, y: 2, z: 8 }, 'gold')).toEqual([])
+    undoChanges(world, changes)
+    expect(world.materialAt(gift)).toBe('gift')
+    // なかみは パレットに ある、その ばしょに とどまる ブロック（クラフトで つくる ものは でない）
+    const palette = new Set<Material>(PALETTE.map(m => m.id))
+    for (const surprise of GIFT_SURPRISES) {
+      const def = PALETTE.find(m => m.id === surprise)!
+      expect(palette.has(surprise)).toBe(true)
+      expect(CRAFTED).not.toContain(surprise)
+      expect('falls' in def || 'plant' in def || 'wool' in def).toBe(false)
+    }
   })
   it('takes a torch away with the ground under it, like other plants', () => {
     const world = createWorld()

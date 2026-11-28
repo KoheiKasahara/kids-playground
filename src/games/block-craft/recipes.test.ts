@@ -29,6 +29,9 @@ it('makes nothing from a partial, extra or unknown set', () => {
   expect(craftResult(['plank', 'plank', 'plank', 'plank'])).toBeNull()
   expect(craftResult(['stone', 'stone', 'stone'])).toBeNull()
   expect(craftResult(['lamp', 'wood'])).toBe('torch')
+  // つくった ブロックも ざいりょうに なる
+  expect(craftResult(['torch', 'honey'])).toBe('candle')
+  expect(craftResult(['snow', 'snow'])).toBeNull()
 })
 
 it('starts the palette with the crafting table and keeps every crafted block in it', () => {

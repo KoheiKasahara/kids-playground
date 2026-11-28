@@ -98,6 +98,13 @@ export const MATERIALS = [
   { id: 'carpet', label: 'じゅうたん', color: '#c94f6d', emoji: '🟥', height: 0.07, passable: true },
   { id: 'bookshelf', label: 'ほんだな', color: '#a8743f', emoji: '📚' },
   { id: 'hay', label: 'ほしくさ', color: '#d9b83a', emoji: '🟨' },
+  // クラフトで つくる：タッチすると あいさつ・おとが なる・なかから なにか でてくる・たべられる
+  { id: 'snowman', label: 'ゆきだるま', color: '#f4f8fc', emoji: '⛄', width: 0.8 },
+  { id: 'bell', label: 'ベル', color: '#f2c230', emoji: '🔔', width: 0.72, height: 0.78 },
+  { id: 'musicbox', label: 'オルゴール', color: '#8b5a3c', emoji: '🎶' },
+  { id: 'gift', label: 'プレゼント', color: '#e8505b', emoji: '🎁', width: 0.82, height: 0.82 },
+  { id: 'candle', label: 'ろうそく', color: '#fbefd0', emoji: '🕯️', plant: true, glow: true, width: 0.26, height: 0.45 },
+  { id: 'cookie', label: 'クッキー', color: '#d9a35f', emoji: '🍪', width: 0.72, height: 0.22 },
 ] as const satisfies readonly MaterialDef[]
 export const MATERIAL_DEFS: readonly MaterialDef[] = MATERIALS
 export type Material = typeof MATERIALS[number]['id']
@@ -557,11 +564,21 @@ export function toggleDoor(world: World, p: Position): Changes {
   })
 }
 
-/** ケーキを ひとくち たべる。2かい たべると なくなる。 */
-export function eatCake(world: World, p: Position): Changes {
-  const material = world.materialAt(p)
-  if (material !== 'cake' && material !== 'cake_half') return []
-  return world.change(write => write(p, material === 'cake' ? materialCode('cake_half') : 0), true)
+/** たべた あとに のこる もの（ケーキは 2かい、クッキーは 1かいで なくなる）。 */
+const BITES: Partial<Record<Material, number>> = { cake: materialCode('cake_half'), cake_half: 0, cookie: 0 }
+/** ケーキや クッキーを ひとくち たべる。 */
+export function eatFood(world: World, p: Position): Changes {
+  const left = BITES[world.materialAt(p) as Material]
+  if (left === undefined) return []
+  return world.change(write => write(p, left), true)
+}
+
+/** プレゼントを あけると でてくる ブロック（クラフトで つくる ものは でない）。 */
+export const GIFT_SURPRISES = ['diamond', 'gold', 'emerald', 'crystal', 'rainbow', 'chocolate', 'melon', 'pumpkin', 'sakura', 'honey'] as const satisfies readonly Material[]
+/** プレゼントを あける。なかの ブロックに かわる。 */
+export function openGift(world: World, p: Position, surprise: Material): Changes {
+  if (world.materialAt(p) !== 'gift') return []
+  return world.change(write => write(p, materialCode(surprise)), true)
 }
 
 const portal = materialCode('portal')
